@@ -7,6 +7,7 @@ import com.google.mlkit.vision.pose.PoseLandmark
 data class HangDetectionConfig(
     val wristShoulderMargin: Float = 0.06f,
     val missingPoseTimeoutMs: Long = 300L,
+    val partialPoseHoldMs: Long = 3000L,
     val stableSwitchMs: Long = 500L,
     val minToggleIntervalMs: Long = 1500L,
 )
@@ -22,6 +23,7 @@ class HangDetector(
 
     private var isHanging = false
     private var missingSinceMs: Long? = null
+    private var partialSinceMs: Long? = null
     private var candidateState: Boolean? = null
     private var candidateSinceMs: Long = 0L
     private var lastToggleMs: Long = 0L
@@ -33,6 +35,7 @@ class HangDetector(
     fun reset() {
         isHanging = false
         missingSinceMs = null
+        partialSinceMs = null
         candidateState = null
         candidateSinceMs = 0L
         lastToggleMs = 0L
@@ -65,21 +68,50 @@ class HangDetector(
     }
 
     private fun rawHangingState(frame: PoseFrame, nowMs: Long): Boolean {
-        if (!frame.posePresent) {
-            if (missingSinceMs == null) missingSinceMs = nowMs
-            val missingDuration = nowMs - (missingSinceMs ?: nowMs)
-            if (missingDuration > config.missingPoseTimeoutMs) {
-                return false
-            }
-            return isHanging
+        val shoulderY = frame.averageY(PoseLandmark.LEFT_SHOULDER, PoseLandmark.RIGHT_SHOULDER)
+        val wristY = frame.averageY(PoseLandmark.LEFT_WRIST, PoseLandmark.RIGHT_WRIST)
+        val canComputeHangNow = shoulderY != null && wristY != null && hasReliableUpperBodyPose(frame)
+
+        if (canComputeHangNow) {
+            missingSinceMs = null
+            partialSinceMs = null
+            return wristY < (shoulderY - config.wristShoulderMargin)
         }
-        missingSinceMs = null
-        if (!hasReliableUpperBodyPose(frame)) return false
 
-        val wristY = frame.averageY(PoseLandmark.LEFT_WRIST, PoseLandmark.RIGHT_WRIST) ?: return false
-        val shoulderY = frame.averageY(PoseLandmark.LEFT_SHOULDER, PoseLandmark.RIGHT_SHOULDER) ?: return false
+        // At top position, wrists can leave frame on door bars. Keep hanging briefly if upper body is still reliable.
+        if (isHanging && hasUpperBodyCore(frame)) {
+            if (partialSinceMs == null) partialSinceMs = nowMs
+            val partialDuration = nowMs - (partialSinceMs ?: nowMs)
+            if (partialDuration <= config.partialPoseHoldMs) {
+                return true
+            }
+        } else {
+            partialSinceMs = null
+        }
 
-        return wristY < (shoulderY - config.wristShoulderMargin)
+        if (missingSinceMs == null) missingSinceMs = nowMs
+        val missingDuration = nowMs - (missingSinceMs ?: nowMs)
+        if (missingDuration > config.missingPoseTimeoutMs) {
+            return false
+        }
+        return isHanging
+    }
+
+    private fun hasUpperBodyCore(frame: PoseFrame): Boolean {
+        val leftShoulder = frame.landmark(PoseLandmark.LEFT_SHOULDER)
+        val rightShoulder = frame.landmark(PoseLandmark.RIGHT_SHOULDER)
+        if (leftShoulder == null && rightShoulder == null) return false
+
+        val hasLeftElbow = frame.landmark(PoseLandmark.LEFT_ELBOW) != null
+        val hasRightElbow = frame.landmark(PoseLandmark.RIGHT_ELBOW) != null
+        if (!hasLeftElbow && !hasRightElbow) return false
+
+        if (leftShoulder != null && rightShoulder != null) {
+            val shoulderWidth = distance(leftShoulder, rightShoulder)
+            if (shoulderWidth < 0.08f) return false
+        }
+
+        return true
     }
 
     private fun hasReliableUpperBodyPose(frame: PoseFrame): Boolean {
