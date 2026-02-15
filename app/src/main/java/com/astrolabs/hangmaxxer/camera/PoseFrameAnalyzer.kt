@@ -13,11 +13,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 class PoseFrameAnalyzer(
     private val detectorWrapper: PoseDetectorWrapper,
     private val featureExtractor: PoseFeatureExtractor,
     private val minFrameIntervalMs: Long = 66L,
+    private val onFrameTick: (() -> Unit)? = null,
     private val onPoseFrame: (PoseFrame) -> Unit,
 ) : ImageAnalysis.Analyzer {
 
@@ -36,9 +38,11 @@ class PoseFrameAnalyzer(
             return
         }
         lastAnalyzedMs = now
+        onFrameTick?.invoke()
 
         val mediaImage = image.image
         if (mediaImage == null) {
+            Log.w(TAG, "ImageProxy had null mediaImage")
             isProcessing.set(false)
             image.close()
             return
@@ -51,7 +55,13 @@ class PoseFrameAnalyzer(
 
         scope.launch {
             try {
-                val pose = detectorWrapper.process(inputImage)
+                val pose = withTimeoutOrNull(DETECTOR_TIMEOUT_MS) {
+                    detectorWrapper.process(inputImage)
+                }
+                if (pose == null) {
+                    Log.w(TAG, "Pose detection timed out after ${DETECTOR_TIMEOUT_MS}ms")
+                    return@launch
+                }
                 val frame = featureExtractor.toPoseFrame(
                     pose = pose,
                     frameWidth = frameWidth,
@@ -74,5 +84,6 @@ class PoseFrameAnalyzer(
 
     companion object {
         private const val TAG = "PoseFrameAnalyzer"
+        private const val DETECTOR_TIMEOUT_MS = 1200L
     }
 }

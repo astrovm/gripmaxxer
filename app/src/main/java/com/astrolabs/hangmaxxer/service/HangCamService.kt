@@ -44,6 +44,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 class HangCamService : LifecycleService() {
 
@@ -73,9 +75,9 @@ class HangCamService : LifecycleService() {
     private var currentHangState = false
     private var currentReps = 0
     private var hangStartRealtimeMs = 0L
-    private var framesSinceTick = 0
     private var latestFps = 0
-    private var lastFrameRealtimeMs = 0L
+    private val rawFramesSinceTick = AtomicInteger(0)
+    private val lastFrameRealtimeMs = AtomicLong(0L)
     private var lastPosePresent = false
 
     override fun onCreate() {
@@ -87,6 +89,9 @@ class HangCamService : LifecycleService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Required so LifecycleService can dispatch STARTED state to its LifecycleOwner.
+        super.onStartCommand(intent, flags, startId)
+
         when (intent?.action) {
             ACTION_START -> {
                 startForegroundNow("Preparing camera pipeline")
@@ -117,9 +122,9 @@ class HangCamService : LifecycleService() {
         currentHangState = false
         currentReps = 0
         hangStartRealtimeMs = 0L
-        framesSinceTick = 0
         latestFps = 0
-        lastFrameRealtimeMs = 0L
+        rawFramesSinceTick.set(0)
+        lastFrameRealtimeMs.set(0L)
         lastPosePresent = false
         repCounter.reset()
         hangDetector.reset()
@@ -190,6 +195,10 @@ class HangCamService : LifecycleService() {
                 detectorWrapper = poseDetectorWrapper ?: return@launch,
                 featureExtractor = featureExtractor,
                 minFrameIntervalMs = 66L,
+                onFrameTick = {
+                    rawFramesSinceTick.incrementAndGet()
+                    lastFrameRealtimeMs.set(SystemClock.elapsedRealtime())
+                },
             ) { frame ->
                 serviceScope.launch {
                     processPoseFrame(frame)
@@ -220,9 +229,9 @@ class HangCamService : LifecycleService() {
         currentHangState = false
         currentReps = 0
         hangStartRealtimeMs = 0L
-        framesSinceTick = 0
         latestFps = 0
-        lastFrameRealtimeMs = 0L
+        rawFramesSinceTick.set(0)
+        lastFrameRealtimeMs.set(0L)
         lastPosePresent = false
 
         settingsJob?.cancel()
@@ -258,9 +267,6 @@ class HangCamService : LifecycleService() {
         frameMutex.withLock {
             if (!running) return
             val nowMs = System.currentTimeMillis()
-            val nowRealtimeMs = SystemClock.elapsedRealtime()
-            framesSinceTick += 1
-            lastFrameRealtimeMs = nowRealtimeMs
             lastPosePresent = frame.posePresent
 
             val hangResult = hangDetector.process(frame, nowMs)
@@ -299,8 +305,7 @@ class HangCamService : LifecycleService() {
         tickerJob?.cancel()
         tickerJob = serviceScope.launch {
             while (isActive && running) {
-                latestFps = framesSinceTick
-                framesSinceTick = 0
+                latestFps = rawFramesSinceTick.getAndSet(0)
                 publishStateAndNotification()
                 delay(1000L)
             }
@@ -313,8 +318,9 @@ class HangCamService : LifecycleService() {
         } else {
             0L
         }
-        val frameAgeMs = if (lastFrameRealtimeMs > 0L) {
-            SystemClock.elapsedRealtime() - lastFrameRealtimeMs
+        val lastFrameMs = lastFrameRealtimeMs.get()
+        val frameAgeMs = if (lastFrameMs > 0L) {
+            SystemClock.elapsedRealtime() - lastFrameMs
         } else {
             Long.MAX_VALUE
         }
