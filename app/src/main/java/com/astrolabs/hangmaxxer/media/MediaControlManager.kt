@@ -1,4 +1,4 @@
-package com.example.hangplaycam.media
+package com.astrolabs.hangmaxxer.media
 
 import android.content.ComponentName
 import android.content.Context

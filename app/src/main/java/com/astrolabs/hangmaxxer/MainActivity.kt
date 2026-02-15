@@ -1,12 +1,12 @@
-package com.example.hangplaycam
+package com.astrolabs.hangmaxxer
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.material3.MaterialTheme
-import com.example.hangplaycam.ui.MainScreen
-import com.example.hangplaycam.ui.MainViewModel
+import com.astrolabs.hangmaxxer.ui.MainScreen
+import com.astrolabs.hangmaxxer.ui.MainViewModel
 
 class MainActivity : ComponentActivity() {
 

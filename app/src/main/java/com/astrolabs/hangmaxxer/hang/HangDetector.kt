@@ -1,6 +1,6 @@
-package com.example.hangplaycam.hang
+package com.astrolabs.hangmaxxer.hang
 
-import com.example.hangplaycam.pose.PoseFrame
+import com.astrolabs.hangmaxxer.pose.PoseFrame
 import com.google.mlkit.vision.pose.PoseLandmark
 
 data class HangDetectionConfig(

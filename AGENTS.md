@@ -7,7 +7,7 @@ Guidance for coding agents working in this repository.
 - App name: `Hangmaxxer`
 - Platform: Android (Kotlin)
 - Module layout: single module `:app`
-- Package name: `com.example.hangplaycam` (do not rename unless explicitly requested)
+- Package name: `com.astrolabs.hangmaxxer` (do not rename unless explicitly requested)
 - UI: Jetpack Compose
 - Camera/ML: CameraX + ML Kit Pose Detection
 - Persistence: DataStore Preferences
@@ -25,9 +25,9 @@ Guidance for coding agents working in this repository.
 
 ## Important Files
 - Manifest: `app/src/main/AndroidManifest.xml`
-- Service: `app/src/main/java/com/example/hangplaycam/service/HangCamService.kt`
-- Main UI: `app/src/main/java/com/example/hangplaycam/ui/MainScreen.kt`
-- Settings: `app/src/main/java/com/example/hangplaycam/datastore/SettingsRepository.kt`
+- Service: `app/src/main/java/com/astrolabs/hangmaxxer/service/HangCamService.kt`
+- Main UI: `app/src/main/java/com/astrolabs/hangmaxxer/ui/MainScreen.kt`
+- Settings: `app/src/main/java/com/astrolabs/hangmaxxer/datastore/SettingsRepository.kt`
 - README: `README.md`
 
 ## Coding Guidelines

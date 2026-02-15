@@ -1,4 +1,4 @@
-package com.example.hangplaycam.ui
+package com.astrolabs.hangmaxxer.ui
 
 import android.Manifest
 import android.content.Intent
@@ -31,7 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.hangplaycam.reps.ExerciseMode
+import com.astrolabs.hangmaxxer.reps.ExerciseMode
 import java.util.Locale
 
 @Composable

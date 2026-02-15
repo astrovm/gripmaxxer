@@ -1,18 +1,18 @@
-package com.example.hangplaycam.ui
+package com.astrolabs.hangmaxxer.ui
 
 import android.app.Application
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.hangplaycam.datastore.AppSettings
-import com.example.hangplaycam.datastore.SettingsRepository
-import com.example.hangplaycam.media.MediaControlManager
-import com.example.hangplaycam.overlay.OverlayTimerManager
-import com.example.hangplaycam.reps.ExerciseMode
-import com.example.hangplaycam.service.HangCamService
-import com.example.hangplaycam.service.MonitoringSnapshot
-import com.example.hangplaycam.service.MonitoringStateStore
+import com.astrolabs.hangmaxxer.datastore.AppSettings
+import com.astrolabs.hangmaxxer.datastore.SettingsRepository
+import com.astrolabs.hangmaxxer.media.MediaControlManager
+import com.astrolabs.hangmaxxer.overlay.OverlayTimerManager
+import com.astrolabs.hangmaxxer.reps.ExerciseMode
+import com.astrolabs.hangmaxxer.service.HangCamService
+import com.astrolabs.hangmaxxer.service.MonitoringSnapshot
+import com.astrolabs.hangmaxxer.service.MonitoringStateStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

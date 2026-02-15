@@ -1,4 +1,4 @@
-package com.example.hangplaycam.overlay
+package com.astrolabs.hangmaxxer.overlay
 
 import android.content.Context
 import android.graphics.Color

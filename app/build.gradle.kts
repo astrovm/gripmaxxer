@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.hangplaycam"
+    namespace = "com.astrolabs.hangmaxxer"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.hangplaycam"
+        applicationId = "com.astrolabs.hangmaxxer"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

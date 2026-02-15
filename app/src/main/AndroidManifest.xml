@@ -19,6 +19,13 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Hangmaxxer">
 
+        <meta-data
+            android:name="com.astrolabs.hangmaxxer.DEVELOPER_NAME"
+            android:value="@string/developer_name" />
+        <meta-data
+            android:name="com.astrolabs.hangmaxxer.DEVELOPER_ID"
+            android:value="@string/developer_id" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true">

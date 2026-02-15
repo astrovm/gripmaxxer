@@ -1,4 +1,4 @@
-package com.example.hangplaycam.datastore
+package com.astrolabs.hangmaxxer.datastore
 
 data class AppSettings(
     val overlayEnabled: Boolean = true,

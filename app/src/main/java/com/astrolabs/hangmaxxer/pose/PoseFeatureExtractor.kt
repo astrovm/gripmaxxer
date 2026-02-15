@@ -1,4 +1,4 @@
-package com.example.hangplaycam.pose
+package com.astrolabs.hangmaxxer.pose
 
 import com.google.mlkit.vision.pose.Pose
 import com.google.mlkit.vision.pose.PoseLandmark

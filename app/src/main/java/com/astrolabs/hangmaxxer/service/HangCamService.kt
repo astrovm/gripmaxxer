@@ -1,4 +1,4 @@
-package com.example.hangplaycam.service
+package com.astrolabs.hangmaxxer.service
 
 import android.Manifest
 import android.app.NotificationChannel
@@ -15,22 +15,22 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleService
-import com.example.hangplaycam.MainActivity
-import com.example.hangplaycam.R
-import com.example.hangplaycam.camera.FrontCameraManager
-import com.example.hangplaycam.camera.PoseFrameAnalyzer
-import com.example.hangplaycam.datastore.AppSettings
-import com.example.hangplaycam.datastore.SettingsRepository
-import com.example.hangplaycam.hang.HangDetectionConfig
-import com.example.hangplaycam.hang.HangDetector
-import com.example.hangplaycam.media.MediaControlManager
-import com.example.hangplaycam.overlay.OverlayTimerManager
-import com.example.hangplaycam.pose.PoseDetectorWrapper
-import com.example.hangplaycam.pose.PoseFeatureExtractor
-import com.example.hangplaycam.pose.PoseFrame
-import com.example.hangplaycam.reps.ExerciseMode
-import com.example.hangplaycam.reps.RepCounter
-import com.example.hangplaycam.reps.RepCounterConfig
+import com.astrolabs.hangmaxxer.MainActivity
+import com.astrolabs.hangmaxxer.R
+import com.astrolabs.hangmaxxer.camera.FrontCameraManager
+import com.astrolabs.hangmaxxer.camera.PoseFrameAnalyzer
+import com.astrolabs.hangmaxxer.datastore.AppSettings
+import com.astrolabs.hangmaxxer.datastore.SettingsRepository
+import com.astrolabs.hangmaxxer.hang.HangDetectionConfig
+import com.astrolabs.hangmaxxer.hang.HangDetector
+import com.astrolabs.hangmaxxer.media.MediaControlManager
+import com.astrolabs.hangmaxxer.overlay.OverlayTimerManager
+import com.astrolabs.hangmaxxer.pose.PoseDetectorWrapper
+import com.astrolabs.hangmaxxer.pose.PoseFeatureExtractor
+import com.astrolabs.hangmaxxer.pose.PoseFrame
+import com.astrolabs.hangmaxxer.reps.ExerciseMode
+import com.astrolabs.hangmaxxer.reps.RepCounter
+import com.astrolabs.hangmaxxer.reps.RepCounterConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -378,8 +378,8 @@ class HangCamService : LifecycleService() {
     }
 
     companion object {
-        const val ACTION_START = "com.example.hangplaycam.action.START"
-        const val ACTION_STOP = "com.example.hangplaycam.action.STOP"
+        const val ACTION_START = "com.astrolabs.hangmaxxer.action.START"
+        const val ACTION_STOP = "com.astrolabs.hangmaxxer.action.STOP"
         const val EXTRA_MODE = "extra_mode"
 
         private const val NOTIFICATION_ID = 1001

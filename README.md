@@ -6,6 +6,8 @@ Hangmaxxer is an Android app (Kotlin + Compose) that uses the **front camera** a
 - Show an always-on-top numeric overlay stopwatch while hanging.
 - Count pull-up/chin-up reps during hanging sessions.
 
+Made by **Astro Labs** (`astrolabs`).
+
 ## What It Does
 - **HANGING** -> sends `play()` to the active media session.
 - **NOT HANGING** -> sends `pause()`.

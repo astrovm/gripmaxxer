@@ -1,7 +1,7 @@
-package com.example.hangplaycam.reps
+package com.astrolabs.hangmaxxer.reps
 
-import com.example.hangplaycam.pose.PoseFeatureExtractor
-import com.example.hangplaycam.pose.PoseFrame
+import com.astrolabs.hangmaxxer.pose.PoseFeatureExtractor
+import com.astrolabs.hangmaxxer.pose.PoseFrame
 
 enum class ExerciseMode(val label: String) {
     PULL_UP("Pull-up"),

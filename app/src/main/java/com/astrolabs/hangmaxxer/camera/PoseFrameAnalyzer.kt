@@ -1,10 +1,10 @@
-package com.example.hangplaycam.camera
+package com.astrolabs.hangmaxxer.camera
 
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
-import com.example.hangplaycam.pose.PoseDetectorWrapper
-import com.example.hangplaycam.pose.PoseFeatureExtractor
-import com.example.hangplaycam.pose.PoseFrame
+import com.astrolabs.hangmaxxer.pose.PoseDetectorWrapper
+import com.astrolabs.hangmaxxer.pose.PoseFeatureExtractor
+import com.astrolabs.hangmaxxer.pose.PoseFrame
 import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope

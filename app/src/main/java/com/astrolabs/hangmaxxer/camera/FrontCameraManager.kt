@@ -1,4 +1,4 @@
-package com.example.hangplaycam.camera
+package com.astrolabs.hangmaxxer.camera
 
 import android.content.Context
 import androidx.camera.core.CameraSelector

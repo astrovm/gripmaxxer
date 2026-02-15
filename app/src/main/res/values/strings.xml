@@ -5,4 +5,6 @@
     <string name="notification_title">Hangmaxxer monitoring</string>
     <string name="notification_listener_label">Hangmaxxer Notification Access</string>
     <string name="notification_stop">Stop monitoring</string>
+    <string name="developer_name">Astro Labs</string>
+    <string name="developer_id">astrolabs</string>
 </resources>

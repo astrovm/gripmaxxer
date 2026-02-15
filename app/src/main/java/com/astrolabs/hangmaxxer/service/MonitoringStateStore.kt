@@ -1,6 +1,6 @@
-package com.example.hangplaycam.service
+package com.astrolabs.hangmaxxer.service
 
-import com.example.hangplaycam.reps.ExerciseMode
+import com.astrolabs.hangmaxxer.reps.ExerciseMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
