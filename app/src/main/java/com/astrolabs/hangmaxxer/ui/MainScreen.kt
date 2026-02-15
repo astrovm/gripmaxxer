@@ -7,6 +7,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -66,11 +67,16 @@ fun MainScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Hangmaxxer", style = MaterialTheme.typography.headlineSmall)
+        Text(
+            text = "Hangmaxxer",
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onBackground
+        )
 
         StatusLine("Camera permission", uiState.permissions.cameraGranted)
         StatusLine("Notification access", uiState.permissions.notificationAccessEnabled)
@@ -81,14 +87,17 @@ fun MainScreen(
         Text(
             text = "Reps (${uiState.monitoring.mode.label}): ${uiState.monitoring.reps}",
             style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground
         )
         Text(
             text = "Elapsed hanging time: ${String.format(Locale.US, "%.1f", uiState.monitoring.elapsedHangMs / 1000f)} s",
             style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onBackground
         )
         Text(
             text = "Active media controller: ${uiState.monitoring.mediaControllerPackage ?: "none"}",
             style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onBackground
         )
 
         HorizontalDivider()
@@ -131,7 +140,11 @@ fun MainScreen(
             onToggle = viewModel::setPoseModeAccurate,
         )
 
-        Text("Exercise mode", style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = "Exercise mode",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ExerciseMode.entries.forEach { mode ->
                 FilterChip(
@@ -220,8 +233,8 @@ private fun StatusLine(label: String, value: Boolean) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text = label)
-        Text(text = if (value) "Yes" else "No")
+        Text(text = label, color = MaterialTheme.colorScheme.onBackground)
+        Text(text = if (value) "Yes" else "No", color = MaterialTheme.colorScheme.onBackground)
     }
 }
 
@@ -236,7 +249,11 @@ private fun SettingToggle(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, modifier = Modifier.weight(1f))
+        Text(
+            text = label,
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.onBackground
+        )
         Switch(
             checked = checked,
             onCheckedChange = onToggle,
@@ -257,8 +274,8 @@ private fun SettingSlider(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(text = title)
-            Text(text = displayValue)
+            Text(text = title, color = MaterialTheme.colorScheme.onBackground)
+            Text(text = displayValue, color = MaterialTheme.colorScheme.onBackground)
         }
         Slider(
             value = value,
