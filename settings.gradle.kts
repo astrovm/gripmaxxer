@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "HangPlayCam"
+rootProject.name = "Hangmaxxer"
 include(":app")

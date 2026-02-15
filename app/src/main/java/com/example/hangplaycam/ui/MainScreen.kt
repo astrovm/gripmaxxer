@@ -70,7 +70,7 @@ fun MainScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("HangPlayCam", style = MaterialTheme.typography.headlineSmall)
+        Text("Hangmaxxer", style = MaterialTheme.typography.headlineSmall)
 
         StatusLine("Camera permission", uiState.permissions.cameraGranted)
         StatusLine("Notification access", uiState.permissions.notificationAccessEnabled)

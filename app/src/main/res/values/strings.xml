@@ -1,7 +1,8 @@
 <resources>
-    <string name="app_name">HangPlayCam</string>
+    <string name="app_name">Hangmaxxer</string>
     <string name="notification_channel_name">Hang Monitoring</string>
     <string name="notification_channel_description">Foreground camera service for hang and rep detection</string>
-    <string name="notification_title">HangPlayCam monitoring</string>
+    <string name="notification_title">Hangmaxxer monitoring</string>
+    <string name="notification_listener_label">Hangmaxxer Notification Access</string>
     <string name="notification_stop">Stop monitoring</string>
 </resources>

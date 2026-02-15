@@ -1,6 +1,6 @@
-# HangPlayCam
+# Hangmaxxer
 
-HangPlayCam is an Android app (Kotlin + Compose) that uses the **front camera** and **ML Kit Pose Detection** to:
+Hangmaxxer is an Android app (Kotlin + Compose) that uses the **front camera** and **ML Kit Pose Detection** to:
 - Detect when you are hanging from a pull-up bar.
 - Send **system-wide media play/pause** commands through active MediaSession controllers.
 - Show an always-on-top numeric overlay stopwatch while hanging.
