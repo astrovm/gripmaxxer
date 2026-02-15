@@ -1,0 +1,403 @@
+package com.example.hangplaycam.service
+
+import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
+import android.os.Build
+import android.os.SystemClock
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.LifecycleService
+import com.example.hangplaycam.MainActivity
+import com.example.hangplaycam.R
+import com.example.hangplaycam.camera.FrontCameraManager
+import com.example.hangplaycam.camera.PoseFrameAnalyzer
+import com.example.hangplaycam.datastore.AppSettings
+import com.example.hangplaycam.datastore.SettingsRepository
+import com.example.hangplaycam.hang.HangDetectionConfig
+import com.example.hangplaycam.hang.HangDetector
+import com.example.hangplaycam.media.MediaControlManager
+import com.example.hangplaycam.overlay.OverlayTimerManager
+import com.example.hangplaycam.pose.PoseDetectorWrapper
+import com.example.hangplaycam.pose.PoseFeatureExtractor
+import com.example.hangplaycam.pose.PoseFrame
+import com.example.hangplaycam.reps.ExerciseMode
+import com.example.hangplaycam.reps.RepCounter
+import com.example.hangplaycam.reps.RepCounterConfig
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+class HangCamService : LifecycleService() {
+
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val frameMutex = Mutex()
+
+    private lateinit var settingsRepository: SettingsRepository
+    private lateinit var mediaControlManager: MediaControlManager
+
+    private var settingsJob: Job? = null
+    private var tickerJob: Job? = null
+    private var mediaStatusJob: Job? = null
+
+    private var frontCameraManager: FrontCameraManager? = null
+    private var poseDetectorWrapper: PoseDetectorWrapper? = null
+    private var frameAnalyzer: PoseFrameAnalyzer? = null
+    private var overlayTimerManager: OverlayTimerManager? = null
+
+    private val featureExtractor = PoseFeatureExtractor()
+    private val hangDetector = HangDetector()
+    private val repCounter = RepCounter(featureExtractor)
+
+    @Volatile
+    private var running = false
+    private var currentMode = ExerciseMode.PULL_UP
+    private var currentSettings = AppSettings()
+    private var currentHangState = false
+    private var currentReps = 0
+    private var hangStartRealtimeMs = 0L
+
+    override fun onCreate() {
+        super.onCreate()
+        settingsRepository = SettingsRepository(applicationContext)
+        mediaControlManager = MediaControlManager(applicationContext)
+        overlayTimerManager = OverlayTimerManager(applicationContext)
+        createNotificationChannel()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_START -> {
+                startForegroundNow("Preparing camera pipeline")
+                if (!running) {
+                    val modeRaw = intent.getStringExtra(EXTRA_MODE)
+                    currentMode = ExerciseMode.entries.firstOrNull { it.name == modeRaw } ?: ExerciseMode.PULL_UP
+                    startMonitoring()
+                }
+            }
+
+            ACTION_STOP -> {
+                stopMonitoring()
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+            }
+        }
+        return Service.START_NOT_STICKY
+    }
+
+    override fun onDestroy() {
+        stopMonitoring()
+        serviceScope.cancel()
+        super.onDestroy()
+    }
+
+    private fun startMonitoring() {
+        running = true
+        currentHangState = false
+        currentReps = 0
+        hangStartRealtimeMs = 0L
+        repCounter.reset()
+        hangDetector.reset()
+
+        MonitoringStateStore.update {
+            it.copy(
+                serviceRunning = true,
+                hanging = false,
+                reps = 0,
+                elapsedHangMs = 0L,
+                mode = currentMode,
+            )
+        }
+
+        settingsJob?.cancel()
+        settingsJob = serviceScope.launch {
+            settingsRepository.settingsFlow.collect { settings ->
+                currentSettings = settings
+                hangDetector.updateConfig(
+                    HangDetectionConfig(
+                        wristShoulderMargin = settings.wristShoulderMargin,
+                        missingPoseTimeoutMs = settings.missingPoseTimeoutMs,
+                    )
+                )
+                repCounter.updateConfig(
+                    RepCounterConfig(
+                        elbowUpAngle = settings.elbowUpAngle,
+                        elbowDownAngle = settings.elbowDownAngle,
+                        marginUp = settings.marginUp,
+                        marginDown = settings.marginDown,
+                        stableMs = settings.stableMs,
+                        minRepIntervalMs = settings.minRepIntervalMs,
+                    )
+                )
+                poseDetectorWrapper?.setAccurateMode(settings.poseModeAccurate)
+            }
+        }
+
+        mediaControlManager.start()
+        mediaStatusJob?.cancel()
+        mediaStatusJob = serviceScope.launch {
+            mediaControlManager.status.collect { status ->
+                MonitoringStateStore.update {
+                    it.copy(
+                        hasMediaController = status.hasController,
+                        mediaControllerPackage = status.controllerPackage,
+                    )
+                }
+            }
+        }
+
+        serviceScope.launch {
+            if (!hasCameraPermission()) {
+                running = false
+                MonitoringStateStore.update { it.copy(serviceRunning = false) }
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+                return@launch
+            }
+
+            currentSettings = settingsRepository.settingsFlow.first()
+            poseDetectorWrapper = PoseDetectorWrapper(currentSettings.poseModeAccurate)
+
+            val analyzer = PoseFrameAnalyzer(
+                detectorWrapper = poseDetectorWrapper ?: return@launch,
+                featureExtractor = featureExtractor,
+                minFrameIntervalMs = 66L,
+            ) { frame ->
+                serviceScope.launch {
+                    processPoseFrame(frame)
+                }
+            }
+            frameAnalyzer = analyzer
+
+            val cameraManager = FrontCameraManager(applicationContext, this@HangCamService)
+            frontCameraManager = cameraManager
+            try {
+                cameraManager.start(analyzer)
+            } catch (_: Exception) {
+                stopMonitoring()
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+                return@launch
+            }
+
+            startTicker()
+        }
+    }
+
+    private fun stopMonitoring() {
+        if (!running) return
+
+        running = false
+        currentHangState = false
+        currentReps = 0
+        hangStartRealtimeMs = 0L
+
+        settingsJob?.cancel()
+        settingsJob = null
+
+        tickerJob?.cancel()
+        tickerJob = null
+
+        mediaStatusJob?.cancel()
+        mediaStatusJob = null
+
+        frameAnalyzer?.stop()
+        frameAnalyzer = null
+
+        frontCameraManager?.stop()
+        frontCameraManager = null
+
+        serviceScope.launch {
+            poseDetectorWrapper?.close()
+            poseDetectorWrapper = null
+        }
+
+        mediaControlManager.stop()
+
+        overlayTimerManager?.onHangStateChanged(false)
+        overlayTimerManager?.release()
+        overlayTimerManager = OverlayTimerManager(applicationContext)
+
+        MonitoringStateStore.reset()
+    }
+
+    private suspend fun processPoseFrame(frame: PoseFrame) {
+        frameMutex.withLock {
+            if (!running) return
+            val nowMs = System.currentTimeMillis()
+
+            val hangResult = hangDetector.process(frame, nowMs)
+            if (hangResult.transitioned) {
+                if (hangResult.isHanging) {
+                    currentHangState = true
+                    hangStartRealtimeMs = SystemClock.elapsedRealtime()
+                    if (currentSettings.overlayEnabled && OverlayTimerManager.isOverlayPermissionGranted(applicationContext)) {
+                        overlayTimerManager?.onHangStateChanged(true)
+                    }
+                    mediaControlManager.play()
+                } else {
+                    currentHangState = false
+                    hangStartRealtimeMs = 0L
+                    overlayTimerManager?.onHangStateChanged(false)
+                    mediaControlManager.pause()
+                }
+            }
+
+            val repResult = repCounter.process(
+                frame = frame,
+                hanging = currentHangState,
+                nowMs = nowMs,
+            )
+            currentReps = repResult.reps
+
+            if (repResult.repEvent && currentSettings.overlayEnabled) {
+                overlayTimerManager?.onRepEvent(currentReps)
+            }
+
+            publishStateAndNotification()
+        }
+    }
+
+    private fun startTicker() {
+        tickerJob?.cancel()
+        tickerJob = serviceScope.launch {
+            while (isActive && running) {
+                publishStateAndNotification()
+                delay(1000L)
+            }
+        }
+    }
+
+    private fun publishStateAndNotification() {
+        val elapsedMs = if (currentHangState && hangStartRealtimeMs > 0L) {
+            SystemClock.elapsedRealtime() - hangStartRealtimeMs
+        } else {
+            0L
+        }
+
+        MonitoringStateStore.update {
+            it.copy(
+                serviceRunning = running,
+                hanging = currentHangState,
+                reps = currentReps,
+                elapsedHangMs = elapsedMs,
+                mode = currentMode,
+            )
+        }
+
+        NotificationManagerCompat.from(this).notify(
+            NOTIFICATION_ID,
+            buildNotification(
+                text = "${if (currentHangState) "HANGING" else "NOT HANGING"} | Reps: $currentReps | ${formatSeconds(elapsedMs)}s"
+            )
+        )
+    }
+
+    private fun startForegroundNow(text: String) {
+        val notification = buildNotification(text)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA,
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
+    }
+
+    private fun buildNotification(text: String): android.app.Notification {
+        val openIntent = PendingIntent.getActivity(
+            this,
+            1,
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+
+        val stopIntent = PendingIntent.getService(
+            this,
+            2,
+            Intent(this, HangCamService::class.java).apply {
+                action = ACTION_STOP
+            },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+
+        return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle(getString(R.string.notification_title))
+            .setContentText(text)
+            .setContentIntent(openIntent)
+            .setOnlyAlertOnce(true)
+            .setOngoing(true)
+            .addAction(0, getString(R.string.notification_stop), stopIntent)
+            .build()
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+
+        val channel = NotificationChannel(
+            NOTIFICATION_CHANNEL_ID,
+            getString(R.string.notification_channel_name),
+            NotificationManager.IMPORTANCE_LOW,
+        ).apply {
+            description = getString(R.string.notification_channel_description)
+            setShowBadge(false)
+        }
+
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(channel)
+    }
+
+    private fun hasCameraPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun formatSeconds(ms: Long): String {
+        return String.format(java.util.Locale.US, "%.1f", ms / 1000f)
+    }
+
+    companion object {
+        const val ACTION_START = "com.example.hangplaycam.action.START"
+        const val ACTION_STOP = "com.example.hangplaycam.action.STOP"
+        const val EXTRA_MODE = "extra_mode"
+
+        private const val NOTIFICATION_ID = 1001
+        private const val NOTIFICATION_CHANNEL_ID = "hang_monitoring"
+
+        fun start(context: Context, mode: ExerciseMode) {
+            val intent = Intent(context, HangCamService::class.java).apply {
+                action = ACTION_START
+                putExtra(EXTRA_MODE, mode.name)
+            }
+            ContextCompat.startForegroundService(context, intent)
+        }
+
+        fun stop(context: Context) {
+            val intent = Intent(context, HangCamService::class.java).apply {
+                action = ACTION_STOP
+            }
+            context.startService(intent)
+        }
+    }
+}
