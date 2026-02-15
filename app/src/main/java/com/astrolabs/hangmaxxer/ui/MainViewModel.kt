@@ -93,48 +93,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun setPoseModeAccurate(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setPoseModeAccurate(enabled)
-        }
-    }
-
-    fun setWristShoulderMargin(value: Float) {
-        viewModelScope.launch {
-            settingsRepository.setWristShoulderMargin(value)
-        }
-    }
-
-    fun setMissingPoseTimeoutMs(value: Long) {
-        viewModelScope.launch {
-            settingsRepository.setMissingPoseTimeoutMs(value)
-        }
-    }
-
-    fun setMarginUp(value: Float) {
-        viewModelScope.launch {
-            settingsRepository.setMarginUp(value)
-        }
-    }
-
-    fun setMarginDown(value: Float) {
-        viewModelScope.launch {
-            settingsRepository.setMarginDown(value)
-        }
-    }
-
-    fun setElbowUpAngle(value: Float) {
-        viewModelScope.launch {
-            settingsRepository.setElbowUpAngle(value)
-        }
-    }
-
-    fun setElbowDownAngle(value: Float) {
-        viewModelScope.launch {
-            settingsRepository.setElbowDownAngle(value)
-        }
-    }
-
     fun startMonitoring() {
         HangCamService.start(appContext)
     }

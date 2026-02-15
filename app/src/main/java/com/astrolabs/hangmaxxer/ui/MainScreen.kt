@@ -21,9 +21,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -71,183 +72,213 @@ fun MainScreen(
         }
     }
 
+    val notificationsEnabled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        NotificationManagerCompat.from(context).areNotificationsEnabled()
+    } else {
+        true
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(16.dp)
+            .padding(bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Text(
             text = "Hangmaxxer",
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onBackground
         )
-
-        StatusLine("Camera permission", uiState.permissions.cameraGranted)
-        StatusLine("Notification access", uiState.permissions.notificationAccessEnabled)
-        StatusLine("Overlay permission", uiState.permissions.overlayPermissionGranted)
-        StatusLine("Service running", uiState.monitoring.serviceRunning)
-        StatusLine("Hang state", uiState.monitoring.hanging)
-        StatusLine("Pose present", uiState.monitoring.posePresent)
-
         Text(
-            text = "Reps (${uiState.monitoring.mode.label}): ${uiState.monitoring.reps}",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            text = "Elapsed hanging time: ${String.format(Locale.US, "%.1f", uiState.monitoring.elapsedHangMs / 1000f)} s",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            text = "Active media controller: ${uiState.monitoring.mediaControllerPackage ?: "none"}",
+            text = "Real-time hang monitoring with automatic pull-up/chin-up detection.",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            text = "Camera frames: ${uiState.monitoring.cameraFps} fps",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            text = if (uiState.monitoring.lastFrameAgeMs == Long.MAX_VALUE) {
-                "Last frame: no frames yet"
-            } else {
-                "Last frame: ${uiState.monitoring.lastFrameAgeMs} ms ago"
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onBackground
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        HorizontalDivider()
-
-        Button(
-            onClick = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text("Grant Camera Permission")
-        }
-
-        Button(
-            onClick = { openNotificationAccessSettings() },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text("Open Notification Access Settings")
-        }
-
-        SettingToggle(
-            label = "Enable overlay stopwatch",
-            checked = uiState.settings.overlayEnabled,
-            onToggle = { enabled ->
-                viewModel.setOverlayEnabled(enabled)
-                if (enabled && !uiState.permissions.overlayPermissionGranted) {
-                    openOverlaySettings()
-                }
-            },
-        )
-
-        Button(
-            onClick = { openOverlaySettings() },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text("Request Overlay Permission")
-        }
-
-        SettingToggle(
-            label = "Pose mode accurate (FAST off)",
-            checked = uiState.settings.poseModeAccurate,
-            onToggle = viewModel::setPoseModeAccurate,
-        )
-
-        SettingToggle(
-            label = "Show camera preview + tracking",
-            checked = uiState.showCameraPreview,
-            onToggle = viewModel::setShowCameraPreview,
-        )
-
-        if (uiState.showCameraPreview) {
-            val frame = uiState.cameraPreviewFrame
-            if (frame != null) {
-                CameraPreviewWithTracking(frame = frame)
-            } else {
+        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 Text(
-                    text = "No camera frames yet. Keep monitoring active and stay on this screen.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onBackground
+                    text = "Live Overview",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Detected mode: ${uiState.monitoring.mode.label}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Reps: ${uiState.monitoring.reps}",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    MetricTile(
+                        label = "Hang Time",
+                        value = formatDuration(uiState.monitoring.elapsedHangMs),
+                        modifier = Modifier.weight(1f),
+                    )
+                    MetricTile(
+                        label = "Camera FPS",
+                        value = uiState.monitoring.cameraFps.toString(),
+                        modifier = Modifier.weight(1f),
+                    )
+                    MetricTile(
+                        label = "Last Frame",
+                        value = formatLastFrameAge(uiState.monitoring.lastFrameAgeMs),
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                HorizontalDivider()
+                StatusLine("Monitoring service", uiState.monitoring.serviceRunning)
+                StatusLine("Hang state", uiState.monitoring.hanging)
+                StatusLine("Pose detected", uiState.monitoring.posePresent)
+                StatusLine("Notifications enabled", notificationsEnabled)
+            }
+        }
+
+        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    text = "Controls",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Button(
+                    onClick = { viewModel.startMonitoring() },
+                    enabled = uiState.permissions.cameraGranted,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Start Monitoring")
+                }
+                OutlinedButton(
+                    onClick = { viewModel.stopMonitoring() },
+                    enabled = uiState.monitoring.serviceRunning,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Stop Monitoring")
+                }
+                Text(
+                    text = "Active media source: ${uiState.monitoring.mediaControllerPackage ?: "Not connected"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
 
-        SettingSlider(
-            title = "wristShoulderMargin",
-            value = uiState.settings.wristShoulderMargin,
-            valueRange = 0.02f..0.15f,
-            displayValue = String.format(Locale.US, "%.3f", uiState.settings.wristShoulderMargin),
-            onValueChange = viewModel::setWristShoulderMargin,
-        )
-
-        SettingSlider(
-            title = "missingPoseTimeoutMs",
-            value = uiState.settings.missingPoseTimeoutMs.toFloat(),
-            valueRange = 100f..800f,
-            displayValue = "${uiState.settings.missingPoseTimeoutMs.toInt()} ms",
-            onValueChange = { viewModel.setMissingPoseTimeoutMs(it.toLong()) },
-        )
-
-        SettingSlider(
-            title = "marginUp",
-            value = uiState.settings.marginUp,
-            valueRange = 0.01f..0.20f,
-            displayValue = String.format(Locale.US, "%.3f", uiState.settings.marginUp),
-            onValueChange = viewModel::setMarginUp,
-        )
-
-        SettingSlider(
-            title = "marginDown",
-            value = uiState.settings.marginDown,
-            valueRange = 0.01f..0.20f,
-            displayValue = String.format(Locale.US, "%.3f", uiState.settings.marginDown),
-            onValueChange = viewModel::setMarginDown,
-        )
-
-        SettingSlider(
-            title = "elbowUpAngle",
-            value = uiState.settings.elbowUpAngle,
-            valueRange = 70f..150f,
-            displayValue = String.format(Locale.US, "%.1f°", uiState.settings.elbowUpAngle),
-            onValueChange = viewModel::setElbowUpAngle,
-        )
-
-        SettingSlider(
-            title = "elbowDownAngle",
-            value = uiState.settings.elbowDownAngle,
-            valueRange = 130f..180f,
-            displayValue = String.format(Locale.US, "%.1f°", uiState.settings.elbowDownAngle),
-            onValueChange = viewModel::setElbowDownAngle,
-        )
-
-        Button(
-            onClick = { viewModel.startMonitoring() },
-            enabled = uiState.permissions.cameraGranted,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text("Start monitoring")
+        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    text = "Permissions",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                StatusLine("Camera permission", uiState.permissions.cameraGranted)
+                if (!uiState.permissions.cameraGranted) {
+                    Button(
+                        onClick = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Grant Camera Permission")
+                    }
+                }
+                StatusLine("Notification access", uiState.permissions.notificationAccessEnabled)
+                if (!uiState.permissions.notificationAccessEnabled) {
+                    Button(
+                        onClick = { openNotificationAccessSettings() },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Open Notification Access Settings")
+                    }
+                }
+                StatusLine("Overlay permission", uiState.permissions.overlayPermissionGranted)
+                if (uiState.settings.overlayEnabled && !uiState.permissions.overlayPermissionGranted) {
+                    OutlinedButton(
+                        onClick = { openOverlaySettings() },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Grant Overlay Permission")
+                    }
+                }
+            }
         }
 
-        Button(
-            onClick = { viewModel.stopMonitoring() },
-            enabled = uiState.monitoring.serviceRunning,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text("Stop monitoring")
+        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    text = "Preferences",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                SettingToggle(
+                    label = "Show floating overlay timer",
+                    checked = uiState.settings.overlayEnabled,
+                    onToggle = { enabled ->
+                        viewModel.setOverlayEnabled(enabled)
+                        if (enabled && !uiState.permissions.overlayPermissionGranted) {
+                            openOverlaySettings()
+                        }
+                    },
+                )
+                SettingToggle(
+                    label = "Show live camera preview",
+                    checked = uiState.showCameraPreview,
+                    onToggle = viewModel::setShowCameraPreview,
+                )
+            }
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val notificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
-            StatusLine("Notifications enabled", notificationsEnabled)
+        if (uiState.showCameraPreview) {
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(
+                        text = "Live Camera Preview",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    val frame = uiState.cameraPreviewFrame
+                    if (frame != null) {
+                        CameraPreviewWithTracking(frame = frame)
+                    } else {
+                        Text(
+                            text = "Waiting for camera frames. Start monitoring and keep this screen open.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -259,8 +290,15 @@ private fun StatusLine(label: String, value: Boolean) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text = label, color = MaterialTheme.colorScheme.onBackground)
-        Text(text = if (value) "Yes" else "No", color = MaterialTheme.colorScheme.onBackground)
+        Text(text = label, color = MaterialTheme.colorScheme.onSurface)
+        Text(
+            text = if (value) "Ready" else "Needs action",
+            color = if (value) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.error
+            }
+        )
     }
 }
 
@@ -278,7 +316,7 @@ private fun SettingToggle(
         Text(
             text = label,
             modifier = Modifier.weight(1f),
-            color = MaterialTheme.colorScheme.onBackground
+            color = MaterialTheme.colorScheme.onSurface
         )
         Switch(
             checked = checked,
@@ -288,25 +326,29 @@ private fun SettingToggle(
 }
 
 @Composable
-private fun SettingSlider(
-    title: String,
-    value: Float,
-    valueRange: ClosedFloatingPointRange<Float>,
-    displayValue: String,
-    onValueChange: (Float) -> Unit,
+private fun MetricTile(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(text = title, color = MaterialTheme.colorScheme.onBackground)
-            Text(text = displayValue, color = MaterialTheme.colorScheme.onBackground)
-        }
-        Slider(
-            value = value,
-            valueRange = valueRange,
-            onValueChange = onValueChange,
+    Column(
+        modifier = modifier
+            .background(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = MaterialTheme.shapes.small,
+            )
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }
@@ -340,4 +382,19 @@ private fun CameraPreviewWithTracking(frame: DebugPreviewFrame) {
             }
         }
     }
+}
+
+private fun formatLastFrameAge(lastFrameAgeMs: Long): String {
+    return if (lastFrameAgeMs == Long.MAX_VALUE) {
+        "No frames"
+    } else {
+        "${lastFrameAgeMs}ms"
+    }
+}
+
+private fun formatDuration(elapsedMs: Long): String {
+    val totalSeconds = (elapsedMs / 1000L).coerceAtLeast(0L)
+    val minutes = totalSeconds / 60L
+    val seconds = totalSeconds % 60L
+    return String.format(Locale.US, "%d:%02d", minutes, seconds)
 }
