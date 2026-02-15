@@ -11,6 +11,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.SystemClock
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -72,6 +73,10 @@ class HangCamService : LifecycleService() {
     private var currentHangState = false
     private var currentReps = 0
     private var hangStartRealtimeMs = 0L
+    private var framesSinceTick = 0
+    private var latestFps = 0
+    private var lastFrameRealtimeMs = 0L
+    private var lastPosePresent = false
 
     override fun onCreate() {
         super.onCreate()
@@ -112,6 +117,10 @@ class HangCamService : LifecycleService() {
         currentHangState = false
         currentReps = 0
         hangStartRealtimeMs = 0L
+        framesSinceTick = 0
+        latestFps = 0
+        lastFrameRealtimeMs = 0L
+        lastPosePresent = false
         repCounter.reset()
         hangDetector.reset()
 
@@ -121,6 +130,9 @@ class HangCamService : LifecycleService() {
                 hanging = false,
                 reps = 0,
                 elapsedHangMs = 0L,
+                cameraFps = 0,
+                posePresent = false,
+                lastFrameAgeMs = Long.MAX_VALUE,
                 mode = currentMode,
             )
         }
@@ -189,7 +201,8 @@ class HangCamService : LifecycleService() {
             frontCameraManager = cameraManager
             try {
                 cameraManager.start(analyzer)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start camera monitoring", e)
                 stopMonitoring()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
@@ -207,6 +220,10 @@ class HangCamService : LifecycleService() {
         currentHangState = false
         currentReps = 0
         hangStartRealtimeMs = 0L
+        framesSinceTick = 0
+        latestFps = 0
+        lastFrameRealtimeMs = 0L
+        lastPosePresent = false
 
         settingsJob?.cancel()
         settingsJob = null
@@ -241,6 +258,10 @@ class HangCamService : LifecycleService() {
         frameMutex.withLock {
             if (!running) return
             val nowMs = System.currentTimeMillis()
+            val nowRealtimeMs = SystemClock.elapsedRealtime()
+            framesSinceTick += 1
+            lastFrameRealtimeMs = nowRealtimeMs
+            lastPosePresent = frame.posePresent
 
             val hangResult = hangDetector.process(frame, nowMs)
             if (hangResult.transitioned) {
@@ -278,6 +299,8 @@ class HangCamService : LifecycleService() {
         tickerJob?.cancel()
         tickerJob = serviceScope.launch {
             while (isActive && running) {
+                latestFps = framesSinceTick
+                framesSinceTick = 0
                 publishStateAndNotification()
                 delay(1000L)
             }
@@ -290,6 +313,11 @@ class HangCamService : LifecycleService() {
         } else {
             0L
         }
+        val frameAgeMs = if (lastFrameRealtimeMs > 0L) {
+            SystemClock.elapsedRealtime() - lastFrameRealtimeMs
+        } else {
+            Long.MAX_VALUE
+        }
 
         MonitoringStateStore.update {
             it.copy(
@@ -297,6 +325,9 @@ class HangCamService : LifecycleService() {
                 hanging = currentHangState,
                 reps = currentReps,
                 elapsedHangMs = elapsedMs,
+                cameraFps = latestFps,
+                posePresent = lastPosePresent,
+                lastFrameAgeMs = frameAgeMs,
                 mode = currentMode,
             )
         }
@@ -304,7 +335,7 @@ class HangCamService : LifecycleService() {
         NotificationManagerCompat.from(this).notify(
             NOTIFICATION_ID,
             buildNotification(
-                text = "${if (currentHangState) "HANGING" else "NOT HANGING"} | Reps: $currentReps | ${formatSeconds(elapsedMs)}s"
+                text = "${if (currentHangState) "HANGING" else "NOT HANGING"} | Reps: $currentReps | ${formatSeconds(elapsedMs)}s | Cam:${latestFps}fps ${if (lastPosePresent) "pose" else "no-pose"}"
             )
         )
     }
@@ -378,6 +409,7 @@ class HangCamService : LifecycleService() {
     }
 
     companion object {
+        private const val TAG = "HangCamService"
         const val ACTION_START = "com.astrolabs.hangmaxxer.action.START"
         const val ACTION_STOP = "com.astrolabs.hangmaxxer.action.STOP"
         const val EXTRA_MODE = "extra_mode"

@@ -36,14 +36,10 @@ class PoseFeatureExtractor {
             landmarks.containsKey(PoseLandmark.RIGHT_SHOULDER)
         val wristsPresent = landmarks.containsKey(PoseLandmark.LEFT_WRIST) ||
             landmarks.containsKey(PoseLandmark.RIGHT_WRIST)
-        val facePresent = landmarks.containsKey(PoseLandmark.NOSE) ||
-            landmarks.containsKey(PoseLandmark.LEFT_MOUTH) ||
-            landmarks.containsKey(PoseLandmark.RIGHT_MOUTH)
-
         return PoseFrame(
             landmarks = landmarks,
             timestampMs = timestampMs,
-            posePresent = shouldersPresent && wristsPresent && facePresent,
+            posePresent = shouldersPresent && wristsPresent,
         )
     }
 

@@ -4,6 +4,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.pose.Pose
 import com.google.mlkit.vision.pose.PoseDetection
 import com.google.mlkit.vision.pose.PoseDetector
+import com.google.mlkit.vision.pose.PoseDetectorOptionsBase
 import com.google.mlkit.vision.pose.defaults.PoseDetectorOptions
 import com.google.mlkit.vision.pose.accurate.AccuratePoseDetectorOptions
 import kotlinx.coroutines.sync.Mutex
@@ -41,11 +42,13 @@ class PoseDetectorWrapper(initialAccurateMode: Boolean = false) {
         return if (accurate) {
             val options = AccuratePoseDetectorOptions.Builder()
                 .setDetectorMode(AccuratePoseDetectorOptions.STREAM_MODE)
+                .setPreferredHardwareConfigs(PoseDetectorOptionsBase.CPU)
                 .build()
             PoseDetection.getClient(options)
         } else {
             val options = PoseDetectorOptions.Builder()
                 .setDetectorMode(PoseDetectorOptions.STREAM_MODE)
+                .setPreferredHardwareConfigs(PoseDetectorOptionsBase.CPU)
                 .build()
             PoseDetection.getClient(options)
         }

@@ -1,5 +1,6 @@
 package com.astrolabs.hangmaxxer.camera
 
+import android.util.Log
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import com.astrolabs.hangmaxxer.pose.PoseDetectorWrapper
@@ -58,8 +59,8 @@ class PoseFrameAnalyzer(
                     timestampMs = now,
                 )
                 onPoseFrame(frame)
-            } catch (_: Exception) {
-                // Ignore single-frame failures; stream should continue.
+            } catch (e: Exception) {
+                Log.e(TAG, "Pose frame analysis failed", e)
             } finally {
                 isProcessing.set(false)
                 image.close()
@@ -69,5 +70,9 @@ class PoseFrameAnalyzer(
 
     fun stop() {
         scope.cancel()
+    }
+
+    companion object {
+        private const val TAG = "PoseFrameAnalyzer"
     }
 }

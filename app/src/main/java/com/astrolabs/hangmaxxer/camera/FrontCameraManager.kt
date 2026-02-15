@@ -1,13 +1,17 @@
 package com.astrolabs.hangmaxxer.camera
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.lifecycle.LifecycleOwner
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -25,8 +29,6 @@ class FrontCameraManager(
             cameraProvider = it
         }
 
-        provider.unbindAll()
-
         val executor = Executors.newSingleThreadExecutor().also { cameraExecutor = it }
         val imageAnalysis = ImageAnalysis.Builder()
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
@@ -37,17 +39,29 @@ class FrontCameraManager(
 
         analysisUseCase = imageAnalysis
 
-        provider.bindToLifecycle(
-            lifecycleOwner,
-            CameraSelector.DEFAULT_FRONT_CAMERA,
-            imageAnalysis,
-        )
+        withContext(Dispatchers.Main.immediate) {
+            provider.unbindAll()
+            provider.bindToLifecycle(
+                lifecycleOwner,
+                CameraSelector.DEFAULT_FRONT_CAMERA,
+                imageAnalysis,
+            )
+        }
     }
 
     fun stop() {
         analysisUseCase?.clearAnalyzer()
         analysisUseCase = null
-        cameraProvider?.unbindAll()
+        val provider = cameraProvider
+        if (provider != null) {
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                provider.unbindAll()
+            } else {
+                Handler(Looper.getMainLooper()).post {
+                    provider.unbindAll()
+                }
+            }
+        }
         cameraExecutor?.shutdownNow()
         cameraExecutor = null
     }

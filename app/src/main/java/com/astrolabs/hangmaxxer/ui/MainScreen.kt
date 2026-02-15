@@ -83,6 +83,7 @@ fun MainScreen(
         StatusLine("Overlay permission", uiState.permissions.overlayPermissionGranted)
         StatusLine("Service running", uiState.monitoring.serviceRunning)
         StatusLine("Hang state", uiState.monitoring.hanging)
+        StatusLine("Pose present", uiState.monitoring.posePresent)
 
         Text(
             text = "Reps (${uiState.monitoring.mode.label}): ${uiState.monitoring.reps}",
@@ -96,6 +97,20 @@ fun MainScreen(
         )
         Text(
             text = "Active media controller: ${uiState.monitoring.mediaControllerPackage ?: "none"}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Text(
+            text = "Camera frames: ${uiState.monitoring.cameraFps} fps",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Text(
+            text = if (uiState.monitoring.lastFrameAgeMs == Long.MAX_VALUE) {
+                "Last frame: no frames yet"
+            } else {
+                "Last frame: ${uiState.monitoring.lastFrameAgeMs} ms ago"
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onBackground
         )
