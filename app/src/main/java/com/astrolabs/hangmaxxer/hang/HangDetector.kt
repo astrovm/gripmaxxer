@@ -85,21 +85,35 @@ class HangDetector(
     private fun hasReliableUpperBodyPose(frame: PoseFrame): Boolean {
         val leftShoulder = frame.landmark(PoseLandmark.LEFT_SHOULDER) ?: return false
         val rightShoulder = frame.landmark(PoseLandmark.RIGHT_SHOULDER) ?: return false
-        val leftElbow = frame.landmark(PoseLandmark.LEFT_ELBOW) ?: return false
-        val rightElbow = frame.landmark(PoseLandmark.RIGHT_ELBOW) ?: return false
-        val leftWrist = frame.landmark(PoseLandmark.LEFT_WRIST) ?: return false
-        val rightWrist = frame.landmark(PoseLandmark.RIGHT_WRIST) ?: return false
 
         val shoulderWidth = distance(leftShoulder, rightShoulder)
-        if (shoulderWidth < 0.12f) return false
+        if (shoulderWidth < 0.10f) return false
 
-        val wristWidth = distance(leftWrist, rightWrist)
-        if (wristWidth < shoulderWidth * 0.55f || wristWidth > shoulderWidth * 2.6f) return false
+        val leftElbow = frame.landmark(PoseLandmark.LEFT_ELBOW)
+        val rightElbow = frame.landmark(PoseLandmark.RIGHT_ELBOW)
+        val leftWrist = frame.landmark(PoseLandmark.LEFT_WRIST)
+        val rightWrist = frame.landmark(PoseLandmark.RIGHT_WRIST)
 
-        val leftArmLength = distance(leftShoulder, leftElbow) + distance(leftElbow, leftWrist)
-        val rightArmLength = distance(rightShoulder, rightElbow) + distance(rightElbow, rightWrist)
-        val minArmLength = shoulderWidth * 0.9f
-        if (leftArmLength < minArmLength || rightArmLength < minArmLength) return false
+        val leftArmLength = if (leftElbow != null && leftWrist != null) {
+            distance(leftShoulder, leftElbow) + distance(leftElbow, leftWrist)
+        } else {
+            null
+        }
+        val rightArmLength = if (rightElbow != null && rightWrist != null) {
+            distance(rightShoulder, rightElbow) + distance(rightElbow, rightWrist)
+        } else {
+            null
+        }
+
+        val minArmLength = shoulderWidth * 0.85f
+        val leftArmReliable = leftArmLength != null && leftArmLength >= minArmLength
+        val rightArmReliable = rightArmLength != null && rightArmLength >= minArmLength
+        if (!leftArmReliable && !rightArmReliable) return false
+
+        if (leftWrist != null && rightWrist != null) {
+            val wristWidth = distance(leftWrist, rightWrist)
+            if (wristWidth < shoulderWidth * 0.45f || wristWidth > shoulderWidth * 2.8f) return false
+        }
 
         return true
     }

@@ -35,6 +35,7 @@ class RepCounter(
 
     private val wristWindow = ArrayDeque<Float>()
     private val noseWindow = ArrayDeque<Float>()
+    private val shoulderWindow = ArrayDeque<Float>()
     private val elbowWindow = ArrayDeque<Float>()
 
     private val movingAverageWindow = 5
@@ -52,6 +53,7 @@ class RepCounter(
     fun reset() {
         wristWindow.clear()
         noseWindow.clear()
+        shoulderWindow.clear()
         elbowWindow.clear()
         state = State.DOWN
         reps = 0
@@ -74,15 +76,36 @@ class RepCounter(
             com.google.mlkit.vision.pose.PoseLandmark.RIGHT_WRIST,
         ) ?: return RepCounterResult(reps = reps, repEvent = false)
 
-        val noseY = frame.noseOrMouthY() ?: return RepCounterResult(reps = reps, repEvent = false)
+        val shoulderY = frame.averageY(
+            com.google.mlkit.vision.pose.PoseLandmark.LEFT_SHOULDER,
+            com.google.mlkit.vision.pose.PoseLandmark.RIGHT_SHOULDER,
+        ) ?: return RepCounterResult(reps = reps, repEvent = false)
+        val noseY = frame.noseOrMouthY()
         val elbowAngle = featureExtractor.elbowAngleDegrees(frame) ?: return RepCounterResult(reps = reps, repEvent = false)
 
         val smoothWrist = pushAndAverage(wristWindow, wristY)
-        val smoothNose = pushAndAverage(noseWindow, noseY)
+        val smoothShoulder = pushAndAverage(shoulderWindow, shoulderY)
         val smoothElbow = pushAndAverage(elbowWindow, elbowAngle)
+        val smoothNose = if (noseY != null) {
+            pushAndAverage(noseWindow, noseY)
+        } else {
+            noseWindow.clear()
+            null
+        }
 
-        val isDown = smoothElbow > config.elbowDownAngle && smoothNose > smoothWrist + config.marginDown
-        val isUp = smoothElbow < config.elbowUpAngle && smoothNose < smoothWrist - config.marginUp
+        val (isDown, isUp) = if (smoothNose != null) {
+            val down = smoothElbow > config.elbowDownAngle && smoothNose > smoothWrist + config.marginDown
+            val up = smoothElbow < config.elbowUpAngle && smoothNose < smoothWrist - config.marginUp
+            down to up
+        } else {
+            // Face can leave frame near the top on door-mounted bars; fall back to shoulder-vs-wrist travel.
+            val shoulderToWristDelta = smoothShoulder - smoothWrist
+            val down = smoothElbow > config.elbowDownAngle &&
+                shoulderToWristDelta > (config.marginDown + SHOULDER_DOWN_EXTRA_DELTA)
+            val up = smoothElbow < config.elbowUpAngle &&
+                shoulderToWristDelta < (config.marginUp + SHOULDER_UP_EXTRA_DELTA)
+            down to up
+        }
 
         return when (state) {
             State.DOWN -> handleDownState(isUp, nowMs)
@@ -136,5 +159,10 @@ class RepCounter(
             window.removeFirst()
         }
         return window.average().toFloat()
+    }
+
+    companion object {
+        private const val SHOULDER_DOWN_EXTRA_DELTA = 0.15f
+        private const val SHOULDER_UP_EXTRA_DELTA = 0.07f
     }
 }
