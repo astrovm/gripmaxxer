@@ -199,6 +199,16 @@ class HangCamService : LifecycleService() {
                     rawFramesSinceTick.incrementAndGet()
                     lastFrameRealtimeMs.set(SystemClock.elapsedRealtime())
                 },
+                shouldEmitDebugFrame = { DebugPreviewStore.enabled.value },
+                onDebugFrame = { bitmap, poseFrame ->
+                    DebugPreviewStore.publish(
+                        DebugPreviewFrame(
+                            bitmap = bitmap,
+                            landmarks = poseFrame.landmarks,
+                            timestampMs = poseFrame.timestampMs,
+                        )
+                    )
+                },
             ) { frame ->
                 serviceScope.launch {
                     processPoseFrame(frame)
@@ -261,6 +271,7 @@ class HangCamService : LifecycleService() {
         overlayTimerManager = OverlayTimerManager(applicationContext)
 
         MonitoringStateStore.reset()
+        DebugPreviewStore.clear()
     }
 
     private suspend fun processPoseFrame(frame: PoseFrame) {

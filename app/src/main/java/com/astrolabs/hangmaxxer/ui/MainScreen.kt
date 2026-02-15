@@ -8,9 +8,13 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -28,11 +32,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.astrolabs.hangmaxxer.reps.ExerciseMode
+import com.astrolabs.hangmaxxer.service.DebugPreviewFrame
 import java.util.Locale
 
 @Composable
@@ -154,6 +163,25 @@ fun MainScreen(
             checked = uiState.settings.poseModeAccurate,
             onToggle = viewModel::setPoseModeAccurate,
         )
+
+        SettingToggle(
+            label = "Show camera preview + tracking",
+            checked = uiState.showCameraPreview,
+            onToggle = viewModel::setShowCameraPreview,
+        )
+
+        if (uiState.showCameraPreview) {
+            val frame = uiState.cameraPreviewFrame
+            if (frame != null) {
+                CameraPreviewWithTracking(frame = frame)
+            } else {
+                Text(
+                    text = "No camera frames yet. Keep monitoring active and stay on this screen.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
+        }
 
         Text(
             text = "Exercise mode",
@@ -297,5 +325,36 @@ private fun SettingSlider(
             valueRange = valueRange,
             onValueChange = onValueChange,
         )
+    }
+}
+
+@Composable
+private fun CameraPreviewWithTracking(frame: DebugPreviewFrame) {
+    val aspect = frame.bitmap.width.toFloat() / frame.bitmap.height.toFloat()
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(aspect.coerceIn(0.4f, 2.5f))
+            .background(Color.Black)
+    ) {
+        Image(
+            bitmap = frame.bitmap.asImageBitmap(),
+            contentDescription = "Camera preview with tracking",
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier.fillMaxSize(),
+        )
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val radius = 5.dp.toPx()
+            frame.landmarks.values.forEach { landmark ->
+                drawCircle(
+                    color = Color.Red,
+                    radius = radius,
+                    center = Offset(
+                        x = (1f - landmark.x).coerceIn(0f, 1f) * size.width,
+                        y = landmark.y.coerceIn(0f, 1f) * size.height,
+                    ),
+                )
+            }
+        }
     }
 }

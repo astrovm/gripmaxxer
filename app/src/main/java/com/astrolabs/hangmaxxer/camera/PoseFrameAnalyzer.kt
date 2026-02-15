@@ -20,12 +20,15 @@ class PoseFrameAnalyzer(
     private val featureExtractor: PoseFeatureExtractor,
     private val minFrameIntervalMs: Long = 66L,
     private val onFrameTick: (() -> Unit)? = null,
+    private val shouldEmitDebugFrame: (() -> Boolean)? = null,
+    private val onDebugFrame: ((android.graphics.Bitmap, PoseFrame) -> Unit)? = null,
     private val onPoseFrame: (PoseFrame) -> Unit,
 ) : ImageAnalysis.Analyzer {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val isProcessing = AtomicBoolean(false)
     private var lastAnalyzedMs: Long = 0L
+    private var lastDebugFrameMs: Long = 0L
 
     override fun analyze(image: ImageProxy) {
         val now = System.currentTimeMillis()
@@ -69,6 +72,17 @@ class PoseFrameAnalyzer(
                     timestampMs = now,
                 )
                 onPoseFrame(frame)
+                if (shouldEmitDebugFrame?.invoke() == true && now - lastDebugFrameMs >= DEBUG_FRAME_INTERVAL_MS) {
+                    val bitmap = ImageProxyBitmapConverter.toDebugBitmap(
+                        image = image,
+                        rotationDegrees = rotation,
+                        mirrorHorizontally = true,
+                    )
+                    if (bitmap != null) {
+                        lastDebugFrameMs = now
+                        onDebugFrame?.invoke(bitmap, frame)
+                    }
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Pose frame analysis failed", e)
             } finally {
@@ -85,5 +99,6 @@ class PoseFrameAnalyzer(
     companion object {
         private const val TAG = "PoseFrameAnalyzer"
         private const val DETECTOR_TIMEOUT_MS = 1200L
+        private const val DEBUG_FRAME_INTERVAL_MS = 250L
     }
 }

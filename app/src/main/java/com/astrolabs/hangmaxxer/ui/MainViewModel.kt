@@ -10,6 +10,8 @@ import com.astrolabs.hangmaxxer.datastore.SettingsRepository
 import com.astrolabs.hangmaxxer.media.MediaControlManager
 import com.astrolabs.hangmaxxer.overlay.OverlayTimerManager
 import com.astrolabs.hangmaxxer.reps.ExerciseMode
+import com.astrolabs.hangmaxxer.service.DebugPreviewFrame
+import com.astrolabs.hangmaxxer.service.DebugPreviewStore
 import com.astrolabs.hangmaxxer.service.HangCamService
 import com.astrolabs.hangmaxxer.service.MonitoringSnapshot
 import com.astrolabs.hangmaxxer.service.MonitoringStateStore
@@ -32,6 +34,8 @@ data class MainUiState(
     val permissions: PermissionSnapshot = PermissionSnapshot(),
     val monitoring: MonitoringSnapshot = MonitoringSnapshot(),
     val selectedMode: ExerciseMode = ExerciseMode.PULL_UP,
+    val showCameraPreview: Boolean = true,
+    val cameraPreviewFrame: DebugPreviewFrame? = null,
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -41,18 +45,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val permissionsState = MutableStateFlow(readPermissions())
     private val selectedModeState = MutableStateFlow(ExerciseMode.PULL_UP)
+    private val showCameraPreviewState = MutableStateFlow(true)
 
-    val uiState: StateFlow<MainUiState> = combine(
+    init {
+        DebugPreviewStore.enabled.value = true
+    }
+
+    private val baseUiState = combine(
         settingsRepository.settingsFlow,
         permissionsState,
         MonitoringStateStore.snapshot,
         selectedModeState,
-    ) { settings, permissions, monitoring, selectedMode ->
+        showCameraPreviewState,
+    ) { settings, permissions, monitoring, selectedMode, showCameraPreview ->
         MainUiState(
             settings = settings,
             permissions = permissions,
             monitoring = monitoring,
             selectedMode = selectedMode,
+            showCameraPreview = showCameraPreview,
+        )
+    }
+
+    val uiState: StateFlow<MainUiState> = combine(
+        baseUiState,
+        DebugPreviewStore.frame,
+    ) { base, debugPreviewFrame ->
+        base.copy(
+            cameraPreviewFrame = if (base.showCameraPreview) debugPreviewFrame else null,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -66,6 +86,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setMode(mode: ExerciseMode) {
         selectedModeState.value = mode
+    }
+
+    fun setShowCameraPreview(enabled: Boolean) {
+        showCameraPreviewState.value = enabled
+        DebugPreviewStore.enabled.value = enabled
+        if (!enabled) {
+            DebugPreviewStore.clear()
+        }
     }
 
     fun setOverlayEnabled(enabled: Boolean) {
