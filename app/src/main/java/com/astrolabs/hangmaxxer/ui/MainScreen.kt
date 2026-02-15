@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -40,7 +39,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.astrolabs.hangmaxxer.reps.ExerciseMode
 import com.astrolabs.hangmaxxer.service.DebugPreviewFrame
 import java.util.Locale
 
@@ -179,21 +177,6 @@ fun MainScreen(
                     text = "No camera frames yet. Keep monitoring active and stay on this screen.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onBackground
-                )
-            }
-        }
-
-        Text(
-            text = "Exercise mode",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ExerciseMode.entries.forEach { mode ->
-                FilterChip(
-                    selected = uiState.selectedMode == mode,
-                    onClick = { viewModel.setMode(mode) },
-                    label = { Text(mode.label) },
                 )
             }
         }

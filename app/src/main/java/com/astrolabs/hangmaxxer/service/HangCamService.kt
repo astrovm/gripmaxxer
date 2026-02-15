@@ -70,7 +70,9 @@ class HangCamService : LifecycleService() {
 
     @Volatile
     private var running = false
-    private var currentMode = ExerciseMode.PULL_UP
+    private var currentMode = ExerciseMode.UNKNOWN
+    private var pullUpVotes = 0
+    private var chinUpVotes = 0
     private var currentSettings = AppSettings()
     private var currentHangState = false
     private var currentReps = 0
@@ -96,8 +98,6 @@ class HangCamService : LifecycleService() {
             ACTION_START -> {
                 startForegroundNow("Preparing camera pipeline")
                 if (!running) {
-                    val modeRaw = intent.getStringExtra(EXTRA_MODE)
-                    currentMode = ExerciseMode.entries.firstOrNull { it.name == modeRaw } ?: ExerciseMode.PULL_UP
                     startMonitoring()
                 }
             }
@@ -121,6 +121,9 @@ class HangCamService : LifecycleService() {
         running = true
         currentHangState = false
         currentReps = 0
+        currentMode = ExerciseMode.UNKNOWN
+        pullUpVotes = 0
+        chinUpVotes = 0
         hangStartRealtimeMs = 0L
         latestFps = 0
         rawFramesSinceTick.set(0)
@@ -238,6 +241,9 @@ class HangCamService : LifecycleService() {
         running = false
         currentHangState = false
         currentReps = 0
+        currentMode = ExerciseMode.UNKNOWN
+        pullUpVotes = 0
+        chinUpVotes = 0
         hangStartRealtimeMs = 0L
         latestFps = 0
         rawFramesSinceTick.set(0)
@@ -279,6 +285,7 @@ class HangCamService : LifecycleService() {
             if (!running) return
             val nowMs = System.currentTimeMillis()
             lastPosePresent = frame.posePresent
+            updateDetectedMode(frame)
 
             val hangResult = hangDetector.process(frame, nowMs)
             if (hangResult.transitioned) {
@@ -309,6 +316,33 @@ class HangCamService : LifecycleService() {
             }
 
             publishStateAndNotification()
+        }
+    }
+
+    private fun updateDetectedMode(frame: PoseFrame) {
+        if (!frame.posePresent) return
+
+        when (featureExtractor.inferExerciseMode(frame)) {
+            ExerciseMode.PULL_UP -> {
+                pullUpVotes = (pullUpVotes + 2).coerceAtMost(30)
+                chinUpVotes = (chinUpVotes - 1).coerceAtLeast(0)
+            }
+
+            ExerciseMode.CHIN_UP -> {
+                chinUpVotes = (chinUpVotes + 2).coerceAtMost(30)
+                pullUpVotes = (pullUpVotes - 1).coerceAtLeast(0)
+            }
+
+            ExerciseMode.UNKNOWN -> {
+                pullUpVotes = (pullUpVotes - 1).coerceAtLeast(0)
+                chinUpVotes = (chinUpVotes - 1).coerceAtLeast(0)
+            }
+        }
+
+        currentMode = when {
+            pullUpVotes >= chinUpVotes + 4 -> ExerciseMode.PULL_UP
+            chinUpVotes >= pullUpVotes + 4 -> ExerciseMode.CHIN_UP
+            else -> ExerciseMode.UNKNOWN
         }
     }
 
@@ -429,15 +463,13 @@ class HangCamService : LifecycleService() {
         private const val TAG = "HangCamService"
         const val ACTION_START = "com.astrolabs.hangmaxxer.action.START"
         const val ACTION_STOP = "com.astrolabs.hangmaxxer.action.STOP"
-        const val EXTRA_MODE = "extra_mode"
 
         private const val NOTIFICATION_ID = 1001
         private const val NOTIFICATION_CHANNEL_ID = "hang_monitoring"
 
-        fun start(context: Context, mode: ExerciseMode) {
+        fun start(context: Context) {
             val intent = Intent(context, HangCamService::class.java).apply {
                 action = ACTION_START
-                putExtra(EXTRA_MODE, mode.name)
             }
             ContextCompat.startForegroundService(context, intent)
         }

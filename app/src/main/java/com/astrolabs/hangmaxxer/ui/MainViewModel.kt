@@ -9,7 +9,6 @@ import com.astrolabs.hangmaxxer.datastore.AppSettings
 import com.astrolabs.hangmaxxer.datastore.SettingsRepository
 import com.astrolabs.hangmaxxer.media.MediaControlManager
 import com.astrolabs.hangmaxxer.overlay.OverlayTimerManager
-import com.astrolabs.hangmaxxer.reps.ExerciseMode
 import com.astrolabs.hangmaxxer.service.DebugPreviewFrame
 import com.astrolabs.hangmaxxer.service.DebugPreviewStore
 import com.astrolabs.hangmaxxer.service.HangCamService
@@ -33,7 +32,6 @@ data class MainUiState(
     val settings: AppSettings = AppSettings(),
     val permissions: PermissionSnapshot = PermissionSnapshot(),
     val monitoring: MonitoringSnapshot = MonitoringSnapshot(),
-    val selectedMode: ExerciseMode = ExerciseMode.PULL_UP,
     val showCameraPreview: Boolean = true,
     val cameraPreviewFrame: DebugPreviewFrame? = null,
 )
@@ -44,7 +42,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val settingsRepository = SettingsRepository(appContext)
 
     private val permissionsState = MutableStateFlow(readPermissions())
-    private val selectedModeState = MutableStateFlow(ExerciseMode.PULL_UP)
     private val showCameraPreviewState = MutableStateFlow(true)
 
     init {
@@ -55,14 +52,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         settingsRepository.settingsFlow,
         permissionsState,
         MonitoringStateStore.snapshot,
-        selectedModeState,
         showCameraPreviewState,
-    ) { settings, permissions, monitoring, selectedMode, showCameraPreview ->
+    ) { settings, permissions, monitoring, showCameraPreview ->
         MainUiState(
             settings = settings,
             permissions = permissions,
             monitoring = monitoring,
-            selectedMode = selectedMode,
             showCameraPreview = showCameraPreview,
         )
     }
@@ -82,10 +77,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshPermissionState() {
         permissionsState.value = readPermissions()
-    }
-
-    fun setMode(mode: ExerciseMode) {
-        selectedModeState.value = mode
     }
 
     fun setShowCameraPreview(enabled: Boolean) {
@@ -145,7 +136,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startMonitoring() {
-        HangCamService.start(appContext, selectedModeState.value)
+        HangCamService.start(appContext)
     }
 
     fun stopMonitoring() {

@@ -4,6 +4,7 @@ import com.astrolabs.hangmaxxer.pose.PoseFeatureExtractor
 import com.astrolabs.hangmaxxer.pose.PoseFrame
 
 enum class ExerciseMode(val label: String) {
+    UNKNOWN("Detecting"),
     PULL_UP("Pull-up"),
     CHIN_UP("Chin-up"),
 }
