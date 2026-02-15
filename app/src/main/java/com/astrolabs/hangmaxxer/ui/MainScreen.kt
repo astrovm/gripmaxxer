@@ -213,7 +213,7 @@ fun MainScreen(
                     }
                 }
                 StatusLine("Overlay permission", uiState.permissions.overlayPermissionGranted)
-                if (uiState.settings.overlayEnabled && !uiState.permissions.overlayPermissionGranted) {
+                if (!uiState.permissions.overlayPermissionGranted) {
                     OutlinedButton(
                         onClick = { openOverlaySettings() },
                         modifier = Modifier.fillMaxWidth(),
@@ -236,15 +236,10 @@ fun MainScreen(
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                SettingToggle(
-                    label = "Show floating overlay timer",
-                    checked = uiState.settings.overlayEnabled,
-                    onToggle = { enabled ->
-                        viewModel.setOverlayEnabled(enabled)
-                        if (enabled && !uiState.permissions.overlayPermissionGranted) {
-                            openOverlaySettings()
-                        }
-                    },
+                Text(
+                    text = "Overlay is shown automatically while monitoring.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 SettingToggle(
                     label = "Show live camera preview",

@@ -35,7 +35,7 @@ class SettingsRepository(private val context: Context) {
         return AppSettings(
             overlayEnabled = this[Keys.overlayEnabled] ?: true,
             poseModeAccurate = this[Keys.poseModeAccurate] ?: false,
-            wristShoulderMargin = this[Keys.wristShoulderMargin] ?: 0.06f,
+            wristShoulderMargin = this[Keys.wristShoulderMargin] ?: 0.08f,
             missingPoseTimeoutMs = this[Keys.missingPoseTimeoutMs] ?: 300L,
             marginUp = this[Keys.marginUp] ?: 0.05f,
             marginDown = this[Keys.marginDown] ?: 0.03f,

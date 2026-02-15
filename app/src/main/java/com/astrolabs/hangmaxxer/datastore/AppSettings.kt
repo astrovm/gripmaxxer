@@ -3,7 +3,7 @@ package com.astrolabs.hangmaxxer.datastore
 data class AppSettings(
     val overlayEnabled: Boolean = true,
     val poseModeAccurate: Boolean = false,
-    val wristShoulderMargin: Float = 0.06f,
+    val wristShoulderMargin: Float = 0.08f,
     val missingPoseTimeoutMs: Long = 300L,
     val marginUp: Float = 0.05f,
     val marginDown: Float = 0.03f,

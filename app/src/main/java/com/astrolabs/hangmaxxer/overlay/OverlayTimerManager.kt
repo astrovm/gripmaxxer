@@ -21,59 +21,77 @@ class OverlayTimerManager(context: Context) {
 
     private var textView: TextView? = null
     private var isAdded = false
+    private var isMonitoring = false
     private var isRunning = false
-    private var isShowingRep = false
+    private var sessionReps = 0
+    private var frozenElapsedMs = 0L
     private var startElapsedMs = 0L
 
     private val updateRunnable = object : Runnable {
         override fun run() {
-            if (isRunning && !isShowingRep) {
-                val elapsedSeconds = (SystemClock.elapsedRealtime() - startElapsedMs) / 1000f
-                textView?.text = String.format(Locale.US, "%.1f", elapsedSeconds)
+            if (isMonitoring && isAdded) {
+                val elapsedMs = if (isRunning) {
+                    SystemClock.elapsedRealtime() - startElapsedMs
+                } else {
+                    frozenElapsedMs
+                }
+                textView?.text = formatOverlayText(elapsedMs = elapsedMs, reps = sessionReps)
                 handler.postDelayed(this, UPDATE_INTERVAL_MS)
             }
         }
     }
 
-    fun onHangStateChanged(hanging: Boolean) {
+    fun onMonitoringChanged(monitoring: Boolean) {
         handler.post {
-            if (hanging) {
+            isMonitoring = monitoring
+            if (monitoring) {
                 if (!isOverlayPermissionGranted(appContext)) return@post
                 ensureView()
                 showIfNeeded()
-                startElapsedMs = SystemClock.elapsedRealtime()
-                isRunning = true
-                isShowingRep = false
-                textView?.text = "0.0"
                 handler.removeCallbacks(updateRunnable)
                 handler.post(updateRunnable)
             } else {
                 isRunning = false
-                isShowingRep = false
+                sessionReps = 0
+                frozenElapsedMs = 0L
+                startElapsedMs = 0L
                 handler.removeCallbacks(updateRunnable)
                 hideAndReset()
             }
         }
     }
 
-    fun onRepEvent(reps: Int) {
+    fun onHangStateChanged(hanging: Boolean) {
         handler.post {
-            if (!isRunning || !isAdded) return@post
-            isShowingRep = true
-            textView?.text = reps.toString()
-            handler.postDelayed({
-                isShowingRep = false
-                if (isRunning) {
-                    handler.removeCallbacks(updateRunnable)
-                    handler.post(updateRunnable)
-                }
-            }, REP_DISPLAY_MS)
+            if (!isMonitoring) return@post
+            if (hanging && !isRunning) {
+                startElapsedMs = SystemClock.elapsedRealtime()
+                frozenElapsedMs = 0L
+                sessionReps = 0
+                isRunning = true
+            } else if (!hanging && isRunning) {
+                frozenElapsedMs = SystemClock.elapsedRealtime() - startElapsedMs
+                isRunning = false
+            }
+            handler.removeCallbacks(updateRunnable)
+            handler.post(updateRunnable)
+        }
+    }
+
+    fun onRepCountChanged(reps: Int) {
+        handler.post {
+            if (!isMonitoring || !isAdded) return@post
+            sessionReps = reps.coerceAtLeast(0)
+            handler.removeCallbacks(updateRunnable)
+            handler.post(updateRunnable)
         }
     }
 
     fun currentElapsedMs(): Long {
-        if (!isRunning) return 0L
-        return SystemClock.elapsedRealtime() - startElapsedMs
+        if (isRunning) {
+            return SystemClock.elapsedRealtime() - startElapsedMs
+        }
+        return frozenElapsedMs
     }
 
     fun release() {
@@ -91,8 +109,8 @@ class OverlayTimerManager(context: Context) {
     private fun ensureView() {
         if (textView != null) return
         textView = TextView(appContext).apply {
-            text = "0.0"
-            textSize = 64f
+            text = formatOverlayText(elapsedMs = 0L, reps = 0)
+            textSize = 40f
             setTextColor(Color.WHITE)
             setBackgroundColor(Color.TRANSPARENT)
             gravity = Gravity.CENTER
@@ -119,16 +137,20 @@ class OverlayTimerManager(context: Context) {
     }
 
     private fun hideAndReset() {
-        textView?.text = "0.0"
+        textView?.text = formatOverlayText(elapsedMs = 0L, reps = 0)
         if (isAdded) {
             runCatching { windowManager.removeView(textView) }
             isAdded = false
         }
     }
 
+    private fun formatOverlayText(elapsedMs: Long, reps: Int): String {
+        val elapsedSeconds = (elapsedMs / 1000f).coerceAtLeast(0f)
+        return String.format(Locale.US, "%.1fs\nReps %d", elapsedSeconds, reps)
+    }
+
     companion object {
         private const val UPDATE_INTERVAL_MS = 100L
-        private const val REP_DISPLAY_MS = 800L
 
         fun isOverlayPermissionGranted(context: Context): Boolean {
             return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {

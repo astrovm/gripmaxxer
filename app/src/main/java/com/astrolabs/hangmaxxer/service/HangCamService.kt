@@ -76,6 +76,7 @@ class HangCamService : LifecycleService() {
     private var currentSettings = AppSettings()
     private var currentHangState = false
     private var currentReps = 0
+    private var currentSessionElapsedMs = 0L
     private var hangStartRealtimeMs = 0L
     private var latestFps = 0
     private val rawFramesSinceTick = AtomicInteger(0)
@@ -125,12 +126,14 @@ class HangCamService : LifecycleService() {
         pullUpVotes = 0
         chinUpVotes = 0
         hangStartRealtimeMs = 0L
+        currentSessionElapsedMs = 0L
         latestFps = 0
         rawFramesSinceTick.set(0)
         lastFrameRealtimeMs.set(0L)
         lastPosePresent = false
         repCounter.reset()
         hangDetector.reset()
+        updateOverlayVisibility()
 
         MonitoringStateStore.update {
             it.copy(
@@ -151,7 +154,7 @@ class HangCamService : LifecycleService() {
                 currentSettings = settings
                 hangDetector.updateConfig(
                     HangDetectionConfig(
-                        wristShoulderMargin = settings.wristShoulderMargin,
+                        wristShoulderMargin = settings.wristShoulderMargin.coerceAtLeast(MIN_WRIST_SHOULDER_MARGIN),
                         missingPoseTimeoutMs = settings.missingPoseTimeoutMs,
                     )
                 )
@@ -166,6 +169,7 @@ class HangCamService : LifecycleService() {
                     )
                 )
                 poseDetectorWrapper?.setAccurateMode(settings.poseModeAccurate)
+                updateOverlayVisibility()
             }
         }
 
@@ -192,6 +196,7 @@ class HangCamService : LifecycleService() {
             }
 
             currentSettings = settingsRepository.settingsFlow.first()
+            updateOverlayVisibility()
             poseDetectorWrapper = PoseDetectorWrapper(currentSettings.poseModeAccurate)
 
             val analyzer = PoseFrameAnalyzer(
@@ -245,6 +250,7 @@ class HangCamService : LifecycleService() {
         pullUpVotes = 0
         chinUpVotes = 0
         hangStartRealtimeMs = 0L
+        currentSessionElapsedMs = 0L
         latestFps = 0
         rawFramesSinceTick.set(0)
         lastFrameRealtimeMs.set(0L)
@@ -272,7 +278,7 @@ class HangCamService : LifecycleService() {
 
         mediaControlManager.stop()
 
-        overlayTimerManager?.onHangStateChanged(false)
+        overlayTimerManager?.onMonitoringChanged(false)
         overlayTimerManager?.release()
         overlayTimerManager = OverlayTimerManager(applicationContext)
 
@@ -291,13 +297,17 @@ class HangCamService : LifecycleService() {
             if (hangResult.transitioned) {
                 if (hangResult.isHanging) {
                     currentHangState = true
+                    currentReps = 0
+                    currentSessionElapsedMs = 0L
+                    repCounter.reset()
                     hangStartRealtimeMs = SystemClock.elapsedRealtime()
-                    if (currentSettings.overlayEnabled && OverlayTimerManager.isOverlayPermissionGranted(applicationContext)) {
-                        overlayTimerManager?.onHangStateChanged(true)
-                    }
+                    overlayTimerManager?.onHangStateChanged(true)
                     mediaControlManager.play()
                 } else {
                     currentHangState = false
+                    if (hangStartRealtimeMs > 0L) {
+                        currentSessionElapsedMs = SystemClock.elapsedRealtime() - hangStartRealtimeMs
+                    }
                     hangStartRealtimeMs = 0L
                     overlayTimerManager?.onHangStateChanged(false)
                     mediaControlManager.pause()
@@ -311,9 +321,7 @@ class HangCamService : LifecycleService() {
             )
             currentReps = repResult.reps
 
-            if (repResult.repEvent && currentSettings.overlayEnabled) {
-                overlayTimerManager?.onRepEvent(currentReps)
-            }
+            overlayTimerManager?.onRepCountChanged(currentReps)
 
             publishStateAndNotification()
         }
@@ -359,9 +367,10 @@ class HangCamService : LifecycleService() {
 
     private fun publishStateAndNotification() {
         val elapsedMs = if (currentHangState && hangStartRealtimeMs > 0L) {
-            SystemClock.elapsedRealtime() - hangStartRealtimeMs
+            currentSessionElapsedMs = SystemClock.elapsedRealtime() - hangStartRealtimeMs
+            currentSessionElapsedMs
         } else {
-            0L
+            currentSessionElapsedMs
         }
         val lastFrameMs = lastFrameRealtimeMs.get()
         val frameAgeMs = if (lastFrameMs > 0L) {
@@ -389,6 +398,12 @@ class HangCamService : LifecycleService() {
                 text = "${if (currentHangState) "HANGING" else "NOT HANGING"} | Reps: $currentReps | ${formatSeconds(elapsedMs)}s | Cam:${latestFps}fps ${if (lastPosePresent) "pose" else "no-pose"}"
             )
         )
+    }
+
+    private fun updateOverlayVisibility() {
+        val shouldShowOverlay = running &&
+            OverlayTimerManager.isOverlayPermissionGranted(applicationContext)
+        overlayTimerManager?.onMonitoringChanged(shouldShowOverlay)
     }
 
     private fun startForegroundNow(text: String) {
@@ -463,6 +478,7 @@ class HangCamService : LifecycleService() {
         private const val TAG = "HangCamService"
         const val ACTION_START = "com.astrolabs.hangmaxxer.action.START"
         const val ACTION_STOP = "com.astrolabs.hangmaxxer.action.STOP"
+        private const val MIN_WRIST_SHOULDER_MARGIN = 0.08f
 
         private const val NOTIFICATION_ID = 1001
         private const val NOTIFICATION_CHANNEL_ID = "hang_monitoring"
