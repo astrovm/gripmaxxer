@@ -6,6 +6,7 @@ Gripmaxxer is an Android app (Kotlin + Compose) that uses the **front camera** a
   - Active hang
   - One-arm dead hang
   - One-arm active hang
+  - Handstand hold
   - Pull-up
   - Chin-up
   - One-arm pull-up
@@ -90,6 +91,7 @@ Some system screens or OEM-specific UIs may still hide overlays.
   - Active hang: bar framing with bent elbows and upper body visible
   - One-arm dead hang: keep support shoulder/elbow/wrist fully visible
   - One-arm active hang: keep support shoulder/elbow/wrist fully visible
+  - Handstand hold: works for wall-assisted and freestanding; keep hands/shoulders/hips/legs in frame
   - Pull-up: front bar framing with shoulders/arms visible
   - Chin-up: front bar framing with shoulders/arms visible
   - One-arm pull-up: keep support-side arm and torso centered in frame

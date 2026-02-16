@@ -39,6 +39,7 @@ import com.astrolabs.gripmaxxer.reps.ExerciseMode
 import com.astrolabs.gripmaxxer.reps.ActiveHangActivityDetector
 import com.astrolabs.gripmaxxer.reps.DeadHangActivityDetector
 import com.astrolabs.gripmaxxer.reps.HoldRepDetector
+import com.astrolabs.gripmaxxer.reps.HandstandHoldActivityDetector
 import com.astrolabs.gripmaxxer.reps.HangingLegRaiseActivityDetector
 import com.astrolabs.gripmaxxer.reps.HangingLegRaiseRepDetector
 import com.astrolabs.gripmaxxer.reps.PistolSquatActivityDetector
@@ -87,6 +88,7 @@ class HangCamService : LifecycleService() {
     private val pullUpActivityDetector = PullUpActivityDetector()
     private val deadHangActivityDetector = DeadHangActivityDetector(featureExtractor)
     private val activeHangActivityDetector = ActiveHangActivityDetector(featureExtractor)
+    private val handstandHoldActivityDetector = HandstandHoldActivityDetector(featureExtractor)
     private val hangingLegRaiseActivityDetector = HangingLegRaiseActivityDetector()
     private val pushUpActivityDetector = PushUpActivityDetector(featureExtractor)
     private val squatActivityDetector = SquatActivityDetector(featureExtractor)
@@ -101,6 +103,7 @@ class HangCamService : LifecycleService() {
     private val dipRepDetector = DipRepDetector(featureExtractor)
     private val deadHangRepDetector = HoldRepDetector()
     private val activeHangRepDetector = HoldRepDetector()
+    private val handstandHoldRepDetector = HoldRepDetector()
     private val hangingLegRaiseRepDetector = HangingLegRaiseRepDetector()
     private val repEngine = RepEngine(
         detectors = mapOf(
@@ -113,6 +116,7 @@ class HangCamService : LifecycleService() {
             ExerciseMode.ACTIVE_HANG to activeHangRepDetector,
             ExerciseMode.ONE_ARM_DEAD_HANG to deadHangRepDetector,
             ExerciseMode.ONE_ARM_ACTIVE_HANG to activeHangRepDetector,
+            ExerciseMode.HANDSTAND_HOLD to handstandHoldRepDetector,
             ExerciseMode.PUSH_UP to pushUpRepDetector,
             ExerciseMode.ONE_ARM_PUSH_UP to pushUpRepDetector,
             ExerciseMode.SQUAT to squatRepDetector,
@@ -132,6 +136,7 @@ class HangCamService : LifecycleService() {
         ExerciseMode.ACTIVE_HANG to activeHangActivityDetector,
         ExerciseMode.ONE_ARM_DEAD_HANG to deadHangActivityDetector,
         ExerciseMode.ONE_ARM_ACTIVE_HANG to activeHangActivityDetector,
+        ExerciseMode.HANDSTAND_HOLD to handstandHoldActivityDetector,
         ExerciseMode.PUSH_UP to pushUpActivityDetector,
         ExerciseMode.ONE_ARM_PUSH_UP to pushUpActivityDetector,
         ExerciseMode.SQUAT to squatActivityDetector,

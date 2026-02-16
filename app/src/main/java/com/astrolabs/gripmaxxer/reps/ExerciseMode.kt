@@ -10,6 +10,7 @@ enum class ExerciseMode(val label: String) {
     ACTIVE_HANG("Active hang"),
     ONE_ARM_DEAD_HANG("One-arm dead hang"),
     ONE_ARM_ACTIVE_HANG("One-arm active hang"),
+    HANDSTAND_HOLD("Handstand hold"),
     PUSH_UP("Push-up"),
     ONE_ARM_PUSH_UP("One-arm push-up"),
     SQUAT("Squat"),
