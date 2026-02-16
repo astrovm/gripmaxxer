@@ -99,6 +99,7 @@ class HangCamService : LifecycleService() {
     private val repEngine = RepEngine(
         detectors = mapOf(
             ExerciseMode.PULL_UP to pullUpRepDetector,
+            ExerciseMode.CHIN_UP to pullUpRepDetector,
             ExerciseMode.HANGING_LEG_RAISE to hangingLegRaiseRepDetector,
             ExerciseMode.DEAD_HANG to deadHangRepDetector,
             ExerciseMode.ACTIVE_HANG to activeHangRepDetector,
@@ -111,6 +112,7 @@ class HangCamService : LifecycleService() {
     )
     private val activityDetectors = mapOf(
         ExerciseMode.PULL_UP to pullUpActivityDetector,
+        ExerciseMode.CHIN_UP to pullUpActivityDetector,
         ExerciseMode.HANGING_LEG_RAISE to hangingLegRaiseActivityDetector,
         ExerciseMode.DEAD_HANG to deadHangActivityDetector,
         ExerciseMode.ACTIVE_HANG to activeHangActivityDetector,
