@@ -19,73 +19,21 @@ import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Entity(
-    tableName = "routines",
-    indices = [Index(value = ["name"])],
-)
-data class RoutineEntity(
-    val name: String,
-    val createdAtMs: Long,
-    val updatedAtMs: Long,
-    @PrimaryKey(autoGenerate = true)
-    val id: Long = 0L,
-)
-
-@Entity(
-    tableName = "routine_exercises",
-    foreignKeys = [
-        ForeignKey(
-            entity = RoutineEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["routineId"],
-            onDelete = ForeignKey.CASCADE,
-        )
-    ],
-    indices = [Index(value = ["routineId"]), Index(value = ["position"])],
-)
-data class RoutineExerciseEntity(
-    val routineId: Long,
-    val position: Int,
-    val exerciseName: String,
-    val modeName: String?,
-    val targetSets: Int,
-    val targetReps: Int,
-    val targetWeightKg: Float,
-    val restSeconds: Int,
-    @PrimaryKey(autoGenerate = true)
-    val id: Long = 0L,
-)
-
-@Entity(
     tableName = "workouts",
-    indices = [Index(value = ["completedAtMs"]), Index(value = ["startedAtMs"])],
+    indices = [
+        Index(value = ["completedAtMs"]),
+        Index(value = ["startedAtMs"]),
+        Index(value = ["exerciseModeName"]),
+    ],
 )
 data class WorkoutEntity(
     val title: String,
+    val exerciseModeName: String,
     val startedAtMs: Long,
     val completedAtMs: Long?,
-    val sourceRoutineId: Long?,
-    @PrimaryKey(autoGenerate = true)
-    val id: Long = 0L,
-)
-
-@Entity(
-    tableName = "workout_exercises",
-    foreignKeys = [
-        ForeignKey(
-            entity = WorkoutEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["workoutId"],
-            onDelete = ForeignKey.CASCADE,
-        )
-    ],
-    indices = [Index(value = ["workoutId"]), Index(value = ["position"]), Index(value = ["exerciseName"])],
-)
-data class WorkoutExerciseEntity(
-    val workoutId: Long,
-    val position: Int,
-    val exerciseName: String,
-    val modeName: String?,
-    val restSeconds: Int,
+    val isPaused: Boolean,
+    val pauseStartedAtMs: Long?,
+    val pausedAccumulatedMs: Long,
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0L,
 )
@@ -94,66 +42,42 @@ data class WorkoutExerciseEntity(
     tableName = "workout_sets",
     foreignKeys = [
         ForeignKey(
-            entity = WorkoutExerciseEntity::class,
+            entity = WorkoutEntity::class,
             parentColumns = ["id"],
-            childColumns = ["workoutExerciseId"],
+            childColumns = ["workoutId"],
             onDelete = ForeignKey.CASCADE,
         )
     ],
-    indices = [Index(value = ["workoutExerciseId"]), Index(value = ["setNumber"]), Index(value = ["completedAtMs"])],
+    indices = [Index(value = ["workoutId"]), Index(value = ["setNumber"]), Index(value = ["completedAtMs"])],
 )
 data class WorkoutSetEntity(
-    val workoutExerciseId: Long,
+    val workoutId: Long,
     val setNumber: Int,
-    val weightKg: Float,
     val reps: Int,
-    val done: Boolean,
     val durationMs: Long,
-    val completedAtMs: Long?,
+    val completedAtMs: Long,
     val autoTracked: Boolean,
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0L,
 )
 
-data class RoutineWithExercisesEntity(
-    @Embedded
-    val routine: RoutineEntity,
-    @Relation(
-        parentColumn = "id",
-        entityColumn = "routineId",
-        entity = RoutineExerciseEntity::class,
-    )
-    val exercises: List<RoutineExerciseEntity>,
-)
-
-data class WorkoutExerciseWithSetsEntity(
-    @Embedded
-    val exercise: WorkoutExerciseEntity,
-    @Relation(
-        parentColumn = "id",
-        entityColumn = "workoutExerciseId",
-    )
-    val sets: List<WorkoutSetEntity>,
-)
-
-data class WorkoutWithExercisesEntity(
+data class WorkoutWithSetsEntity(
     @Embedded
     val workout: WorkoutEntity,
     @Relation(
         parentColumn = "id",
         entityColumn = "workoutId",
-        entity = WorkoutExerciseEntity::class,
     )
-    val exercises: List<WorkoutExerciseWithSetsEntity>,
+    val sets: List<WorkoutSetEntity>,
 )
 
 data class WorkoutFeedRow(
     val workoutId: Long,
     val title: String,
+    val modeName: String,
     val completedAtMs: Long,
     val durationMs: Long,
-    val exerciseCount: Int,
-    val totalVolumeKg: Float,
+    val setCount: Int,
 )
 
 data class CalendarDayRow(
@@ -163,52 +87,19 @@ data class CalendarDayRow(
 
 data class ProfileBaseRow(
     val totalWorkouts: Int,
-    val totalSets: Int,
-    val totalVolumeKg: Float,
     val maxReps: Int,
-    val maxActiveMs: Long,
+    val maxHoldMs: Long,
 )
-
-data class RecordRow(
-    val exerciseName: String,
-    val maxReps: Int,
-)
-
-@Dao
-interface RoutineDao {
-    @Transaction
-    @Query("SELECT * FROM routines ORDER BY updatedAtMs DESC")
-    fun observeRoutinesWithExercises(): Flow<List<RoutineWithExercisesEntity>>
-
-    @Transaction
-    @Query("SELECT * FROM routines WHERE id = :routineId LIMIT 1")
-    suspend fun getRoutineWithExercises(routineId: Long): RoutineWithExercisesEntity?
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertRoutine(entity: RoutineEntity): Long
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertRoutineExercises(entities: List<RoutineExerciseEntity>): List<Long>
-
-    @Update
-    suspend fun updateRoutine(entity: RoutineEntity)
-
-    @Query("DELETE FROM routines WHERE id = :routineId")
-    suspend fun deleteRoutine(routineId: Long)
-
-    @Query("DELETE FROM routine_exercises WHERE routineId = :routineId")
-    suspend fun deleteRoutineExercisesByRoutineId(routineId: Long)
-}
 
 @Dao
 interface WorkoutDao {
     @Transaction
     @Query("SELECT * FROM workouts WHERE completedAtMs IS NULL ORDER BY startedAtMs DESC LIMIT 1")
-    fun observeActiveWorkoutWithExercises(): Flow<WorkoutWithExercisesEntity?>
+    fun observeActiveWorkoutWithSets(): Flow<WorkoutWithSetsEntity?>
 
     @Transaction
     @Query("SELECT * FROM workouts WHERE id = :workoutId LIMIT 1")
-    suspend fun getWorkoutWithExercises(workoutId: Long): WorkoutWithExercisesEntity?
+    suspend fun getWorkoutWithSets(workoutId: Long): WorkoutWithSetsEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWorkout(entity: WorkoutEntity): Long
@@ -217,32 +108,40 @@ interface WorkoutDao {
     suspend fun updateWorkout(entity: WorkoutEntity)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertWorkoutExercise(entity: WorkoutExerciseEntity): Long
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertWorkoutSets(entities: List<WorkoutSetEntity>): List<Long>
+    suspend fun insertWorkoutSet(entity: WorkoutSetEntity): Long
 
     @Update
     suspend fun updateWorkoutSet(entity: WorkoutSetEntity)
 
+    @Update
+    suspend fun updateWorkoutSets(entities: List<WorkoutSetEntity>)
+
     @Query("DELETE FROM workout_sets WHERE id = :setId")
     suspend fun deleteWorkoutSetById(setId: Long)
 
-    @Query("SELECT COALESCE(MAX(setNumber), 0) FROM workout_sets WHERE workoutExerciseId = :exerciseId")
-    suspend fun getMaxSetNumber(exerciseId: Long): Int
+    @Query("SELECT * FROM workout_sets WHERE workoutId = :workoutId ORDER BY setNumber")
+    suspend fun getSetsForWorkout(workoutId: Long): List<WorkoutSetEntity>
+
+    @Query("SELECT * FROM workout_sets WHERE id = :setId LIMIT 1")
+    suspend fun getSetById(setId: Long): WorkoutSetEntity?
+
+    @Query("SELECT COUNT(*) FROM workout_sets WHERE workoutId = :workoutId")
+    suspend fun countSetsForWorkout(workoutId: Long): Int
+
+    @Query("SELECT workoutId FROM workout_sets WHERE id = :setId LIMIT 1")
+    suspend fun getWorkoutIdBySetId(setId: Long): Long?
 
     @Query(
         """
         SELECT
             w.id AS workoutId,
             w.title AS title,
+            w.exerciseModeName AS modeName,
             w.completedAtMs AS completedAtMs,
-            (w.completedAtMs - w.startedAtMs) AS durationMs,
-            COUNT(DISTINCT we.id) AS exerciseCount,
-            COALESCE(SUM(CASE WHEN ws.done = 1 THEN ws.weightKg * ws.reps ELSE 0 END), 0) AS totalVolumeKg
+            (w.completedAtMs - w.startedAtMs - w.pausedAccumulatedMs) AS durationMs,
+            COALESCE(COUNT(ws.id), 0) AS setCount
         FROM workouts w
-        LEFT JOIN workout_exercises we ON we.workoutId = w.id
-        LEFT JOIN workout_sets ws ON ws.workoutExerciseId = we.id
+        LEFT JOIN workout_sets ws ON ws.workoutId = w.id
         WHERE w.completedAtMs IS NOT NULL
         GROUP BY w.id
         ORDER BY w.completedAtMs DESC
@@ -267,43 +166,11 @@ interface WorkoutDao {
         """
         SELECT
             (SELECT COUNT(*) FROM workouts WHERE completedAtMs IS NOT NULL) AS totalWorkouts,
-            (SELECT COUNT(*) FROM workout_sets WHERE done = 1) AS totalSets,
-            (SELECT COALESCE(SUM(weightKg * reps), 0) FROM workout_sets WHERE done = 1) AS totalVolumeKg,
-            (SELECT COALESCE(MAX(reps), 0) FROM workout_sets WHERE done = 1) AS maxReps,
-            (SELECT COALESCE(MAX(durationMs), 0) FROM workout_sets WHERE done = 1) AS maxActiveMs
+            (SELECT COALESCE(MAX(reps), 0) FROM workout_sets) AS maxReps,
+            (SELECT COALESCE(MAX(durationMs), 0) FROM workout_sets) AS maxHoldMs
         """
     )
     fun observeProfileBase(): Flow<ProfileBaseRow>
-
-    @Query(
-        """
-        SELECT
-            we.exerciseName AS exerciseName,
-            MAX(ws.reps) AS maxReps
-        FROM workout_sets ws
-        INNER JOIN workout_exercises we ON we.id = ws.workoutExerciseId
-        WHERE ws.done = 1
-        GROUP BY we.exerciseName
-        ORDER BY maxReps DESC
-        LIMIT :limit
-        """
-    )
-    fun observeTopRecords(limit: Int = 8): Flow<List<RecordRow>>
-
-    @Query(
-        """
-        SELECT ws.weightKg, ws.reps
-        FROM workout_sets ws
-        INNER JOIN workout_exercises we ON we.id = ws.workoutExerciseId
-        INNER JOIN workouts w ON w.id = we.workoutId
-        WHERE we.exerciseName = :exerciseName
-            AND ws.done = 1
-            AND w.completedAtMs IS NOT NULL
-        ORDER BY w.completedAtMs DESC, ws.completedAtMs DESC
-        LIMIT 1
-        """
-    )
-    suspend fun getLatestCompletedSet(exerciseName: String): LatestSetRow?
 
     @Query("SELECT id FROM workouts WHERE completedAtMs IS NULL ORDER BY startedAtMs DESC LIMIT 1")
     suspend fun getActiveWorkoutId(): Long?
@@ -312,24 +179,15 @@ interface WorkoutDao {
     suspend fun getCompletedWorkoutCount(): Int
 }
 
-data class LatestSetRow(
-    val weightKg: Float,
-    val reps: Int,
-)
-
 @Database(
     entities = [
-        RoutineEntity::class,
-        RoutineExerciseEntity::class,
         WorkoutEntity::class,
-        WorkoutExerciseEntity::class,
         WorkoutSetEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class GripmaxxerDatabase : RoomDatabase() {
-    abstract fun routineDao(): RoutineDao
     abstract fun workoutDao(): WorkoutDao
 
     companion object {
@@ -342,7 +200,9 @@ abstract class GripmaxxerDatabase : RoomDatabase() {
                     context.applicationContext,
                     GripmaxxerDatabase::class.java,
                     "gripmaxxer.db",
-                ).fallbackToDestructiveMigration().build().also { instance = it }
+                ).fallbackToDestructiveMigration(dropAllTables = true)
+                    .build()
+                    .also { instance = it }
             }
         }
     }

@@ -12,7 +12,7 @@ Gripmaxxer is an Android app (Kotlin + Compose) that uses the **front camera** a
 - Send **system-wide media play/pause** commands through active MediaSession controllers.
 - Show an always-on-top numeric overlay stopwatch while exercise is active.
 - Count reps in the selected exercise mode.
-- Provide a Hevy-style workout tracker shell with bottom tabs: `Home`, `Workout`, `Profile`.
+- Provide a simple workout shell with bottom tabs: `Log`, `Workout`, `Profile`.
 
 Made by **Astro Labs** (`astrolabs`).
 
@@ -26,15 +26,19 @@ Made by **Astro Labs** (`astrolabs`).
   - On rep event: temporarily shows only rep number (for 800ms), then returns to stopwatch value.
   - Overlay can be dragged and dropped anywhere on screen; its position is remembered.
 - While this app screen is open and monitoring is active, the display is kept awake to avoid screen timeout mid-set.
-- Workout tab includes:
-  - `Start Empty Workout`
-  - `Routines` with create/duplicate/rename/delete
-  - `Explore` local exercise library
-  - `Start Routine` cards
-- Active workout logging includes per-exercise set rows (`kg`, `reps`, `done`) and auto rest timer.
-- Home tab shows completed workout feed and workout details.
-- Profile tab shows stats/records and settings (unit toggle `kg/lb`, media, overlay, camera feedback).
-- Camera auto-detection emits auto-set suggestions that can be applied/discarded; sets are still user-confirmed.
+- Workout tab includes a minimal pre-session picker:
+  - Select one camera-trackable exercise mode
+  - Tap `Start Workout`
+- Active workout runs in a fullscreen camera tracker with live HUD:
+  - Exercise mode
+  - Elapsed workout time
+  - Current set reps/time
+  - Completed set count
+  - Controls: `Pause/Resume`, `End`, and `Sets` editor
+- Sets are auto-created on activity end (`active -> idle`) from camera events.
+- Set correction (edit/delete) is available both during tracking and in `Log` session detail.
+- Log tab shows completed sessions feed, calendar aggregation, and editable detail.
+- Profile tab shows essential stats/settings (media control, overlay, camera preview, permissions).
 
 ## Why Notification Access Is Required
 Android does not allow unrestricted access to active media sessions without privileged permissions.
@@ -61,10 +65,8 @@ Some system screens or OEM-specific UIs may still hide overlays.
    - Notification access
    - Overlay permission (if overlay is enabled)
 5. Start playback in your target app (YouTube, TikTok, browser, etc.).
-6. Open `Workout` tab and either:
-   - Tap **Start Empty Workout**, or
-   - Tap **Start Routine** from `My Routines`.
-7. During an active workout, optionally use **Auto Track** on supported camera exercises.
+6. Open `Workout` tab, select an exercise mode, and tap **Start Workout**.
+7. During tracking, use **Pause/Resume** or **End**, and open **Sets** to edit/delete finalized sets.
 
 ## Troubleshooting
 - Start media playback first in the target app before monitoring.

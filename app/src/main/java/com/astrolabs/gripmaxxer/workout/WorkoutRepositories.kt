@@ -1,36 +1,15 @@
 package com.astrolabs.gripmaxxer.workout
 
-import androidx.room.withTransaction
-import com.astrolabs.gripmaxxer.datastore.CalendarDayRow
 import com.astrolabs.gripmaxxer.datastore.GripmaxxerDatabase
 import com.astrolabs.gripmaxxer.datastore.ProfileBaseRow
-import com.astrolabs.gripmaxxer.datastore.RecordRow
-import com.astrolabs.gripmaxxer.datastore.RoutineEntity
-import com.astrolabs.gripmaxxer.datastore.RoutineExerciseEntity
-import com.astrolabs.gripmaxxer.datastore.RoutineWithExercisesEntity
 import com.astrolabs.gripmaxxer.datastore.WorkoutEntity
-import com.astrolabs.gripmaxxer.datastore.WorkoutExerciseEntity
-import com.astrolabs.gripmaxxer.datastore.WorkoutExerciseWithSetsEntity
 import com.astrolabs.gripmaxxer.datastore.WorkoutFeedRow
 import com.astrolabs.gripmaxxer.datastore.WorkoutSetEntity
-import com.astrolabs.gripmaxxer.datastore.WorkoutSession
-import com.astrolabs.gripmaxxer.datastore.WorkoutWithExercisesEntity
+import com.astrolabs.gripmaxxer.datastore.WorkoutWithSetsEntity
 import com.astrolabs.gripmaxxer.reps.ExerciseMode
 import com.astrolabs.gripmaxxer.service.AutoSetEvent
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
-import java.time.LocalDate
-import java.time.ZoneId
-import kotlin.math.roundToInt
-
-interface RoutineRepository {
-    val routinesFlow: Flow<List<Routine>>
-    suspend fun createRoutine(name: String, exercises: List<RoutineExerciseTemplateInput>): Long
-    suspend fun renameRoutine(routineId: Long, newName: String)
-    suspend fun duplicateRoutine(routineId: Long): Long?
-    suspend fun deleteRoutine(routineId: Long)
-}
 
 interface WorkoutRepository {
     val activeWorkoutFlow: Flow<ActiveWorkoutState?>
@@ -38,155 +17,23 @@ interface WorkoutRepository {
     val calendarSummaryFlow: Flow<List<CalendarDaySummary>>
     val profileStatsFlow: Flow<ProfileStats>
 
-    suspend fun startEmptyWorkout(title: String): Long
-    suspend fun startWorkoutFromRoutine(routineId: Long): Long?
-    suspend fun updateWorkoutTitle(workoutId: Long, title: String)
-    suspend fun addExerciseToWorkout(
-        workoutId: Long,
-        exerciseName: String,
-        mode: ExerciseMode?,
-        targetSets: Int,
-        targetReps: Int,
-        targetWeightKg: Float,
-        restSeconds: Int,
-    ): Long
-
-    suspend fun addSet(exerciseId: Long): Long
-    suspend fun updateSetWeight(setId: Long, weightKg: Float)
-    suspend fun updateSetReps(setId: Long, reps: Int)
-    suspend fun toggleSetDone(setId: Long, done: Boolean)
-    suspend fun removeSet(setId: Long)
-    suspend fun finishWorkout(workoutId: Long): Boolean
+    suspend fun startWorkout(mode: ExerciseMode): Long
+    suspend fun pauseWorkout(workoutId: Long): Boolean
+    suspend fun resumeWorkout(workoutId: Long): Boolean
+    suspend fun endWorkout(workoutId: Long): Boolean
+    suspend fun appendAutoSet(workoutId: Long, event: AutoSetEvent): WorkoutSetState?
+    suspend fun editSet(setId: Long, reps: Int, durationMs: Long): Boolean
+    suspend fun deleteSet(setId: Long): Boolean
     suspend fun getCompletedWorkoutDetail(workoutId: Long): CompletedWorkoutDetail?
-    suspend fun applyAutoSetEvent(event: AutoSetEvent, preferredExerciseId: Long?): AutoSetSuggestion?
-    suspend fun importLegacySessionsIfNeeded(sessions: List<WorkoutSession>)
-}
-
-interface ActiveWorkoutRepository {
-    val activeWorkoutFlow: Flow<ActiveWorkoutState?>
-    suspend fun startEmptyWorkout(title: String): Long
-    suspend fun startWorkoutFromRoutine(routineId: Long): Long?
-    suspend fun finishWorkout(workoutId: Long): Boolean
-    suspend fun applyAutoSetEvent(event: AutoSetEvent, preferredExerciseId: Long?): AutoSetSuggestion?
-}
-
-data class RoutineExerciseTemplateInput(
-    val exerciseName: String,
-    val mode: ExerciseMode?,
-    val targetSets: Int,
-    val targetReps: Int,
-    val targetWeightKg: Float,
-    val restSeconds: Int,
-)
-
-class RoomRoutineRepository(
-    private val database: GripmaxxerDatabase,
-) : RoutineRepository {
-    private val routineDao = database.routineDao()
-
-    override val routinesFlow: Flow<List<Routine>> = routineDao.observeRoutinesWithExercises()
-        .map { routines ->
-            routines.map { it.toDomain() }
-        }
-
-    override suspend fun createRoutine(name: String, exercises: List<RoutineExerciseTemplateInput>): Long {
-        val now = System.currentTimeMillis()
-        return database.withTransaction {
-            val routineId = routineDao.insertRoutine(
-                RoutineEntity(
-                    name = name,
-                    createdAtMs = now,
-                    updatedAtMs = now,
-                )
-            )
-            routineDao.insertRoutineExercises(
-                exercises.mapIndexed { index, exercise ->
-                    RoutineExerciseEntity(
-                        routineId = routineId,
-                        position = index,
-                        exerciseName = exercise.exerciseName,
-                        modeName = exercise.mode?.name,
-                        targetSets = exercise.targetSets.coerceAtLeast(1),
-                        targetReps = exercise.targetReps.coerceAtLeast(0),
-                        targetWeightKg = exercise.targetWeightKg.coerceAtLeast(0f),
-                        restSeconds = exercise.restSeconds.coerceAtLeast(15),
-                    )
-                }
-            )
-            routineId
-        }
-    }
-
-    override suspend fun renameRoutine(routineId: Long, newName: String) {
-        val current = routineDao.getRoutineWithExercises(routineId)?.routine ?: return
-        routineDao.updateRoutine(
-            current.copy(
-                name = newName,
-                updatedAtMs = System.currentTimeMillis(),
-            )
-        )
-    }
-
-    override suspend fun duplicateRoutine(routineId: Long): Long? {
-        val source = routineDao.getRoutineWithExercises(routineId) ?: return null
-        val now = System.currentTimeMillis()
-        return database.withTransaction {
-            val duplicatedId = routineDao.insertRoutine(
-                RoutineEntity(
-                    name = "${source.routine.name} Copy",
-                    createdAtMs = now,
-                    updatedAtMs = now,
-                )
-            )
-            routineDao.insertRoutineExercises(
-                source.exercises.sortedBy { it.position }.map { exercise ->
-                    exercise.copy(id = 0L, routineId = duplicatedId)
-                }
-            )
-            duplicatedId
-        }
-    }
-
-    override suspend fun deleteRoutine(routineId: Long) {
-        routineDao.deleteRoutine(routineId)
-    }
-
-    private fun RoutineWithExercisesEntity.toDomain(): Routine {
-        return Routine(
-            id = routine.id,
-            name = routine.name,
-            createdAtMs = routine.createdAtMs,
-            exercises = exercises
-                .sortedBy { it.position }
-                .map { exercise ->
-                    RoutineExerciseTemplate(
-                        id = exercise.id,
-                        routineId = exercise.routineId,
-                        position = exercise.position,
-                        exerciseName = exercise.exerciseName,
-                        mode = parseMode(exercise.modeName),
-                        targetSets = exercise.targetSets,
-                        targetReps = exercise.targetReps,
-                        targetWeightKg = exercise.targetWeightKg,
-                        restSeconds = exercise.restSeconds,
-                    )
-                },
-        )
-    }
-
-    private fun parseMode(raw: String?): ExerciseMode? {
-        if (raw.isNullOrBlank()) return null
-        return runCatching { ExerciseMode.valueOf(raw) }.getOrNull()
-    }
+    suspend fun getSetById(setId: Long): WorkoutSetState?
 }
 
 class RoomWorkoutRepository(
     private val database: GripmaxxerDatabase,
-) : WorkoutRepository, ActiveWorkoutRepository {
-    private val routineDao = database.routineDao()
+) : WorkoutRepository {
     private val workoutDao = database.workoutDao()
 
-    override val activeWorkoutFlow: Flow<ActiveWorkoutState?> = workoutDao.observeActiveWorkoutWithExercises()
+    override val activeWorkoutFlow: Flow<ActiveWorkoutState?> = workoutDao.observeActiveWorkoutWithSets()
         .map { workout -> workout?.toActiveDomain() }
 
     override val completedWorkoutFeedFlow: Flow<List<WorkoutFeedItem>> = workoutDao.observeCompletedWorkoutFeed()
@@ -195,463 +42,205 @@ class RoomWorkoutRepository(
     override val calendarSummaryFlow: Flow<List<CalendarDaySummary>> = workoutDao.observeCalendarSummary()
         .map { rows -> rows.map { CalendarDaySummary(dayEpochMs = it.dayEpochMs, workoutCount = it.workoutCount) } }
 
-    override val profileStatsFlow: Flow<ProfileStats> = combine(
-        workoutDao.observeProfileBase(),
-        workoutDao.observeCalendarSummary(),
-        workoutDao.observeTopRecords(),
-    ) { base, calendar, records ->
-        base.toProfileStats(calendarRows = calendar, recordRows = records)
-    }
+    override val profileStatsFlow: Flow<ProfileStats> = workoutDao.observeProfileBase()
+        .map { base -> base.toDomain() }
 
-    override suspend fun startEmptyWorkout(title: String): Long {
+    override suspend fun startWorkout(mode: ExerciseMode): Long {
         val activeId = workoutDao.getActiveWorkoutId()
         if (activeId != null) return activeId
+        val now = System.currentTimeMillis()
         return workoutDao.insertWorkout(
             WorkoutEntity(
-                title = title,
-                startedAtMs = System.currentTimeMillis(),
+                title = mode.label,
+                exerciseModeName = mode.name,
+                startedAtMs = now,
                 completedAtMs = null,
-                sourceRoutineId = null,
+                isPaused = false,
+                pauseStartedAtMs = null,
+                pausedAccumulatedMs = 0L,
             )
         )
     }
 
-    override suspend fun startWorkoutFromRoutine(routineId: Long): Long? {
-        val activeId = workoutDao.getActiveWorkoutId()
-        if (activeId != null) return activeId
-        val routine = routineDao.getRoutineWithExercises(routineId) ?: return null
-        return database.withTransaction {
-            val workoutId = workoutDao.insertWorkout(
-                WorkoutEntity(
-                    title = routine.routine.name,
-                    startedAtMs = System.currentTimeMillis(),
-                    completedAtMs = null,
-                    sourceRoutineId = routineId,
-                )
+    override suspend fun pauseWorkout(workoutId: Long): Boolean {
+        val full = workoutDao.getWorkoutWithSets(workoutId) ?: return false
+        val workout = full.workout
+        if (workout.completedAtMs != null || workout.isPaused) return false
+        workoutDao.updateWorkout(
+            workout.copy(
+                isPaused = true,
+                pauseStartedAtMs = System.currentTimeMillis(),
             )
-            routine.exercises.sortedBy { it.position }.forEachIndexed { index, routineExercise ->
-                val exerciseId = workoutDao.insertWorkoutExercise(
-                    WorkoutExerciseEntity(
-                        workoutId = workoutId,
-                        position = index,
-                        exerciseName = routineExercise.exerciseName,
-                        modeName = routineExercise.modeName,
-                        restSeconds = routineExercise.restSeconds,
-                    )
-                )
-                workoutDao.insertWorkoutSets(
-                    (1..routineExercise.targetSets.coerceAtLeast(1)).map { setNum ->
-                        WorkoutSetEntity(
-                            workoutExerciseId = exerciseId,
-                            setNumber = setNum,
-                            weightKg = routineExercise.targetWeightKg,
-                            reps = routineExercise.targetReps,
-                            done = false,
-                            durationMs = 0L,
-                            completedAtMs = null,
-                            autoTracked = false,
-                        )
-                    }
-                )
-            }
-            workoutId
-        }
+        )
+        return true
     }
 
-    override suspend fun updateWorkoutTitle(workoutId: Long, title: String) {
-        val full = workoutDao.getWorkoutWithExercises(workoutId) ?: return
-        workoutDao.updateWorkout(full.workout.copy(title = title))
-    }
+    override suspend fun resumeWorkout(workoutId: Long): Boolean {
+        val full = workoutDao.getWorkoutWithSets(workoutId) ?: return false
+        val workout = full.workout
+        if (workout.completedAtMs != null || !workout.isPaused) return false
 
-    override suspend fun addExerciseToWorkout(
-        workoutId: Long,
-        exerciseName: String,
-        mode: ExerciseMode?,
-        targetSets: Int,
-        targetReps: Int,
-        targetWeightKg: Float,
-        restSeconds: Int,
-    ): Long {
-        return database.withTransaction {
-            val workout = workoutDao.getWorkoutWithExercises(workoutId) ?: return@withTransaction -1L
-            val nextPosition = workout.exercises.maxOfOrNull { it.exercise.position }?.plus(1) ?: 0
-            val exerciseId = workoutDao.insertWorkoutExercise(
-                WorkoutExerciseEntity(
-                    workoutId = workoutId,
-                    position = nextPosition,
-                    exerciseName = exerciseName,
-                    modeName = mode?.name,
-                    restSeconds = restSeconds.coerceAtLeast(15),
-                )
+        val pausedStart = workout.pauseStartedAtMs ?: System.currentTimeMillis()
+        val addedPaused = (System.currentTimeMillis() - pausedStart).coerceAtLeast(0L)
+
+        workoutDao.updateWorkout(
+            workout.copy(
+                isPaused = false,
+                pauseStartedAtMs = null,
+                pausedAccumulatedMs = workout.pausedAccumulatedMs + addedPaused,
             )
-            workoutDao.insertWorkoutSets(
-                (1..targetSets.coerceAtLeast(1)).map { setNum ->
-                    WorkoutSetEntity(
-                        workoutExerciseId = exerciseId,
-                        setNumber = setNum,
-                        weightKg = targetWeightKg.coerceAtLeast(0f),
-                        reps = targetReps.coerceAtLeast(0),
-                        done = false,
-                        durationMs = 0L,
-                        completedAtMs = null,
-                        autoTracked = false,
-                    )
-                }
-            )
-            exerciseId
-        }
+        )
+        return true
     }
 
-    override suspend fun addSet(exerciseId: Long): Long {
-        val nextSetNumber = workoutDao.getMaxSetNumber(exerciseId) + 1
-        return workoutDao.insertWorkoutSets(
-            listOf(
-                WorkoutSetEntity(
-                    workoutExerciseId = exerciseId,
-                    setNumber = nextSetNumber,
-                    weightKg = 0f,
-                    reps = 0,
-                    done = false,
-                    durationMs = 0L,
-                    completedAtMs = null,
-                    autoTracked = false,
-                )
-            )
-        ).first()
-    }
-
-    override suspend fun updateSetWeight(setId: Long, weightKg: Float) {
-        updateSet(setId) { it.copy(weightKg = weightKg.coerceAtLeast(0f)) }
-    }
-
-    override suspend fun updateSetReps(setId: Long, reps: Int) {
-        updateSet(setId) { it.copy(reps = reps.coerceAtLeast(0)) }
-    }
-
-    override suspend fun toggleSetDone(setId: Long, done: Boolean) {
-        updateSet(setId) {
-            if (done) {
-                it.copy(done = true, completedAtMs = System.currentTimeMillis())
-            } else {
-                it.copy(done = false, completedAtMs = null)
-            }
-        }
-    }
-
-    override suspend fun removeSet(setId: Long) {
-        workoutDao.deleteWorkoutSetById(setId)
-    }
-
-    override suspend fun finishWorkout(workoutId: Long): Boolean {
-        val full = workoutDao.getWorkoutWithExercises(workoutId) ?: return false
+    override suspend fun endWorkout(workoutId: Long): Boolean {
+        val full = workoutDao.getWorkoutWithSets(workoutId) ?: return false
         val workout = full.workout
         if (workout.completedAtMs != null) return true
-        workoutDao.updateWorkout(workout.copy(completedAtMs = System.currentTimeMillis()))
+
+        val now = System.currentTimeMillis()
+        val finalPausedAccumulated = if (workout.isPaused) {
+            val pausedStart = workout.pauseStartedAtMs ?: now
+            workout.pausedAccumulatedMs + (now - pausedStart).coerceAtLeast(0L)
+        } else {
+            workout.pausedAccumulatedMs
+        }
+
+        workoutDao.updateWorkout(
+            workout.copy(
+                completedAtMs = now,
+                isPaused = false,
+                pauseStartedAtMs = null,
+                pausedAccumulatedMs = finalPausedAccumulated,
+            )
+        )
+        return true
+    }
+
+    override suspend fun appendAutoSet(workoutId: Long, event: AutoSetEvent): WorkoutSetState? {
+        val full = workoutDao.getWorkoutWithSets(workoutId) ?: return null
+        val workout = full.workout
+        if (workout.completedAtMs != null || workout.isPaused) return null
+
+        val mode = parseMode(workout.exerciseModeName) ?: return null
+        if (mode != event.mode) return null
+
+        val nextSet = workoutDao.countSetsForWorkout(workoutId) + 1
+        val setId = workoutDao.insertWorkoutSet(
+            WorkoutSetEntity(
+                workoutId = workoutId,
+                setNumber = nextSet,
+                reps = event.reps.coerceAtLeast(0),
+                durationMs = event.activeMs.coerceAtLeast(0L),
+                completedAtMs = event.timestampMs,
+                autoTracked = true,
+            )
+        )
+        return workoutDao.getSetById(setId)?.toDomain()
+    }
+
+    override suspend fun editSet(setId: Long, reps: Int, durationMs: Long): Boolean {
+        val current = workoutDao.getSetById(setId) ?: return false
+        workoutDao.updateWorkoutSet(
+            current.copy(
+                reps = reps.coerceAtLeast(0),
+                durationMs = durationMs.coerceAtLeast(0L),
+            )
+        )
+        return true
+    }
+
+    override suspend fun deleteSet(setId: Long): Boolean {
+        val workoutId = workoutDao.getWorkoutIdBySetId(setId) ?: return false
+        workoutDao.deleteWorkoutSetById(setId)
+
+        val resequenced = workoutDao.getSetsForWorkout(workoutId)
+            .sortedBy { it.setNumber }
+            .mapIndexed { index, set ->
+                if (set.setNumber == index + 1) set else set.copy(setNumber = index + 1)
+            }
+
+        if (resequenced.isNotEmpty()) {
+            workoutDao.updateWorkoutSets(resequenced)
+        }
         return true
     }
 
     override suspend fun getCompletedWorkoutDetail(workoutId: Long): CompletedWorkoutDetail? {
-        val full = workoutDao.getWorkoutWithExercises(workoutId) ?: return null
+        val full = workoutDao.getWorkoutWithSets(workoutId) ?: return null
         val completedAt = full.workout.completedAtMs ?: return null
+        val mode = parseMode(full.workout.exerciseModeName) ?: return null
+
         return CompletedWorkoutDetail(
             workoutId = full.workout.id,
             title = full.workout.title,
+            mode = mode,
             startedAtMs = full.workout.startedAtMs,
             completedAtMs = completedAt,
-            durationMs = (completedAt - full.workout.startedAtMs).coerceAtLeast(0L),
-            exercises = full.exercises
-                .sortedBy { it.exercise.position }
-                .map { exercise ->
-                    WorkoutExerciseDetail(
-                        exerciseName = exercise.exercise.exerciseName,
-                        sets = mapSetStates(exercise),
-                    )
-                },
+            durationMs = (completedAt - full.workout.startedAtMs - full.workout.pausedAccumulatedMs).coerceAtLeast(0L),
+            sets = full.sets.sortedBy { it.setNumber }.map { it.toDomain() },
         )
     }
 
-    override suspend fun applyAutoSetEvent(event: AutoSetEvent, preferredExerciseId: Long?): AutoSetSuggestion? {
-        val active = workoutDao.getWorkoutWithExercises(workoutDao.getActiveWorkoutId() ?: return null) ?: return null
-        val candidates = active.exercises
-            .sortedBy { it.exercise.position }
-            .filter { it.exercise.modeName == event.mode.name }
-        if (candidates.isEmpty()) return null
-
-        val targetExercise = candidates.firstOrNull { it.exercise.id == preferredExerciseId } ?: candidates.first()
-        val firstPending = targetExercise.sets
-            .sortedBy { it.setNumber }
-            .firstOrNull { !it.done }
-
-        if (firstPending != null) {
-            workoutDao.updateWorkoutSet(
-                firstPending.copy(
-                    reps = event.reps,
-                    durationMs = event.activeMs,
-                    autoTracked = true,
-                )
-            )
-            return AutoSetSuggestion(
-                eventId = event.eventId,
-                exerciseId = targetExercise.exercise.id,
-                exerciseName = targetExercise.exercise.exerciseName,
-                reps = event.reps,
-                durationMs = event.activeMs,
-                mode = event.mode,
-            )
-        }
-
-        workoutDao.insertWorkoutSets(
-            listOf(
-                WorkoutSetEntity(
-                    workoutExerciseId = targetExercise.exercise.id,
-                    setNumber = (targetExercise.sets.maxOfOrNull { it.setNumber } ?: 0) + 1,
-                    weightKg = 0f,
-                    reps = event.reps,
-                    done = false,
-                    durationMs = event.activeMs,
-                    completedAtMs = null,
-                    autoTracked = true,
-                )
-            )
-        )
-
-        return AutoSetSuggestion(
-            eventId = event.eventId,
-            exerciseId = targetExercise.exercise.id,
-            exerciseName = targetExercise.exercise.exerciseName,
-            reps = event.reps,
-            durationMs = event.activeMs,
-            mode = event.mode,
-        )
+    override suspend fun getSetById(setId: Long): WorkoutSetState? {
+        return workoutDao.getSetById(setId)?.toDomain()
     }
 
-    override suspend fun importLegacySessionsIfNeeded(sessions: List<WorkoutSession>) {
-        if (sessions.isEmpty()) return
-        val shouldImport = workoutDao.getCompletedWorkoutCount() == 0
-        if (!shouldImport) return
-
-        database.withTransaction {
-            sessions.sortedBy { it.completedAtMs }.forEach { session ->
-                val startedAt = (session.completedAtMs - session.activeMs).coerceAtLeast(0L)
-                val workoutId = workoutDao.insertWorkout(
-                    WorkoutEntity(
-                        title = "Legacy ${session.mode.label}",
-                        startedAtMs = startedAt,
-                        completedAtMs = session.completedAtMs,
-                        sourceRoutineId = null,
-                    )
-                )
-                val exerciseId = workoutDao.insertWorkoutExercise(
-                    WorkoutExerciseEntity(
-                        workoutId = workoutId,
-                        position = 0,
-                        exerciseName = session.mode.label,
-                        modeName = session.mode.name,
-                        restSeconds = 90,
-                    )
-                )
-                workoutDao.insertWorkoutSets(
-                    listOf(
-                        WorkoutSetEntity(
-                            workoutExerciseId = exerciseId,
-                            setNumber = 1,
-                            weightKg = 0f,
-                            reps = session.reps,
-                            done = true,
-                            durationMs = session.activeMs,
-                            completedAtMs = session.completedAtMs,
-                            autoTracked = true,
-                        )
-                    )
-                )
-            }
-        }
-    }
-
-    private suspend fun updateSet(setId: Long, update: (WorkoutSetEntity) -> WorkoutSetEntity) {
-        val active = workoutDao.getWorkoutWithExercises(workoutDao.getActiveWorkoutId() ?: return) ?: return
-        val set = active.exercises
-            .flatMap { it.sets }
-            .firstOrNull { it.id == setId } ?: return
-        workoutDao.updateWorkoutSet(update(set))
-    }
-
-    private fun RoutineWithExercisesEntity.toDomain(): Routine {
-        return Routine(
-            id = routine.id,
-            name = routine.name,
-            createdAtMs = routine.createdAtMs,
-            exercises = exercises
-                .sortedBy { it.position }
-                .map { exercise ->
-                    RoutineExerciseTemplate(
-                        id = exercise.id,
-                        routineId = exercise.routineId,
-                        position = exercise.position,
-                        exerciseName = exercise.exerciseName,
-                        mode = parseMode(exercise.modeName),
-                        targetSets = exercise.targetSets,
-                        targetReps = exercise.targetReps,
-                        targetWeightKg = exercise.targetWeightKg,
-                        restSeconds = exercise.restSeconds,
-                    )
-                },
-        )
-    }
-
-    private fun WorkoutWithExercisesEntity.toActiveDomain(): ActiveWorkoutState {
+    private fun WorkoutWithSetsEntity.toActiveDomain(): ActiveWorkoutState {
+        val mode = parseMode(workout.exerciseModeName) ?: ExerciseMode.PULL_UP
         val now = System.currentTimeMillis()
+        val runningBase = if (workout.isPaused) {
+            (workout.pauseStartedAtMs ?: now)
+        } else {
+            now
+        }
+
+        val elapsed = (runningBase - workout.startedAtMs - workout.pausedAccumulatedMs).coerceAtLeast(0L)
+
         return ActiveWorkoutState(
             id = workout.id,
             title = workout.title,
+            mode = mode,
             startedAtMs = workout.startedAtMs,
-            elapsedMs = (now - workout.startedAtMs).coerceAtLeast(0L),
-            exercises = exercises
-                .sortedBy { it.exercise.position }
-                .map { exercise ->
-                    WorkoutExerciseState(
-                        id = exercise.exercise.id,
-                        position = exercise.exercise.position,
-                        exerciseName = exercise.exercise.exerciseName,
-                        mode = parseMode(exercise.exercise.modeName),
-                        restSeconds = exercise.exercise.restSeconds,
-                        sets = mapSetStates(exercise),
-                    )
-                },
+            elapsedMs = elapsed,
+            elapsedComputedAtMs = now,
+            paused = workout.isPaused,
+            sets = sets.sortedBy { it.setNumber }.map { it.toDomain() },
         )
-    }
-
-    private fun mapSetStates(exercise: WorkoutExerciseWithSetsEntity): List<WorkoutSetState> {
-        var previous = "-"
-        val exerciseMode = parseMode(exercise.exercise.modeName)
-        return exercise.sets.sortedBy { it.setNumber }.map { set ->
-            val state = WorkoutSetState(
-                id = set.id,
-                setNumber = set.setNumber,
-                previous = previous,
-                weightKg = set.weightKg,
-                reps = set.reps,
-                done = set.done,
-                completedAtMs = set.completedAtMs,
-                durationMs = set.durationMs,
-                autoTracked = set.autoTracked,
-            )
-            if (set.done) {
-                previous = if (exerciseMode.isHangMode()) {
-                    formatHoldDuration(set.durationMs)
-                } else {
-                    "${set.weightKg.trimZero()}kg x ${set.reps}"
-                }
-            }
-            state
-        }
     }
 
     private fun WorkoutFeedRow.toDomain(): WorkoutFeedItem {
         return WorkoutFeedItem(
             workoutId = workoutId,
             title = title,
+            mode = parseMode(modeName) ?: ExerciseMode.PULL_UP,
             completedAtMs = completedAtMs,
             durationMs = durationMs.coerceAtLeast(0L),
-            exerciseCount = exerciseCount,
-            totalVolumeKg = totalVolumeKg,
+            setCount = setCount,
         )
     }
 
-    private fun ProfileBaseRow.toProfileStats(
-        calendarRows: List<CalendarDayRow>,
-        recordRows: List<RecordRow>,
-    ): ProfileStats {
+    private fun ProfileBaseRow.toDomain(): ProfileStats {
         return ProfileStats(
             totalWorkouts = totalWorkouts,
-            totalSets = totalSets,
-            totalVolumeKg = totalVolumeKg,
-            currentWeekCount = computeCurrentWeekCount(calendarRows),
-            streakDays = computeStreakDays(calendarRows),
             maxReps = maxReps,
-            maxActiveMs = maxActiveMs,
-            records = recordRows.map { PersonalRecord(it.exerciseName, it.maxReps) },
+            maxHoldMs = maxHoldMs,
         )
     }
 
-    private fun computeCurrentWeekCount(rows: List<CalendarDayRow>): Int {
-        val zone = ZoneId.systemDefault()
-        val today = LocalDate.now(zone)
-        val start = today.minusDays(today.dayOfWeek.value.toLong() - 1L)
-        return rows.count { row ->
-            val date = row.dayEpochMs.toLocalDate(zone)
-            !date.isBefore(start) && !date.isAfter(today)
-        }
-    }
-
-    private fun computeStreakDays(rows: List<CalendarDayRow>): Int {
-        if (rows.isEmpty()) return 0
-        val zone = ZoneId.systemDefault()
-        val completedDays = rows
-            .map { it.dayEpochMs.toLocalDate(zone) }
-            .toSet()
-
-        var current = LocalDate.now(zone)
-        if (!completedDays.contains(current)) {
-            current = current.minusDays(1)
-        }
-        var streak = 0
-        while (completedDays.contains(current)) {
-            streak += 1
-            current = current.minusDays(1)
-        }
-        return streak
+    private fun WorkoutSetEntity.toDomain(): WorkoutSetState {
+        return WorkoutSetState(
+            id = id,
+            setNumber = setNumber,
+            reps = reps,
+            durationMs = durationMs,
+            completedAtMs = completedAtMs,
+            autoTracked = autoTracked,
+        )
     }
 
     private fun parseMode(raw: String?): ExerciseMode? {
         if (raw.isNullOrBlank()) return null
         return runCatching { ExerciseMode.valueOf(raw) }.getOrNull()
-    }
-
-    private fun Float.trimZero(): String {
-        val rounded = (this * 10f).roundToInt() / 10f
-        val asInt = rounded.toInt()
-        return if (asInt.toFloat() == rounded) {
-            asInt.toString()
-        } else {
-            String.format(java.util.Locale.US, "%.1f", rounded)
-        }
-    }
-
-    private fun Long.toLocalDate(zoneId: ZoneId): LocalDate {
-        return java.time.Instant.ofEpochMilli(this).atZone(zoneId).toLocalDate()
-    }
-
-    private fun ExerciseMode?.isHangMode(): Boolean {
-        return this == ExerciseMode.DEAD_HANG || this == ExerciseMode.ACTIVE_HANG
-    }
-
-    private fun formatHoldDuration(ms: Long): String {
-        val totalSeconds = (ms / 1000L).coerceAtLeast(0L)
-        val minutes = totalSeconds / 60L
-        val seconds = totalSeconds % 60L
-        return String.format(java.util.Locale.US, "%d:%02d hold", minutes, seconds)
-    }
-}
-
-class DefaultActiveWorkoutRepository(
-    private val workoutRepository: WorkoutRepository,
-) : ActiveWorkoutRepository {
-    override val activeWorkoutFlow: Flow<ActiveWorkoutState?> = workoutRepository.activeWorkoutFlow
-
-    override suspend fun startEmptyWorkout(title: String): Long {
-        return workoutRepository.startEmptyWorkout(title)
-    }
-
-    override suspend fun startWorkoutFromRoutine(routineId: Long): Long? {
-        return workoutRepository.startWorkoutFromRoutine(routineId)
-    }
-
-    override suspend fun finishWorkout(workoutId: Long): Boolean {
-        return workoutRepository.finishWorkout(workoutId)
-    }
-
-    override suspend fun applyAutoSetEvent(event: AutoSetEvent, preferredExerciseId: Long?): AutoSetSuggestion? {
-        return workoutRepository.applyAutoSetEvent(event, preferredExerciseId)
     }
 }

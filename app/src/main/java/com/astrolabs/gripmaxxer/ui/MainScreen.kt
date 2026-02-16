@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,24 +25,17 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Explore
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.List
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -75,16 +67,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.astrolabs.gripmaxxer.datastore.WeightUnit
 import com.astrolabs.gripmaxxer.reps.ExerciseMode
 import com.astrolabs.gripmaxxer.service.DebugPreviewFrame
-import com.astrolabs.gripmaxxer.workout.ActiveWorkoutState
-import com.astrolabs.gripmaxxer.workout.CompletedWorkoutDetail
-import com.astrolabs.gripmaxxer.workout.DefaultExerciseLibrary
-import com.astrolabs.gripmaxxer.workout.ExerciseTemplate
-import com.astrolabs.gripmaxxer.workout.Routine
 import com.astrolabs.gripmaxxer.workout.CalendarDaySummary
-import com.astrolabs.gripmaxxer.workout.WorkoutExerciseState
+import com.astrolabs.gripmaxxer.workout.CameraTrackableModes
+import com.astrolabs.gripmaxxer.workout.CompletedWorkoutDetail
 import com.astrolabs.gripmaxxer.workout.WorkoutFeedItem
 import com.astrolabs.gripmaxxer.workout.WorkoutSetState
 import java.text.SimpleDateFormat
@@ -138,130 +125,87 @@ fun MainScreen(
         viewModel.clearWorkoutMessage()
     }
 
+    val inFullscreenTracker = uiState.selectedTab == RootTab.WORKOUT && uiState.workoutSession != null
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    selected = uiState.selectedTab == RootTab.HOME,
-                    onClick = { viewModel.selectTab(RootTab.HOME) },
-                    icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") },
-                    label = { Text("Home") },
-                )
-                NavigationBarItem(
-                    selected = uiState.selectedTab == RootTab.WORKOUT,
-                    onClick = { viewModel.selectTab(RootTab.WORKOUT) },
-                    icon = { Icon(Icons.Outlined.FitnessCenter, contentDescription = "Workout") },
-                    label = { Text("Workout") },
-                )
-                NavigationBarItem(
-                    selected = uiState.selectedTab == RootTab.PROFILE,
-                    onClick = { viewModel.selectTab(RootTab.PROFILE) },
-                    icon = { Icon(Icons.Outlined.AccountCircle, contentDescription = "Profile") },
-                    label = { Text("Profile") },
-                )
+            if (!inFullscreenTracker) {
+                NavigationBar {
+                    NavigationBarItem(
+                        selected = uiState.selectedTab == RootTab.LOG,
+                        onClick = { viewModel.selectTab(RootTab.LOG) },
+                        icon = { Icon(Icons.Outlined.Home, contentDescription = "Log") },
+                        label = { Text("Log") },
+                    )
+                    NavigationBarItem(
+                        selected = uiState.selectedTab == RootTab.WORKOUT,
+                        onClick = { viewModel.selectTab(RootTab.WORKOUT) },
+                        icon = { Icon(Icons.Outlined.FitnessCenter, contentDescription = "Workout") },
+                        label = { Text("Workout") },
+                    )
+                    NavigationBarItem(
+                        selected = uiState.selectedTab == RootTab.PROFILE,
+                        onClick = { viewModel.selectTab(RootTab.PROFILE) },
+                        icon = { Icon(Icons.Outlined.AccountCircle, contentDescription = "Profile") },
+                        label = { Text("Profile") },
+                    )
+                }
             }
         },
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            RestTimerBanner(
-                remaining = uiState.restTimer.remainingSeconds,
-                running = uiState.restTimer.running,
-                notice = uiState.restTimer.completionNotice,
-                onDismissNotice = viewModel::clearRestTimerNotice,
+        if (inFullscreenTracker) {
+            WorkoutTrackerScreen(
+                uiState = uiState,
+                onPause = viewModel::pauseWorkout,
+                onResume = viewModel::resumeWorkout,
+                onEnd = viewModel::endWorkout,
+                onEditSet = viewModel::editActiveSet,
+                onDeleteSet = viewModel::deleteActiveSet,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
             )
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+                    .padding(padding)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                when (uiState.selectedTab) {
+                    RootTab.LOG -> LogTab(
+                        workouts = uiState.completedWorkouts,
+                        calendarDays = uiState.calendarDays,
+                        selectedDetail = uiState.selectedWorkoutDetail,
+                        onOpenDetail = viewModel::openWorkoutDetail,
+                        onCloseDetail = viewModel::closeWorkoutDetail,
+                        onEditSet = viewModel::editDetailSet,
+                        onDeleteSet = viewModel::deleteDetailSet,
+                    )
 
-            when (uiState.selectedTab) {
-                RootTab.HOME -> HomeTab(
-                    workouts = uiState.completedWorkouts,
-                    calendarDays = uiState.calendarDays,
-                    selectedDetail = uiState.selectedWorkoutDetail,
-                    onOpenDetail = viewModel::openWorkoutDetail,
-                    onCloseDetail = viewModel::closeWorkoutDetail,
-                    maxReps = uiState.profileStats.maxReps,
-                    maxTimeMs = uiState.profileStats.maxActiveMs,
-                )
+                    RootTab.WORKOUT -> WorkoutStartTab(
+                        selectedMode = uiState.settings.selectedExerciseMode,
+                        onSelectMode = viewModel::setSelectedExerciseMode,
+                        onStart = { viewModel.startWorkout(uiState.settings.selectedExerciseMode) },
+                        cameraGranted = uiState.permissions.cameraGranted,
+                        onRequestCamera = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) },
+                    )
 
-                RootTab.WORKOUT -> WorkoutTab(
-                    uiState = uiState,
-                    onStartEmptyWorkout = viewModel::startEmptyWorkout,
-                    onCreateRoutine = viewModel::createRoutine,
-                    onQuickCreateRoutine = viewModel::quickCreateRoutine,
-                    onRenameRoutine = viewModel::renameRoutine,
-                    onDuplicateRoutine = viewModel::duplicateRoutine,
-                    onDeleteRoutine = viewModel::deleteRoutine,
-                    onStartRoutine = viewModel::startRoutineWorkout,
-                    onToggleRoutinesExpanded = viewModel::toggleRoutinesExpanded,
-                    onSetExploreVisible = viewModel::setExploreVisible,
-                    onSetExploreQuery = viewModel::setExploreQuery,
-                    onAddExerciseToWorkout = viewModel::addExerciseToActiveWorkout,
-                    onUpdateWorkoutTitle = viewModel::updateActiveWorkoutTitle,
-                    onFinishWorkout = viewModel::finishActiveWorkout,
-                    onAddSet = viewModel::addSet,
-                    onRemoveSet = viewModel::removeSet,
-                    onUpdateSetWeight = viewModel::updateSetWeight,
-                    onUpdateSetReps = viewModel::updateSetReps,
-                    onToggleSetDone = viewModel::toggleSetDone,
-                    onAutoTrackExercise = viewModel::startAutoTrackForExercise,
-                    onApplyPendingAutoEvent = viewModel::applyPendingAutoEvent,
-                    onDiscardPendingAutoEvent = viewModel::discardPendingAutoEvent,
-                    displayWeight = viewModel::displayWeight,
-                )
-
-                RootTab.PROFILE -> ProfileTab(
-                    uiState = uiState,
-                    notificationsEnabled = notificationsEnabled,
-                    onWeightUnitChange = viewModel::setWeightUnit,
-                    onMediaToggle = viewModel::setMediaControlEnabled,
-                    onOverlayToggle = viewModel::setOverlayEnabled,
-                    onPreviewToggle = viewModel::setShowCameraPreview,
-                    onRequestCamera = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) },
-                    onOpenNotificationAccess = openNotificationAccessSettings,
-                    onOpenOverlaySettings = openOverlaySettings,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun RestTimerBanner(
-    remaining: Int,
-    running: Boolean,
-    notice: String?,
-    onDismissNotice: () -> Unit,
-) {
-    if (!running && notice == null) return
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = if (running) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primaryContainer,
-        ),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = if (running) "Rest timer: ${remaining}s" else notice.orEmpty(),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            if (!running && notice != null) {
-                OutlinedButton(onClick = onDismissNotice) {
-                    Text("Dismiss")
+                    RootTab.PROFILE -> ProfileTab(
+                        uiState = uiState,
+                        notificationsEnabled = notificationsEnabled,
+                        onMediaToggle = viewModel::setMediaControlEnabled,
+                        onOverlayToggle = viewModel::setOverlayEnabled,
+                        onPreviewToggle = viewModel::setShowCameraPreview,
+                        onRequestCamera = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) },
+                        onOpenNotificationAccess = openNotificationAccessSettings,
+                        onOpenOverlaySettings = openOverlaySettings,
+                    )
                 }
             }
         }
@@ -269,33 +213,25 @@ private fun RestTimerBanner(
 }
 
 @Composable
-private fun HomeTab(
+private fun LogTab(
     workouts: List<WorkoutFeedItem>,
     calendarDays: List<CalendarDaySummary>,
     selectedDetail: CompletedWorkoutDetail?,
     onOpenDetail: (Long) -> Unit,
     onCloseDetail: () -> Unit,
-    maxReps: Int,
-    maxTimeMs: Long,
+    onEditSet: (Long, Int, Long) -> Unit,
+    onDeleteSet: (Long) -> Unit,
 ) {
     Text(
-        text = "Home",
+        text = "Log",
         style = MaterialTheme.typography.headlineMedium,
         color = MaterialTheme.colorScheme.onBackground,
     )
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        MetricTile(label = "Max Reps", value = maxReps.toString(), modifier = Modifier.weight(1f))
-        MetricTile(label = "Max Time", value = formatDuration(maxTimeMs), modifier = Modifier.weight(1f))
-    }
-
     if (workouts.isEmpty()) {
         ElevatedCard(modifier = Modifier.fillMaxWidth()) {
             Text(
-                text = "No completed workouts yet.",
+                text = "No completed sessions yet.",
                 modifier = Modifier.padding(16.dp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -315,17 +251,17 @@ private fun HomeTab(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
-                        text = "${formatSessionTime(workout.completedAtMs)} • ${formatDuration(workout.durationMs)}",
+                        text = "${workout.mode.label} • ${formatSessionTime(workout.completedAtMs)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        text = "${workout.exerciseCount} exercises • ${formatWeight(workout.totalVolumeKg)} kg volume",
+                        text = "${formatDuration(workout.durationMs)} • ${workout.setCount} set(s)",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     OutlinedButton(onClick = { onOpenDetail(workout.workoutId) }) {
-                        Text("View Details")
+                        Text("View session")
                     }
                 }
             }
@@ -347,9 +283,9 @@ private fun HomeTab(
             if (calendarDays.isEmpty()) {
                 Text("No completed days yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
-                calendarDays.take(10).forEach { day ->
+                calendarDays.take(14).forEach { day ->
                     Text(
-                        text = "${formatDay(day.dayEpochMs)} • ${day.workoutCount} workout(s)",
+                        text = "${formatDay(day.dayEpochMs)} • ${day.workoutCount} session(s)",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -359,443 +295,25 @@ private fun HomeTab(
     }
 
     if (selectedDetail != null) {
-        AlertDialog(
-            onDismissRequest = onCloseDetail,
-            title = { Text(selectedDetail.title) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("${formatSessionTime(selectedDetail.completedAtMs)} • ${formatDuration(selectedDetail.durationMs)}")
-                    selectedDetail.exercises.forEach { exercise ->
-                        Text(
-                            text = exercise.exerciseName,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        exercise.sets.forEach { set ->
-                            val setLine = if (set.durationMs > 0L && set.reps == 0) {
-                                "Set ${set.setNumber}: ${formatHoldDuration(set.durationMs)}${if (set.done) " done" else ""}"
-                            } else {
-                                "Set ${set.setNumber}: ${formatWeight(set.weightKg)}kg x ${set.reps}${if (set.done) " done" else ""}"
-                            }
-                            Text(
-                                text = setLine,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(onClick = onCloseDetail) {
-                    Text("Close")
-                }
-            },
+        SessionDetailDialog(
+            detail = selectedDetail,
+            onDismiss = onCloseDetail,
+            onEditSet = onEditSet,
+            onDeleteSet = onDeleteSet,
         )
     }
 }
 
 @Composable
-private fun WorkoutTab(
-    uiState: MainUiState,
-    onStartEmptyWorkout: () -> Unit,
-    onCreateRoutine: (String, String) -> Unit,
-    onQuickCreateRoutine: () -> Unit,
-    onRenameRoutine: (Long, String) -> Unit,
-    onDuplicateRoutine: (Long) -> Unit,
-    onDeleteRoutine: (Long) -> Unit,
-    onStartRoutine: (Long) -> Unit,
-    onToggleRoutinesExpanded: () -> Unit,
-    onSetExploreVisible: (Boolean) -> Unit,
-    onSetExploreQuery: (String) -> Unit,
-    onAddExerciseToWorkout: (ExerciseTemplate) -> Unit,
-    onUpdateWorkoutTitle: (String) -> Unit,
-    onFinishWorkout: () -> Unit,
-    onAddSet: (Long) -> Unit,
-    onRemoveSet: (Long) -> Unit,
-    onUpdateSetWeight: (Long, Float) -> Unit,
-    onUpdateSetReps: (Long, Int) -> Unit,
-    onToggleSetDone: (Long, Long, Boolean, Int, String) -> Unit,
-    onAutoTrackExercise: (Long, ExerciseMode?) -> Unit,
-    onApplyPendingAutoEvent: (Long) -> Unit,
-    onDiscardPendingAutoEvent: (Long) -> Unit,
-    displayWeight: (Float) -> String,
+private fun WorkoutStartTab(
+    selectedMode: ExerciseMode,
+    onSelectMode: (ExerciseMode) -> Unit,
+    onStart: () -> Unit,
+    cameraGranted: Boolean,
+    onRequestCamera: () -> Unit,
 ) {
-    var showCreateRoutineDialog by rememberSaveable { mutableStateOf(false) }
-
-    if (uiState.activeWorkout != null) {
-        ActiveWorkoutContent(
-            state = uiState.activeWorkout,
-            settingsUnit = uiState.settings.weightUnit,
-            showCameraPreview = uiState.showCameraPreview,
-            cameraPreviewFrame = uiState.cameraPreviewFrame,
-            pendingAutoEvents = uiState.pendingAutoEvents,
-            onUpdateWorkoutTitle = onUpdateWorkoutTitle,
-            onFinishWorkout = onFinishWorkout,
-            onAddExercise = onAddExerciseToWorkout,
-            onAddSet = onAddSet,
-            onRemoveSet = onRemoveSet,
-            onUpdateSetWeight = onUpdateSetWeight,
-            onUpdateSetReps = onUpdateSetReps,
-            onToggleSetDone = onToggleSetDone,
-            onAutoTrackExercise = onAutoTrackExercise,
-            onApplyPendingAutoEvent = onApplyPendingAutoEvent,
-            onDiscardPendingAutoEvent = onDiscardPendingAutoEvent,
-            displayWeight = displayWeight,
-        )
-        return
-    }
-
     Text(
         text = "Workout",
-        style = MaterialTheme.typography.headlineMedium,
-        color = MaterialTheme.colorScheme.onBackground,
-    )
-
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Button(
-            onClick = onStartEmptyWorkout,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-        ) {
-            Icon(Icons.Outlined.Add, contentDescription = null)
-            Spacer(modifier = Modifier.size(8.dp))
-            Text("Start Empty Workout")
-        }
-    }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("Routines", style = MaterialTheme.typography.titleLarge)
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            IconButton(onClick = { showCreateRoutineDialog = true }) {
-                Icon(Icons.Outlined.Add, contentDescription = "New Routine")
-            }
-            IconButton(onClick = onQuickCreateRoutine) {
-                Icon(Icons.Outlined.MoreVert, contentDescription = "Quick Create")
-            }
-        }
-    }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        ElevatedCard(modifier = Modifier.weight(1f)) {
-            OutlinedButton(
-                onClick = { showCreateRoutineDialog = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp),
-            ) {
-                Text("New Routine")
-            }
-        }
-        ElevatedCard(modifier = Modifier.weight(1f)) {
-            OutlinedButton(
-                onClick = { onSetExploreVisible(!uiState.exploreVisible) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp),
-            ) {
-                Icon(Icons.Outlined.Explore, contentDescription = null)
-                Spacer(modifier = Modifier.size(6.dp))
-                Text("Explore")
-            }
-        }
-    }
-
-    if (uiState.exploreVisible) {
-        ExploreCard(
-            query = uiState.exploreQuery,
-            results = uiState.exploreResults,
-            onQueryChange = onSetExploreQuery,
-            onAddExercise = onAddExerciseToWorkout,
-        )
-    }
-
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onToggleRoutinesExpanded) {
-                        Icon(
-                            imageVector = if (uiState.routinesExpanded) Icons.Outlined.KeyboardArrowDown else Icons.Outlined.KeyboardArrowRight,
-                            contentDescription = null,
-                        )
-                    }
-                    Text(
-                        text = "My Routines (${uiState.routines.size})",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
-
-            if (uiState.routinesExpanded) {
-                if (uiState.routines.isEmpty()) {
-                    OutlinedButton(
-                        onClick = { showCreateRoutineDialog = true },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Create your first routine")
-                    }
-                } else {
-                    uiState.routines.forEach { routine ->
-                        RoutineCard(
-                            routine = routine,
-                            onStartRoutine = onStartRoutine,
-                            onRenameRoutine = onRenameRoutine,
-                            onDuplicateRoutine = onDuplicateRoutine,
-                            onDeleteRoutine = onDeleteRoutine,
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    if (showCreateRoutineDialog) {
-        CreateRoutineDialog(
-            onDismiss = { showCreateRoutineDialog = false },
-            onCreate = { name, exercisesCsv ->
-                onCreateRoutine(name, exercisesCsv)
-                showCreateRoutineDialog = false
-            },
-        )
-    }
-}
-
-@Composable
-private fun ExploreCard(
-    query: String,
-    results: List<ExerciseTemplate>,
-    onQueryChange: (String) -> Unit,
-    onAddExercise: (ExerciseTemplate) -> Unit,
-) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text("Explore library", style = MaterialTheme.typography.titleMedium)
-            OutlinedTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Search exercises") },
-                singleLine = true,
-            )
-            if (results.isEmpty()) {
-                Text("No matches", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else {
-                results.take(8).forEach { template ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(template.name)
-                        OutlinedButton(onClick = { onAddExercise(template) }) {
-                            Text("Add")
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RoutineCard(
-    routine: Routine,
-    onStartRoutine: (Long) -> Unit,
-    onRenameRoutine: (Long, String) -> Unit,
-    onDuplicateRoutine: (Long) -> Unit,
-    onDeleteRoutine: (Long) -> Unit,
-) {
-    var menuOpen by remember { mutableStateOf(false) }
-    var renameOpen by remember { mutableStateOf(false) }
-
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = routine.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Box {
-                    IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Outlined.MoreVert, contentDescription = "Routine options")
-                    }
-                    DropdownMenu(
-                        expanded = menuOpen,
-                        onDismissRequest = { menuOpen = false },
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Rename") },
-                            onClick = {
-                                menuOpen = false
-                                renameOpen = true
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Duplicate") },
-                            onClick = {
-                                menuOpen = false
-                                onDuplicateRoutine(routine.id)
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Delete") },
-                            onClick = {
-                                menuOpen = false
-                                onDeleteRoutine(routine.id)
-                            },
-                        )
-                    }
-                }
-            }
-            Text(
-                text = routine.exercises.joinToString(", ") { it.exerciseName }.ifBlank { "No exercises" },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Button(
-                onClick = { onStartRoutine(routine.id) },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Start Routine")
-            }
-        }
-    }
-
-    if (renameOpen) {
-        RenameRoutineDialog(
-            currentName = routine.name,
-            onDismiss = { renameOpen = false },
-            onConfirm = { newName ->
-                onRenameRoutine(routine.id, newName)
-                renameOpen = false
-            },
-        )
-    }
-}
-
-@Composable
-private fun CreateRoutineDialog(
-    onDismiss: () -> Unit,
-    onCreate: (String, String) -> Unit,
-) {
-    var name by rememberSaveable { mutableStateOf("") }
-    var exercises by rememberSaveable { mutableStateOf("Pull-up, Push-up") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("New Routine") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Routine name") },
-                    singleLine = true,
-                )
-                OutlinedTextField(
-                    value = exercises,
-                    onValueChange = { exercises = it },
-                    label = { Text("Exercises (comma separated)") },
-                )
-            }
-        },
-        confirmButton = {
-            Button(onClick = { onCreate(name, exercises) }) {
-                Text("Create")
-            }
-        },
-        dismissButton = {
-            OutlinedButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        },
-    )
-}
-
-@Composable
-private fun RenameRoutineDialog(
-    currentName: String,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit,
-) {
-    var value by rememberSaveable { mutableStateOf(currentName) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Rename Routine") },
-        text = {
-            OutlinedTextField(
-                value = value,
-                onValueChange = { value = it },
-                label = { Text("Name") },
-                singleLine = true,
-            )
-        },
-        confirmButton = {
-            Button(onClick = { onConfirm(value) }) { Text("Save") }
-        },
-        dismissButton = {
-            OutlinedButton(onClick = onDismiss) { Text("Cancel") }
-        },
-    )
-}
-
-@Composable
-private fun ActiveWorkoutContent(
-    state: ActiveWorkoutState,
-    settingsUnit: WeightUnit,
-    showCameraPreview: Boolean,
-    cameraPreviewFrame: DebugPreviewFrame?,
-    pendingAutoEvents: List<com.astrolabs.gripmaxxer.service.AutoSetEvent>,
-    onUpdateWorkoutTitle: (String) -> Unit,
-    onFinishWorkout: () -> Unit,
-    onAddExercise: (ExerciseTemplate) -> Unit,
-    onAddSet: (Long) -> Unit,
-    onRemoveSet: (Long) -> Unit,
-    onUpdateSetWeight: (Long, Float) -> Unit,
-    onUpdateSetReps: (Long, Int) -> Unit,
-    onToggleSetDone: (Long, Long, Boolean, Int, String) -> Unit,
-    onAutoTrackExercise: (Long, ExerciseMode?) -> Unit,
-    onApplyPendingAutoEvent: (Long) -> Unit,
-    onDiscardPendingAutoEvent: (Long) -> Unit,
-    displayWeight: (Float) -> String,
-) {
-    var titleDraft by remember(state.id, state.title) { mutableStateOf(state.title) }
-
-    Text(
-        text = "Active Workout",
         style = MaterialTheme.typography.headlineMedium,
         color = MaterialTheme.colorScheme.onBackground,
     )
@@ -807,293 +325,312 @@ private fun ActiveWorkoutContent(
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            OutlinedTextField(
-                value = titleDraft,
-                onValueChange = {
-                    titleDraft = it
-                    onUpdateWorkoutTitle(it)
-                },
-                label = { Text("Workout title") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Elapsed ${formatDuration(state.elapsedMs)}",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Button(onClick = onFinishWorkout) {
-                    Text("Finish")
-                }
-            }
-        }
-    }
+            Text("Select exercise", style = MaterialTheme.typography.titleMedium)
 
-    if (pendingAutoEvents.isNotEmpty()) {
-        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text("Auto-set inbox", style = MaterialTheme.typography.titleMedium)
-                pendingAutoEvents.takeLast(5).forEach { event ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            if (event.mode.isHangMode()) {
-                                "${event.mode.label}: ${formatHoldDuration(event.activeMs)}"
-                            } else {
-                                "${event.mode.label}: ${event.reps} reps"
-                            }
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            OutlinedButton(onClick = { onDiscardPendingAutoEvent(event.eventId) }) {
-                                Text("Discard")
-                            }
-                            Button(onClick = { onApplyPendingAutoEvent(event.eventId) }) {
-                                Text("Apply")
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    state.exercises.forEach { exercise ->
-        ExerciseCard(
-            exercise = exercise,
-            unit = settingsUnit,
-            onAddSet = onAddSet,
-            onRemoveSet = onRemoveSet,
-            onUpdateSetWeight = onUpdateSetWeight,
-            onUpdateSetReps = onUpdateSetReps,
-            onToggleSetDone = onToggleSetDone,
-            onAutoTrackExercise = onAutoTrackExercise,
-            displayWeight = displayWeight,
-        )
-    }
-
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text("Add Exercise", style = MaterialTheme.typography.titleMedium)
-            DefaultExerciseLibrary.take(8).chunked(2).forEach { chunk ->
+            CameraTrackableModes.chunked(2).forEach { rowModes ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    chunk.forEach { template ->
-                        OutlinedButton(
-                            onClick = { onAddExercise(template) },
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text(template.name)
+                    rowModes.forEach { mode ->
+                        val selected = selectedMode == mode
+                        if (selected) {
+                            Button(
+                                onClick = { onSelectMode(mode) },
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text(mode.label)
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = { onSelectMode(mode) },
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text(mode.label)
+                            }
                         }
                     }
-                    if (chunk.size == 1) {
+                    if (rowModes.size == 1) {
                         Spacer(modifier = Modifier.weight(1f))
                     }
                 }
             }
-        }
-    }
 
-    if (showCameraPreview) {
-        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text("Live camera feedback", style = MaterialTheme.typography.titleMedium)
-                if (cameraPreviewFrame != null) {
-                    CameraPreviewWithTracking(frame = cameraPreviewFrame)
-                } else {
-                    Text("Start auto-track to view camera feedback")
+            if (!cameraGranted) {
+                OutlinedButton(
+                    onClick = onRequestCamera,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Grant camera permission")
                 }
+            }
+
+            Button(
+                onClick = onStart,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = cameraGranted,
+            ) {
+                Text("Start Workout")
             }
         }
     }
 }
 
 @Composable
-private fun ExerciseCard(
-    exercise: WorkoutExerciseState,
-    unit: WeightUnit,
-    onAddSet: (Long) -> Unit,
-    onRemoveSet: (Long) -> Unit,
-    onUpdateSetWeight: (Long, Float) -> Unit,
-    onUpdateSetReps: (Long, Int) -> Unit,
-    onToggleSetDone: (Long, Long, Boolean, Int, String) -> Unit,
-    onAutoTrackExercise: (Long, ExerciseMode?) -> Unit,
-    displayWeight: (Float) -> String,
+private fun WorkoutTrackerScreen(
+    uiState: MainUiState,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onEnd: () -> Unit,
+    onEditSet: (Long, Int, Long) -> Unit,
+    onDeleteSet: (Long) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column {
-                    Text(exercise.exerciseName, style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        text = "Rest ${exercise.restSeconds}s",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                OutlinedButton(onClick = { onAutoTrackExercise(exercise.id, exercise.mode) }) {
-                    Text("Auto Track")
-                }
-            }
+    val session = uiState.workoutSession ?: return
+    var showSetEditor by rememberSaveable(session.workoutId) { mutableStateOf(false) }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+    Box(modifier = modifier.background(Color.Black)) {
+        if (uiState.showCameraPreview && uiState.cameraPreviewFrame != null) {
+            CameraPreviewWithTracking(
+                frame = uiState.cameraPreviewFrame,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center,
             ) {
-                TableHeader("Set", Modifier.weight(0.7f))
-                TableHeader("Prev", Modifier.weight(1.2f))
-                TableHeader(unit.label, Modifier.weight(1.1f))
-                TableHeader("Reps", Modifier.weight(1.1f))
-                TableHeader("Done", Modifier.weight(0.8f))
-            }
-
-            exercise.sets.forEach { set ->
-                SetRow(
-                    exercise = exercise,
-                    set = set,
-                    onRemoveSet = onRemoveSet,
-                    onUpdateSetWeight = onUpdateSetWeight,
-                    onUpdateSetReps = onUpdateSetReps,
-                    onToggleSetDone = onToggleSetDone,
-                    displayWeight = displayWeight,
+                Text(
+                    text = if (uiState.showCameraPreview) "Waiting for camera..." else "Camera preview is off",
+                    color = Color.White,
                 )
             }
+        }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { onAddSet(exercise.id) }) {
-                    Text("Add Set")
+        ElevatedCard(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(12.dp),
+            colors = CardDefaults.elevatedCardColors(
+                containerColor = Color(0xCC101216),
+            ),
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(session.mode.label, color = Color.White, fontWeight = FontWeight.SemiBold)
+                Text("Workout ${formatDuration(session.elapsedMs)}", color = Color.White)
+                Text("Sets ${session.completedSetCount}", color = Color.White)
+                if (session.mode.isHangMode()) {
+                    Text(
+                        text = "Current hold ${formatHoldDuration(session.liveSet.durationMs)}",
+                        color = Color.White,
+                    )
+                } else {
+                    Text(
+                        text = "Current reps ${session.liveSet.reps}",
+                        color = Color.White,
+                    )
+                    Text(
+                        text = "Current set ${formatHoldDuration(session.liveSet.durationMs)}",
+                        color = Color.White,
+                    )
+                }
+            }
+        }
+
+        ElevatedCard(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(12.dp),
+            colors = CardDefaults.elevatedCardColors(
+                containerColor = Color(0xCC101216),
+            ),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    onClick = { showSetEditor = true },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(Icons.Outlined.List, contentDescription = null)
+                    Spacer(modifier = Modifier.size(6.dp))
+                    Text("Sets")
+                }
+
+                if (session.paused) {
+                    Button(onClick = onResume, modifier = Modifier.weight(1f)) {
+                        Text("Resume")
+                    }
+                } else {
+                    OutlinedButton(onClick = onPause, modifier = Modifier.weight(1f)) {
+                        Text("Pause")
+                    }
+                }
+
+                Button(onClick = onEnd, modifier = Modifier.weight(1f)) {
+                    Text("End")
                 }
             }
         }
     }
+
+    if (showSetEditor) {
+        SetEditorDialog(
+            title = "Session sets",
+            sets = session.editor.sets,
+            onDismiss = { showSetEditor = false },
+            onEditSet = onEditSet,
+            onDeleteSet = onDeleteSet,
+        )
+    }
 }
 
 @Composable
-private fun TableHeader(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text,
-        modifier = modifier,
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        fontWeight = FontWeight.SemiBold,
+private fun SessionDetailDialog(
+    detail: CompletedWorkoutDetail,
+    onDismiss: () -> Unit,
+    onEditSet: (Long, Int, Long) -> Unit,
+    onDeleteSet: (Long) -> Unit,
+) {
+    SetEditorDialog(
+        title = "${detail.mode.label} • ${formatSessionTime(detail.completedAtMs)}",
+        subtitle = "${formatDuration(detail.durationMs)} • ${detail.sets.size} set(s)",
+        sets = detail.sets,
+        onDismiss = onDismiss,
+        onEditSet = onEditSet,
+        onDeleteSet = onDeleteSet,
     )
 }
 
 @Composable
-private fun SetRow(
-    exercise: WorkoutExerciseState,
-    set: WorkoutSetState,
-    onRemoveSet: (Long) -> Unit,
-    onUpdateSetWeight: (Long, Float) -> Unit,
-    onUpdateSetReps: (Long, Int) -> Unit,
-    onToggleSetDone: (Long, Long, Boolean, Int, String) -> Unit,
-    displayWeight: (Float) -> String,
+private fun SetEditorDialog(
+    title: String,
+    sets: List<WorkoutSetState>,
+    onDismiss: () -> Unit,
+    onEditSet: (Long, Int, Long) -> Unit,
+    onDeleteSet: (Long) -> Unit,
+    subtitle: String? = null,
 ) {
-    var weightText by remember(set.id, set.weightKg) { mutableStateOf(displayWeight(set.weightKg)) }
-    var repsText by remember(set.id, set.reps) { mutableStateOf(set.reps.toString()) }
+    var editingSet by remember { mutableStateOf<WorkoutSetState?>(null) }
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("#${set.setNumber}", modifier = Modifier.weight(0.7f))
-        Text(set.previous, modifier = Modifier.weight(1.2f), style = MaterialTheme.typography.bodySmall)
-        OutlinedTextField(
-            value = weightText,
-            onValueChange = { value ->
-                weightText = value
-                value.toFloatOrNull()?.let { onUpdateSetWeight(set.id, it) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (subtitle != null) {
+                    Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (sets.isEmpty()) {
+                    Text("No sets yet")
+                } else {
+                    sets.forEach { set ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            val line = if (set.reps == 0 && set.durationMs > 0L) {
+                                "Set ${set.setNumber}: ${formatHoldDuration(set.durationMs)}"
+                            } else {
+                                "Set ${set.setNumber}: ${set.reps} reps • ${formatHoldDuration(set.durationMs)}"
+                            }
+                            Text(line, modifier = Modifier.weight(1f))
+                            OutlinedButton(onClick = { editingSet = set }) {
+                                Icon(Icons.Outlined.Edit, contentDescription = null)
+                                Spacer(modifier = Modifier.size(4.dp))
+                                Text("Edit")
+                            }
+                            Spacer(modifier = Modifier.size(6.dp))
+                            OutlinedButton(onClick = { onDeleteSet(set.id) }) {
+                                Text("Delete")
+                            }
+                        }
+                        HorizontalDivider()
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("Done")
+            }
+        },
+    )
+
+    if (editingSet != null) {
+        EditSetDialog(
+            set = editingSet!!,
+            onDismiss = { editingSet = null },
+            onSave = { reps, durationMs ->
+                onEditSet(editingSet!!.id, reps, durationMs)
+                editingSet = null
             },
-            modifier = Modifier.weight(1.1f),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-        )
-        OutlinedTextField(
-            value = repsText,
-            onValueChange = { value ->
-                repsText = value
-                value.toIntOrNull()?.let { onUpdateSetReps(set.id, it) }
-            },
-            modifier = Modifier.weight(1.1f),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        )
-        Checkbox(
-            checked = set.done,
-            onCheckedChange = {
-                onToggleSetDone(exercise.id, set.id, it, exercise.restSeconds, exercise.exerciseName)
-            },
-            modifier = Modifier.weight(0.8f),
         )
     }
+}
 
-    if (exercise.mode.isHangMode()) {
-        Text(
-            text = if (set.durationMs > 0L) "Hold: ${formatHoldDuration(set.durationMs)}" else "Hold: --",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+@Composable
+private fun EditSetDialog(
+    set: WorkoutSetState,
+    onDismiss: () -> Unit,
+    onSave: (Int, Long) -> Unit,
+) {
+    var repsInput by rememberSaveable(set.id) { mutableStateOf(set.reps.toString()) }
+    var durationInput by rememberSaveable(set.id) { mutableStateOf(((set.durationMs / 1000L).coerceAtLeast(0L)).toString()) }
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (set.autoTracked) {
-            Text(
-                text = "Auto",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        } else {
-            Spacer(modifier = Modifier.height(1.dp))
-        }
-        OutlinedButton(onClick = { onRemoveSet(set.id) }) {
-            Text("Remove")
-        }
-    }
-    HorizontalDivider()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit set ${set.setNumber}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = repsInput,
+                    onValueChange = { repsInput = it },
+                    label = { Text("Reps") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+                OutlinedTextField(
+                    value = durationInput,
+                    onValueChange = { durationInput = it },
+                    label = { Text("Duration (seconds)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val reps = repsInput.toIntOrNull()?.coerceAtLeast(0) ?: 0
+                    val seconds = durationInput.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+                    onSave(reps, seconds * 1000L)
+                }
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
 }
 
 @Composable
 private fun ProfileTab(
     uiState: MainUiState,
     notificationsEnabled: Boolean,
-    onWeightUnitChange: (WeightUnit) -> Unit,
     onMediaToggle: (Boolean) -> Unit,
     onOverlayToggle: (Boolean) -> Unit,
     onPreviewToggle: (Boolean) -> Unit,
@@ -1117,36 +654,8 @@ private fun ProfileTab(
             Text("Stats", style = MaterialTheme.typography.titleMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 MetricTile("Workouts", uiState.profileStats.totalWorkouts.toString(), Modifier.weight(1f))
-                MetricTile("Sets", uiState.profileStats.totalSets.toString(), Modifier.weight(1f))
-                MetricTile("Week", uiState.profileStats.currentWeekCount.toString(), Modifier.weight(1f))
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                MetricTile("Streak", uiState.profileStats.streakDays.toString(), Modifier.weight(1f))
                 MetricTile("Max Reps", uiState.profileStats.maxReps.toString(), Modifier.weight(1f))
-                MetricTile("Max Time", formatDuration(uiState.profileStats.maxActiveMs), Modifier.weight(1f))
-            }
-            Text(
-                text = "Total volume: ${formatWeight(uiState.profileStats.totalVolumeKg)} kg",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text("Personal Records", style = MaterialTheme.typography.titleMedium)
-            if (uiState.profileStats.records.isEmpty()) {
-                Text("No records yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else {
-                uiState.profileStats.records.forEach { record ->
-                    Text("${record.exerciseName}: ${record.maxReps} reps")
-                }
+                MetricTile("Max Hold", formatDuration(uiState.profileStats.maxHoldMs), Modifier.weight(1f))
             }
         }
     }
@@ -1159,18 +668,9 @@ private fun ProfileTab(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text("Settings", style = MaterialTheme.typography.titleMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (uiState.settings.weightUnit == WeightUnit.KG) {
-                    Button(onClick = { onWeightUnitChange(WeightUnit.KG) }) { Text("kg") }
-                    OutlinedButton(onClick = { onWeightUnitChange(WeightUnit.LB) }) { Text("lb") }
-                } else {
-                    OutlinedButton(onClick = { onWeightUnitChange(WeightUnit.KG) }) { Text("kg") }
-                    Button(onClick = { onWeightUnitChange(WeightUnit.LB) }) { Text("lb") }
-                }
-            }
             SettingToggle("Enable media play/pause", uiState.settings.mediaControlEnabled, onMediaToggle)
             SettingToggle("Enable overlay", uiState.settings.overlayEnabled, onOverlayToggle)
-            SettingToggle("Show live camera feedback", uiState.showCameraPreview, onPreviewToggle)
+            SettingToggle("Show camera preview", uiState.showCameraPreview, onPreviewToggle)
         }
     }
 
@@ -1259,18 +759,17 @@ private fun MetricTile(
 }
 
 @Composable
-private fun CameraPreviewWithTracking(frame: DebugPreviewFrame) {
-    val aspect = frame.bitmap.width.toFloat() / frame.bitmap.height.toFloat()
+private fun CameraPreviewWithTracking(
+    frame: DebugPreviewFrame,
+    modifier: Modifier = Modifier,
+) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(aspect.coerceIn(0.4f, 2.5f))
-            .background(Color.Black),
+        modifier = modifier.background(Color.Black),
     ) {
         Image(
             bitmap = frame.bitmap.asImageBitmap(),
             contentDescription = "Camera preview with tracking",
-            contentScale = ContentScale.FillBounds,
+            contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
         )
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -1306,16 +805,7 @@ private fun formatDay(timestampMs: Long): String {
     return formatter.format(Date(timestampMs))
 }
 
-private fun formatWeight(value: Float): String {
-    val asInt = value.toInt()
-    return if (asInt.toFloat() == value) {
-        asInt.toString()
-    } else {
-        String.format(Locale.US, "%.1f", value)
-    }
-}
-
-private fun ExerciseMode?.isHangMode(): Boolean {
+private fun ExerciseMode.isHangMode(): Boolean {
     return this == ExerciseMode.DEAD_HANG || this == ExerciseMode.ACTIVE_HANG
 }
 
