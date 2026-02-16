@@ -45,6 +45,8 @@ class RepCounter(
     private var lastRepTimeMs = 0L
     private var upCandidateSince: Long? = null
     private var downCandidateSince: Long? = null
+    private var downAnchorElbow: Float? = null
+    private var upAnchorElbow: Float? = null
 
     fun updateConfig(config: RepCounterConfig) {
         this.config = config
@@ -60,6 +62,8 @@ class RepCounter(
         lastRepTimeMs = 0L
         upCandidateSince = null
         downCandidateSince = null
+        downAnchorElbow = null
+        upAnchorElbow = null
     }
 
     fun process(
@@ -115,13 +119,55 @@ class RepCounter(
             Triple(down, up, (config.stableMs / 2L).coerceAtLeast(MIN_OCCLUDED_STABLE_MS))
         }
 
+        if (state == State.DOWN) {
+            val anchor = downAnchorElbow
+            downAnchorElbow = if (anchor == null) smoothElbow else maxOf(anchor, smoothElbow)
+        } else {
+            val anchor = upAnchorElbow
+            upAnchorElbow = if (anchor == null) smoothElbow else minOf(anchor, smoothElbow)
+        }
+
+        val isUpByElbowTravel = downAnchorElbow?.let { anchor ->
+            (anchor - smoothElbow) >= ELBOW_UP_TRAVEL_DEG
+        } ?: false
+        val isDownByElbowTravel = upAnchorElbow?.let { anchor ->
+            (smoothElbow - anchor) >= ELBOW_DOWN_TRAVEL_DEG
+        } ?: false
+
+        val upStableMs = if (isUpByElbowTravel) {
+            requiredStableMs.coerceAtMost(ELBOW_TRAVEL_STABLE_MS)
+        } else {
+            requiredStableMs
+        }
+        val downStableMs = if (isDownByElbowTravel) {
+            requiredStableMs.coerceAtMost(ELBOW_TRAVEL_STABLE_MS)
+        } else {
+            requiredStableMs
+        }
+
         return when (state) {
-            State.DOWN -> handleDownState(isUp, nowMs, requiredStableMs)
-            State.IN_UP -> handleInUpState(isDown, nowMs, requiredStableMs)
+            State.DOWN -> handleDownState(
+                isUp = isUp || isUpByElbowTravel,
+                nowMs = nowMs,
+                requiredStableMs = upStableMs,
+                smoothElbow = smoothElbow,
+            )
+
+            State.IN_UP -> handleInUpState(
+                isDown = isDown || isDownByElbowTravel,
+                nowMs = nowMs,
+                requiredStableMs = downStableMs,
+                smoothElbow = smoothElbow,
+            )
         }
     }
 
-    private fun handleDownState(isUp: Boolean, nowMs: Long, requiredStableMs: Long): RepCounterResult {
+    private fun handleDownState(
+        isUp: Boolean,
+        nowMs: Long,
+        requiredStableMs: Long,
+        smoothElbow: Float,
+    ): RepCounterResult {
         if (isUp) {
             if (upCandidateSince == null) {
                 upCandidateSince = nowMs
@@ -134,6 +180,8 @@ class RepCounter(
                 state = State.IN_UP
                 upCandidateSince = null
                 downCandidateSince = null
+                upAnchorElbow = smoothElbow
+                downAnchorElbow = null
                 return RepCounterResult(reps = reps, repEvent = true)
             }
         } else {
@@ -143,7 +191,12 @@ class RepCounter(
         return RepCounterResult(reps = reps, repEvent = false)
     }
 
-    private fun handleInUpState(isDown: Boolean, nowMs: Long, requiredStableMs: Long): RepCounterResult {
+    private fun handleInUpState(
+        isDown: Boolean,
+        nowMs: Long,
+        requiredStableMs: Long,
+        smoothElbow: Float,
+    ): RepCounterResult {
         if (isDown) {
             if (downCandidateSince == null) {
                 downCandidateSince = nowMs
@@ -153,6 +206,8 @@ class RepCounter(
                 state = State.DOWN
                 downCandidateSince = null
                 upCandidateSince = null
+                downAnchorElbow = smoothElbow
+                upAnchorElbow = null
             }
         } else {
             downCandidateSince = null
@@ -177,5 +232,8 @@ class RepCounter(
         private const val ELBOW_ONLY_DOWN_RELAX_DEG = 8f
         private const val ELBOW_ONLY_UP_RELAX_DEG = 12f
         private const val MIN_OCCLUDED_STABLE_MS = 120L
+        private const val ELBOW_UP_TRAVEL_DEG = 24f
+        private const val ELBOW_DOWN_TRAVEL_DEG = 22f
+        private const val ELBOW_TRAVEL_STABLE_MS = 120L
     }
 }
