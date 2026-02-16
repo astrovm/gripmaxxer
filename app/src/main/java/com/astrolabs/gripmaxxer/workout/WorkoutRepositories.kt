@@ -523,6 +523,7 @@ class RoomWorkoutRepository(
 
     private fun mapSetStates(exercise: WorkoutExerciseWithSetsEntity): List<WorkoutSetState> {
         var previous = "-"
+        val exerciseMode = parseMode(exercise.exercise.modeName)
         return exercise.sets.sortedBy { it.setNumber }.map { set ->
             val state = WorkoutSetState(
                 id = set.id,
@@ -536,7 +537,11 @@ class RoomWorkoutRepository(
                 autoTracked = set.autoTracked,
             )
             if (set.done) {
-                previous = "${set.weightKg.trimZero()}kg x ${set.reps}"
+                previous = if (exerciseMode.isHangMode()) {
+                    formatHoldDuration(set.durationMs)
+                } else {
+                    "${set.weightKg.trimZero()}kg x ${set.reps}"
+                }
             }
             state
         }
@@ -615,6 +620,17 @@ class RoomWorkoutRepository(
 
     private fun Long.toLocalDate(zoneId: ZoneId): LocalDate {
         return java.time.Instant.ofEpochMilli(this).atZone(zoneId).toLocalDate()
+    }
+
+    private fun ExerciseMode?.isHangMode(): Boolean {
+        return this == ExerciseMode.DEAD_HANG || this == ExerciseMode.ACTIVE_HANG
+    }
+
+    private fun formatHoldDuration(ms: Long): String {
+        val totalSeconds = (ms / 1000L).coerceAtLeast(0L)
+        val minutes = totalSeconds / 60L
+        val seconds = totalSeconds % 60L
+        return String.format(java.util.Locale.US, "%d:%02d hold", minutes, seconds)
     }
 }
 

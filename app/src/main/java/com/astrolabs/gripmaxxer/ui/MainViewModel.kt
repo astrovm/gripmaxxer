@@ -419,7 +419,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val suggestion = workoutRepository.applyAutoSetEvent(event, autoTrackExerciseIdState.value)
             pendingAutoEventsState.update { pending -> pending.filterNot { it.eventId == eventId } }
             if (suggestion != null) {
-                clearWorkoutMessageLater("Applied auto reps ${suggestion.reps} to ${suggestion.exerciseName}")
+                val message = if (suggestion.mode.isHangMode()) {
+                    "Applied hold ${formatDurationShort(suggestion.durationMs)} to ${suggestion.exerciseName}"
+                } else {
+                    "Applied auto reps ${suggestion.reps} to ${suggestion.exerciseName}"
+                }
+                clearWorkoutMessageLater(message)
             }
         }
     }
@@ -531,7 +536,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             pendingAutoEventsState.update { (it + event).takeLast(MAX_PENDING_AUTO_EVENTS) }
             return
         }
-        clearWorkoutMessageLater("Auto set ready for ${suggestion.exerciseName}: ${suggestion.reps} reps")
+        val message = if (suggestion.mode.isHangMode()) {
+            "Auto set ready for ${suggestion.exerciseName}: ${formatDurationShort(suggestion.durationMs)} hold"
+        } else {
+            "Auto set ready for ${suggestion.exerciseName}: ${suggestion.reps} reps"
+        }
+        clearWorkoutMessageLater(message)
     }
 
     private fun startRestTimer(restSeconds: Int, exerciseName: String) {
@@ -647,6 +657,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return formatter.format(date)
     }
 
+    private fun formatDurationShort(ms: Long): String {
+        val totalSeconds = (ms / 1000L).coerceAtLeast(0L)
+        val minutes = totalSeconds / 60L
+        val seconds = totalSeconds % 60L
+        return String.format(Locale.US, "%d:%02d", minutes, seconds)
+    }
+
     private fun readPermissions(): PermissionSnapshot {
         val cameraGranted = ContextCompat.checkSelfPermission(
             appContext,
@@ -664,4 +681,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private const val LB_PER_KG = 2.20462f
         private const val MAX_PENDING_AUTO_EVENTS = 20
     }
+}
+
+private fun ExerciseMode.isHangMode(): Boolean {
+    return this == ExerciseMode.DEAD_HANG || this == ExerciseMode.ACTIVE_HANG
 }

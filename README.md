@@ -2,6 +2,8 @@
 
 Gripmaxxer is an Android app (Kotlin + Compose) that uses the **front camera** and **ML Kit Pose Detection** to:
 - Track exercise activity and reps for selectable modes:
+  - Dead hang
+  - Active hang
   - Pull-up
   - Push-up
   - Squat
@@ -68,6 +70,8 @@ Some system screens or OEM-specific UIs may still hide overlays.
 - Start media playback first in the target app before monitoring.
 - If `play()` does not work for a specific app/player, `pause()` may still work.
 - Mode framing tips for auto-track:
+  - Dead hang: bar framing with straight elbows visible
+  - Active hang: bar framing with bent elbows and upper body visible
   - Pull-up: front bar framing with shoulders/arms visible
   - Push-up: front view with shoulders/elbows/torso visible
   - Squat: front full-body framing with hips/knees/ankles visible

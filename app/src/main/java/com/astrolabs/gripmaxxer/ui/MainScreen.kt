@@ -372,8 +372,13 @@ private fun HomeTab(
                             fontWeight = FontWeight.SemiBold,
                         )
                         exercise.sets.forEach { set ->
+                            val setLine = if (set.durationMs > 0L && set.reps == 0) {
+                                "Set ${set.setNumber}: ${formatHoldDuration(set.durationMs)}${if (set.done) " done" else ""}"
+                            } else {
+                                "Set ${set.setNumber}: ${formatWeight(set.weightKg)}kg x ${set.reps}${if (set.done) " done" else ""}"
+                            }
                             Text(
-                                text = "Set ${set.setNumber}: ${formatWeight(set.weightKg)}kg x ${set.reps}${if (set.done) " done" else ""}",
+                                text = setLine,
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
@@ -843,7 +848,13 @@ private fun ActiveWorkoutContent(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("${event.mode.label}: ${event.reps} reps")
+                        Text(
+                            if (event.mode.isHangMode()) {
+                                "${event.mode.label}: ${formatHoldDuration(event.activeMs)}"
+                            } else {
+                                "${event.mode.label}: ${event.reps} reps"
+                            }
+                        )
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             OutlinedButton(onClick = { onDiscardPendingAutoEvent(event.eventId) }) {
                                 Text("Discard")
@@ -1046,6 +1057,14 @@ private fun SetRow(
                 onToggleSetDone(exercise.id, set.id, it, exercise.restSeconds, exercise.exerciseName)
             },
             modifier = Modifier.weight(0.8f),
+        )
+    }
+
+    if (exercise.mode.isHangMode()) {
+        Text(
+            text = if (set.durationMs > 0L) "Hold: ${formatHoldDuration(set.durationMs)}" else "Hold: --",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 
@@ -1294,4 +1313,15 @@ private fun formatWeight(value: Float): String {
     } else {
         String.format(Locale.US, "%.1f", value)
     }
+}
+
+private fun ExerciseMode?.isHangMode(): Boolean {
+    return this == ExerciseMode.DEAD_HANG || this == ExerciseMode.ACTIVE_HANG
+}
+
+private fun formatHoldDuration(ms: Long): String {
+    val totalSeconds = (ms / 1000L).coerceAtLeast(0L)
+    val minutes = totalSeconds / 60L
+    val seconds = totalSeconds % 60L
+    return String.format(Locale.US, "%d:%02d", minutes, seconds)
 }

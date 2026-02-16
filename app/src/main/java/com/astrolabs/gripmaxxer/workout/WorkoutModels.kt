@@ -110,6 +110,8 @@ data class ExerciseTemplate(
 )
 
 val DefaultExerciseLibrary = listOf(
+    ExerciseTemplate("Dead Hang", ExerciseMode.DEAD_HANG),
+    ExerciseTemplate("Active Hang", ExerciseMode.ACTIVE_HANG),
     ExerciseTemplate("Pull-up", ExerciseMode.PULL_UP),
     ExerciseTemplate("Chin-up", ExerciseMode.PULL_UP),
     ExerciseTemplate("Push-up", ExerciseMode.PUSH_UP),

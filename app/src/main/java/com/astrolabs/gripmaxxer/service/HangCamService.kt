@@ -34,6 +34,9 @@ import com.astrolabs.gripmaxxer.reps.BenchPressRepDetector
 import com.astrolabs.gripmaxxer.reps.DipActivityDetector
 import com.astrolabs.gripmaxxer.reps.DipRepDetector
 import com.astrolabs.gripmaxxer.reps.ExerciseMode
+import com.astrolabs.gripmaxxer.reps.ActiveHangActivityDetector
+import com.astrolabs.gripmaxxer.reps.DeadHangActivityDetector
+import com.astrolabs.gripmaxxer.reps.HoldRepDetector
 import com.astrolabs.gripmaxxer.reps.PullUpActivityDetector
 import com.astrolabs.gripmaxxer.reps.PullUpRepDetector
 import com.astrolabs.gripmaxxer.reps.PushUpActivityDetector
@@ -76,6 +79,8 @@ class HangCamService : LifecycleService() {
 
     private val featureExtractor = PoseFeatureExtractor()
     private val pullUpActivityDetector = PullUpActivityDetector()
+    private val deadHangActivityDetector = DeadHangActivityDetector(featureExtractor)
+    private val activeHangActivityDetector = ActiveHangActivityDetector(featureExtractor)
     private val pushUpActivityDetector = PushUpActivityDetector(featureExtractor)
     private val squatActivityDetector = SquatActivityDetector(featureExtractor)
     private val benchPressActivityDetector = BenchPressActivityDetector(featureExtractor)
@@ -85,9 +90,13 @@ class HangCamService : LifecycleService() {
     private val squatRepDetector = SquatRepDetector(featureExtractor)
     private val benchPressRepDetector = BenchPressRepDetector(featureExtractor)
     private val dipRepDetector = DipRepDetector(featureExtractor)
+    private val deadHangRepDetector = HoldRepDetector()
+    private val activeHangRepDetector = HoldRepDetector()
     private val repEngine = RepEngine(
         detectors = mapOf(
             ExerciseMode.PULL_UP to pullUpRepDetector,
+            ExerciseMode.DEAD_HANG to deadHangRepDetector,
+            ExerciseMode.ACTIVE_HANG to activeHangRepDetector,
             ExerciseMode.PUSH_UP to pushUpRepDetector,
             ExerciseMode.SQUAT to squatRepDetector,
             ExerciseMode.BENCH_PRESS to benchPressRepDetector,
@@ -97,6 +106,8 @@ class HangCamService : LifecycleService() {
     )
     private val activityDetectors = mapOf(
         ExerciseMode.PULL_UP to pullUpActivityDetector,
+        ExerciseMode.DEAD_HANG to deadHangActivityDetector,
+        ExerciseMode.ACTIVE_HANG to activeHangActivityDetector,
         ExerciseMode.PUSH_UP to pushUpActivityDetector,
         ExerciseMode.SQUAT to squatActivityDetector,
         ExerciseMode.BENCH_PRESS to benchPressActivityDetector,
@@ -186,6 +197,18 @@ class HangCamService : LifecycleService() {
             settingsRepository.settingsFlow.collect { settings ->
                 currentSettings = settings
                 pullUpActivityDetector.updateConfig(
+                    HangDetectionConfig(
+                        wristShoulderMargin = settings.wristShoulderMargin.coerceAtLeast(MIN_WRIST_SHOULDER_MARGIN),
+                        missingPoseTimeoutMs = settings.missingPoseTimeoutMs,
+                    )
+                )
+                deadHangActivityDetector.updateConfig(
+                    HangDetectionConfig(
+                        wristShoulderMargin = settings.wristShoulderMargin.coerceAtLeast(MIN_WRIST_SHOULDER_MARGIN),
+                        missingPoseTimeoutMs = settings.missingPoseTimeoutMs,
+                    )
+                )
+                activeHangActivityDetector.updateConfig(
                     HangDetectionConfig(
                         wristShoulderMargin = settings.wristShoulderMargin.coerceAtLeast(MIN_WRIST_SHOULDER_MARGIN),
                         missingPoseTimeoutMs = settings.missingPoseTimeoutMs,
