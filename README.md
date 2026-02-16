@@ -7,17 +7,23 @@ Gripmaxxer is an Android app (Kotlin + Compose) that uses the **front camera** a
   - One-arm dead hang
   - One-arm active hang
   - Handstand hold
+  - Plank hold
   - Pull-up
   - Chin-up
+  - Muscle-up
   - One-arm pull-up
   - One-arm chin-up
   - Hanging leg raise
   - Push-up
+  - Pike push-up
   - One-arm push-up
   - Squat
   - Pistol squat
+  - Lunge
+  - Bulgarian split squat
+  - Hip thrust
   - Bench press
-  - Dips
+  - Dip
 - Send **system-wide media play/pause** commands through active MediaSession controllers.
 - Show an always-on-top numeric overlay stopwatch while exercise is active.
 - Count reps in the selected exercise mode.
@@ -92,16 +98,22 @@ Some system screens or OEM-specific UIs may still hide overlays.
   - One-arm dead hang: keep support shoulder/elbow/wrist fully visible
   - One-arm active hang: keep support shoulder/elbow/wrist fully visible
   - Handstand hold: works for wall-assisted and freestanding; keep hands/shoulders/hips/legs in frame
+  - Plank hold: side angle works best; keep shoulders/hips/legs visible
   - Pull-up: front bar framing with shoulders/arms visible
   - Chin-up: front bar framing with shoulders/arms visible
+  - Muscle-up: include bar + full upper body with both wrists visible through transition
   - One-arm pull-up: keep support-side arm and torso centered in frame
   - One-arm chin-up: keep support-side arm and torso centered in frame
   - Hanging leg raise: front bar framing with shoulders/hips/knees visible
   - Push-up: front view with shoulders/elbows/torso visible
+  - Pike push-up: keep hips and shoulders fully in frame from a side/front angle
   - One-arm push-up: side/front angle with support arm, shoulder, and hip visible
   - Squat: front full-body framing with hips/knees/ankles visible
   - Pistol squat: full-body framing with support-side hip/knee/ankle visible
+  - Lunge: full-body framing with both knees and ankles visible
+  - Bulgarian split squat: keep both ankles and knees visible in split stance
+  - Hip thrust: side angle with shoulders/hips/knees visible is most reliable
   - Bench press: side profile focused on shoulder-elbow-wrist
-  - Dips: front upper-body framing with shoulders/elbows/wrists visible
+  - Dip: front upper-body framing with shoulders/elbows/wrists visible
 - FAST mode is lighter on battery/heat; ACCURATE mode is heavier but can improve robustness.
 - Long continuous camera processing can increase battery usage and device temperature.

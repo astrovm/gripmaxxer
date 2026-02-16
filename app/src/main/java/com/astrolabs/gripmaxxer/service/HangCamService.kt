@@ -42,8 +42,19 @@ import com.astrolabs.gripmaxxer.reps.HoldRepDetector
 import com.astrolabs.gripmaxxer.reps.HandstandHoldActivityDetector
 import com.astrolabs.gripmaxxer.reps.HangingLegRaiseActivityDetector
 import com.astrolabs.gripmaxxer.reps.HangingLegRaiseRepDetector
+import com.astrolabs.gripmaxxer.reps.HipThrustActivityDetector
+import com.astrolabs.gripmaxxer.reps.HipThrustRepDetector
+import com.astrolabs.gripmaxxer.reps.LungeActivityDetector
+import com.astrolabs.gripmaxxer.reps.LungeRepDetector
+import com.astrolabs.gripmaxxer.reps.BulgarianSplitSquatActivityDetector
+import com.astrolabs.gripmaxxer.reps.BulgarianSplitSquatRepDetector
+import com.astrolabs.gripmaxxer.reps.MuscleUpActivityDetector
+import com.astrolabs.gripmaxxer.reps.MuscleUpRepDetector
 import com.astrolabs.gripmaxxer.reps.PistolSquatActivityDetector
 import com.astrolabs.gripmaxxer.reps.PistolSquatRepDetector
+import com.astrolabs.gripmaxxer.reps.PikePushUpActivityDetector
+import com.astrolabs.gripmaxxer.reps.PikePushUpRepDetector
+import com.astrolabs.gripmaxxer.reps.PlankHoldActivityDetector
 import com.astrolabs.gripmaxxer.reps.PullUpActivityDetector
 import com.astrolabs.gripmaxxer.reps.PullUpRepDetector
 import com.astrolabs.gripmaxxer.reps.PushUpActivityDetector
@@ -89,26 +100,39 @@ class HangCamService : LifecycleService() {
     private val deadHangActivityDetector = DeadHangActivityDetector(featureExtractor)
     private val activeHangActivityDetector = ActiveHangActivityDetector(featureExtractor)
     private val handstandHoldActivityDetector = HandstandHoldActivityDetector(featureExtractor)
+    private val plankHoldActivityDetector = PlankHoldActivityDetector(featureExtractor)
     private val hangingLegRaiseActivityDetector = HangingLegRaiseActivityDetector()
+    private val muscleUpActivityDetector = MuscleUpActivityDetector(featureExtractor)
     private val pushUpActivityDetector = PushUpActivityDetector(featureExtractor)
+    private val pikePushUpActivityDetector = PikePushUpActivityDetector(featureExtractor)
     private val squatActivityDetector = SquatActivityDetector(featureExtractor)
     private val pistolSquatActivityDetector = PistolSquatActivityDetector(featureExtractor)
+    private val lungeActivityDetector = LungeActivityDetector(featureExtractor)
+    private val bulgarianSplitSquatActivityDetector = BulgarianSplitSquatActivityDetector(featureExtractor)
+    private val hipThrustActivityDetector = HipThrustActivityDetector(featureExtractor)
     private val benchPressActivityDetector = BenchPressActivityDetector(featureExtractor)
     private val dipActivityDetector = DipActivityDetector(featureExtractor)
     private val pullUpRepDetector = PullUpRepDetector(featureExtractor)
+    private val muscleUpRepDetector = MuscleUpRepDetector(featureExtractor)
     private val pushUpRepDetector = PushUpRepDetector(featureExtractor)
+    private val pikePushUpRepDetector = PikePushUpRepDetector(featureExtractor)
     private val squatRepDetector = SquatRepDetector(featureExtractor)
     private val pistolSquatRepDetector = PistolSquatRepDetector(featureExtractor)
+    private val lungeRepDetector = LungeRepDetector(featureExtractor)
+    private val bulgarianSplitSquatRepDetector = BulgarianSplitSquatRepDetector(featureExtractor)
+    private val hipThrustRepDetector = HipThrustRepDetector(featureExtractor)
     private val benchPressRepDetector = BenchPressRepDetector(featureExtractor)
     private val dipRepDetector = DipRepDetector(featureExtractor)
     private val deadHangRepDetector = HoldRepDetector()
     private val activeHangRepDetector = HoldRepDetector()
     private val handstandHoldRepDetector = HoldRepDetector()
+    private val plankHoldRepDetector = HoldRepDetector()
     private val hangingLegRaiseRepDetector = HangingLegRaiseRepDetector()
     private val repEngine = RepEngine(
         detectors = mapOf(
             ExerciseMode.PULL_UP to pullUpRepDetector,
             ExerciseMode.CHIN_UP to pullUpRepDetector,
+            ExerciseMode.MUSCLE_UP to muscleUpRepDetector,
             ExerciseMode.ONE_ARM_PULL_UP to pullUpRepDetector,
             ExerciseMode.ONE_ARM_CHIN_UP to pullUpRepDetector,
             ExerciseMode.HANGING_LEG_RAISE to hangingLegRaiseRepDetector,
@@ -117,10 +141,15 @@ class HangCamService : LifecycleService() {
             ExerciseMode.ONE_ARM_DEAD_HANG to deadHangRepDetector,
             ExerciseMode.ONE_ARM_ACTIVE_HANG to activeHangRepDetector,
             ExerciseMode.HANDSTAND_HOLD to handstandHoldRepDetector,
+            ExerciseMode.PLANK_HOLD to plankHoldRepDetector,
             ExerciseMode.PUSH_UP to pushUpRepDetector,
+            ExerciseMode.PIKE_PUSH_UP to pikePushUpRepDetector,
             ExerciseMode.ONE_ARM_PUSH_UP to pushUpRepDetector,
             ExerciseMode.SQUAT to squatRepDetector,
             ExerciseMode.PISTOL_SQUAT to pistolSquatRepDetector,
+            ExerciseMode.LUNGE to lungeRepDetector,
+            ExerciseMode.BULGARIAN_SPLIT_SQUAT to bulgarianSplitSquatRepDetector,
+            ExerciseMode.HIP_THRUST to hipThrustRepDetector,
             ExerciseMode.BENCH_PRESS to benchPressRepDetector,
             ExerciseMode.DIP to dipRepDetector,
         ),
@@ -129,6 +158,7 @@ class HangCamService : LifecycleService() {
     private val activityDetectors = mapOf(
         ExerciseMode.PULL_UP to pullUpActivityDetector,
         ExerciseMode.CHIN_UP to pullUpActivityDetector,
+        ExerciseMode.MUSCLE_UP to muscleUpActivityDetector,
         ExerciseMode.ONE_ARM_PULL_UP to pullUpActivityDetector,
         ExerciseMode.ONE_ARM_CHIN_UP to pullUpActivityDetector,
         ExerciseMode.HANGING_LEG_RAISE to hangingLegRaiseActivityDetector,
@@ -137,10 +167,15 @@ class HangCamService : LifecycleService() {
         ExerciseMode.ONE_ARM_DEAD_HANG to deadHangActivityDetector,
         ExerciseMode.ONE_ARM_ACTIVE_HANG to activeHangActivityDetector,
         ExerciseMode.HANDSTAND_HOLD to handstandHoldActivityDetector,
+        ExerciseMode.PLANK_HOLD to plankHoldActivityDetector,
         ExerciseMode.PUSH_UP to pushUpActivityDetector,
+        ExerciseMode.PIKE_PUSH_UP to pikePushUpActivityDetector,
         ExerciseMode.ONE_ARM_PUSH_UP to pushUpActivityDetector,
         ExerciseMode.SQUAT to squatActivityDetector,
         ExerciseMode.PISTOL_SQUAT to pistolSquatActivityDetector,
+        ExerciseMode.LUNGE to lungeActivityDetector,
+        ExerciseMode.BULGARIAN_SPLIT_SQUAT to bulgarianSplitSquatActivityDetector,
+        ExerciseMode.HIP_THRUST to hipThrustActivityDetector,
         ExerciseMode.BENCH_PRESS to benchPressActivityDetector,
         ExerciseMode.DIP to dipActivityDetector,
     )
@@ -254,6 +289,12 @@ class HangCamService : LifecycleService() {
                     )
                 )
                 hangingLegRaiseActivityDetector.updateConfig(
+                    HangDetectionConfig(
+                        wristShoulderMargin = settings.wristShoulderMargin.coerceAtLeast(MIN_WRIST_SHOULDER_MARGIN),
+                        missingPoseTimeoutMs = settings.missingPoseTimeoutMs,
+                    )
+                )
+                muscleUpActivityDetector.updateConfig(
                     HangDetectionConfig(
                         wristShoulderMargin = settings.wristShoulderMargin.coerceAtLeast(MIN_WRIST_SHOULDER_MARGIN),
                         missingPoseTimeoutMs = settings.missingPoseTimeoutMs,
