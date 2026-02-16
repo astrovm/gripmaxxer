@@ -96,39 +96,39 @@ class RepCounter(
             null
         }
 
-        val (isDown, isUp) = if (smoothNose != null && smoothWrist != null) {
+        val (isDown, isUp, requiredStableMs) = if (smoothNose != null && smoothWrist != null) {
             val down = smoothElbow > config.elbowDownAngle && smoothNose > smoothWrist + config.marginDown
             val up = smoothElbow < config.elbowUpAngle && smoothNose < smoothWrist - config.marginUp
-            down to up
+            Triple(down, up, config.stableMs)
         } else if (smoothShoulder != null && smoothWrist != null) {
             // Face can leave frame near the top on door-mounted bars; fall back to shoulder-vs-wrist travel.
             val shoulderToWristDelta = smoothShoulder - smoothWrist
-            val down = smoothElbow > config.elbowDownAngle &&
+            val down = smoothElbow > (config.elbowDownAngle - SHOULDER_FALLBACK_DOWN_ELBOW_RELAX_DEG) &&
                 shoulderToWristDelta > (config.marginDown + SHOULDER_DOWN_EXTRA_DELTA)
-            val up = smoothElbow < config.elbowUpAngle &&
+            val up = smoothElbow < (config.elbowUpAngle + SHOULDER_FALLBACK_UP_ELBOW_RELAX_DEG) &&
                 shoulderToWristDelta < (config.marginUp + SHOULDER_UP_EXTRA_DELTA)
-            down to up
+            Triple(down, up, config.stableMs)
         } else {
             // If wrists/head are occluded, rely on elbow angle only so reps still count.
-            val down = smoothElbow > (config.elbowDownAngle + ELBOW_ONLY_DOWN_EXTRA_DEG)
-            val up = smoothElbow < (config.elbowUpAngle - ELBOW_ONLY_UP_EXTRA_DEG)
-            down to up
+            val down = smoothElbow > (config.elbowDownAngle - ELBOW_ONLY_DOWN_RELAX_DEG)
+            val up = smoothElbow < (config.elbowUpAngle + ELBOW_ONLY_UP_RELAX_DEG)
+            Triple(down, up, (config.stableMs / 2L).coerceAtLeast(MIN_OCCLUDED_STABLE_MS))
         }
 
         return when (state) {
-            State.DOWN -> handleDownState(isUp, nowMs)
-            State.IN_UP -> handleInUpState(isDown, nowMs)
+            State.DOWN -> handleDownState(isUp, nowMs, requiredStableMs)
+            State.IN_UP -> handleInUpState(isDown, nowMs, requiredStableMs)
         }
     }
 
-    private fun handleDownState(isUp: Boolean, nowMs: Long): RepCounterResult {
+    private fun handleDownState(isUp: Boolean, nowMs: Long, requiredStableMs: Long): RepCounterResult {
         if (isUp) {
             if (upCandidateSince == null) {
                 upCandidateSince = nowMs
             }
             val stableDuration = nowMs - (upCandidateSince ?: nowMs)
             val cooldownPassed = (nowMs - lastRepTimeMs) > config.minRepIntervalMs
-            if (stableDuration >= config.stableMs && cooldownPassed) {
+            if (stableDuration >= requiredStableMs && cooldownPassed) {
                 reps += 1
                 lastRepTimeMs = nowMs
                 state = State.IN_UP
@@ -143,13 +143,13 @@ class RepCounter(
         return RepCounterResult(reps = reps, repEvent = false)
     }
 
-    private fun handleInUpState(isDown: Boolean, nowMs: Long): RepCounterResult {
+    private fun handleInUpState(isDown: Boolean, nowMs: Long, requiredStableMs: Long): RepCounterResult {
         if (isDown) {
             if (downCandidateSince == null) {
                 downCandidateSince = nowMs
             }
             val stableDuration = nowMs - (downCandidateSince ?: nowMs)
-            if (stableDuration >= config.stableMs) {
+            if (stableDuration >= requiredStableMs) {
                 state = State.DOWN
                 downCandidateSince = null
                 upCandidateSince = null
@@ -170,9 +170,12 @@ class RepCounter(
     }
 
     companion object {
-        private const val SHOULDER_DOWN_EXTRA_DELTA = 0.15f
-        private const val SHOULDER_UP_EXTRA_DELTA = 0.07f
-        private const val ELBOW_ONLY_DOWN_EXTRA_DEG = 4f
-        private const val ELBOW_ONLY_UP_EXTRA_DEG = 4f
+        private const val SHOULDER_DOWN_EXTRA_DELTA = 0.12f
+        private const val SHOULDER_UP_EXTRA_DELTA = 0.14f
+        private const val SHOULDER_FALLBACK_DOWN_ELBOW_RELAX_DEG = 6f
+        private const val SHOULDER_FALLBACK_UP_ELBOW_RELAX_DEG = 10f
+        private const val ELBOW_ONLY_DOWN_RELAX_DEG = 8f
+        private const val ELBOW_ONLY_UP_RELAX_DEG = 12f
+        private const val MIN_OCCLUDED_STABLE_MS = 120L
     }
 }
