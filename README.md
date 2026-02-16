@@ -5,6 +5,7 @@ Gripmaxxer is an Android app (Kotlin + Compose) that uses the **front camera** a
   - Dead hang
   - Active hang
   - Pull-up
+  - Hanging leg raise
   - Push-up
   - Squat
   - Bench press
@@ -75,6 +76,7 @@ Some system screens or OEM-specific UIs may still hide overlays.
   - Dead hang: bar framing with straight elbows visible
   - Active hang: bar framing with bent elbows and upper body visible
   - Pull-up: front bar framing with shoulders/arms visible
+  - Hanging leg raise: front bar framing with shoulders/hips/knees visible
   - Push-up: front view with shoulders/elbows/torso visible
   - Squat: front full-body framing with hips/knees/ankles visible
   - Bench press: side profile focused on shoulder-elbow-wrist
