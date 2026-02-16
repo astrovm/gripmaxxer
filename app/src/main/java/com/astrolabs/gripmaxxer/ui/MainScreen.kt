@@ -69,11 +69,14 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.astrolabs.gripmaxxer.reps.ExerciseMode
 import com.astrolabs.gripmaxxer.service.DebugPreviewFrame
-import com.astrolabs.gripmaxxer.workout.CalendarDaySummary
 import com.astrolabs.gripmaxxer.workout.CameraTrackableModes
 import com.astrolabs.gripmaxxer.workout.CompletedWorkoutDetail
 import com.astrolabs.gripmaxxer.workout.WorkoutFeedItem
 import com.astrolabs.gripmaxxer.workout.WorkoutSetState
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -180,7 +183,6 @@ fun MainScreen(
                 when (uiState.selectedTab) {
                     RootTab.LOG -> LogTab(
                         workouts = uiState.completedWorkouts,
-                        calendarDays = uiState.calendarDays,
                         selectedDetail = uiState.selectedWorkoutDetail,
                         onOpenDetail = viewModel::openWorkoutDetail,
                         onCloseDetail = viewModel::closeWorkoutDetail,
@@ -215,7 +217,6 @@ fun MainScreen(
 @Composable
 private fun LogTab(
     workouts: List<WorkoutFeedItem>,
-    calendarDays: List<CalendarDaySummary>,
     selectedDetail: CompletedWorkoutDetail?,
     onOpenDetail: (Long) -> Unit,
     onCloseDetail: () -> Unit,
@@ -227,6 +228,7 @@ private fun LogTab(
         style = MaterialTheme.typography.headlineMedium,
         color = MaterialTheme.colorScheme.onBackground,
     )
+    WeeklyActivityBar(workouts = workouts)
 
     if (workouts.isEmpty()) {
         ElevatedCard(modifier = Modifier.fillMaxWidth()) {
@@ -268,32 +270,6 @@ private fun LogTab(
         }
     }
 
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(
-                text = "Calendar",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            if (calendarDays.isEmpty()) {
-                Text("No completed days yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else {
-                calendarDays.take(14).forEach { day ->
-                    Text(
-                        text = "${formatDay(day.dayEpochMs)} • ${day.workoutCount} session(s)",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-    }
-
     if (selectedDetail != null) {
         SessionDetailDialog(
             detail = selectedDetail,
@@ -301,6 +277,69 @@ private fun LogTab(
             onEditSet = onEditSet,
             onDeleteSet = onDeleteSet,
         )
+    }
+}
+
+@Composable
+private fun WeeklyActivityBar(workouts: List<WorkoutFeedItem>) {
+    val zoneId = ZoneId.systemDefault()
+    val dayFormatter = remember { DateTimeFormatter.ofPattern("EEE", Locale.US) }
+    val today = LocalDate.now(zoneId)
+    val lastSevenDays = remember(today) {
+        (6 downTo 0).map { offset -> today.minusDays(offset.toLong()) }
+    }
+    val exercisedDays = remember(workouts, zoneId) {
+        workouts.mapTo(hashSetOf()) { item ->
+            Instant.ofEpochMilli(item.completedAtMs).atZone(zoneId).toLocalDate()
+        }
+    }
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            lastSevenDays.forEach { day ->
+                val exercised = exercisedDays.contains(day)
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(
+                            color = if (exercised) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant
+                            },
+                            shape = MaterialTheme.shapes.small,
+                        )
+                        .padding(vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        text = day.format(dayFormatter),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (exercised) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                    Text(
+                        text = day.dayOfMonth.toString(),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = if (exercised) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -797,11 +836,6 @@ private fun formatDuration(elapsedMs: Long): String {
 
 private fun formatSessionTime(timestampMs: Long): String {
     val formatter = SimpleDateFormat("MMM d, HH:mm", Locale.US)
-    return formatter.format(Date(timestampMs))
-}
-
-private fun formatDay(timestampMs: Long): String {
-    val formatter = SimpleDateFormat("EEE, MMM d", Locale.US)
     return formatter.format(Date(timestampMs))
 }
 
