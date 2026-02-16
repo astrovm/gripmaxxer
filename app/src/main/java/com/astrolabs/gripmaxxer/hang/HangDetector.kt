@@ -8,7 +8,8 @@ data class HangDetectionConfig(
     val wristShoulderMargin: Float = 0.06f,
     val missingPoseTimeoutMs: Long = 300L,
     val partialPoseHoldMs: Long = 3000L,
-    val shoulderOnlyHoldMs: Long = 900L,
+    val shoulderOnlyHoldMs: Long = 2200L,
+    val occlusionHoldMs: Long = 2200L,
     val stableSwitchMs: Long = 500L,
     val minToggleIntervalMs: Long = 1500L,
 )
@@ -26,6 +27,7 @@ class HangDetector(
     private var missingSinceMs: Long? = null
     private var partialSinceMs: Long? = null
     private var shoulderOnlySinceMs: Long? = null
+    private var occlusionSinceMs: Long? = null
     private var candidateState: Boolean? = null
     private var candidateSinceMs: Long = 0L
     private var lastToggleMs: Long = 0L
@@ -39,6 +41,7 @@ class HangDetector(
         missingSinceMs = null
         partialSinceMs = null
         shoulderOnlySinceMs = null
+        occlusionSinceMs = null
         candidateState = null
         candidateSinceMs = 0L
         lastToggleMs = 0L
@@ -76,10 +79,25 @@ class HangDetector(
         val canComputeHangNow = shoulderY != null && wristY != null && hasReliableUpperBodyPose(frame)
 
         if (canComputeHangNow) {
-            missingSinceMs = null
-            partialSinceMs = null
-            shoulderOnlySinceMs = null
-            return wristY < (shoulderY - config.wristShoulderMargin)
+            val computedHanging = wristY < (shoulderY - config.wristShoulderMargin)
+            val weakExitEvidence = isHanging && !computedHanging && !hasBothWrists(frame)
+            if (!weakExitEvidence) {
+                missingSinceMs = null
+                partialSinceMs = null
+                shoulderOnlySinceMs = null
+                occlusionSinceMs = null
+                return computedHanging
+            }
+        }
+
+        if (isHanging) {
+            if (occlusionSinceMs == null) occlusionSinceMs = nowMs
+            val occlusionDuration = nowMs - (occlusionSinceMs ?: nowMs)
+            if (occlusionDuration <= config.occlusionHoldMs) {
+                return true
+            }
+        } else {
+            occlusionSinceMs = null
         }
 
         // At top position, wrists can leave frame on door bars. Keep hanging briefly if upper body is still reliable.
@@ -174,6 +192,11 @@ class HangDetector(
         val leftShoulder = frame.landmark(PoseLandmark.LEFT_SHOULDER) ?: return false
         val rightShoulder = frame.landmark(PoseLandmark.RIGHT_SHOULDER) ?: return false
         return distance(leftShoulder, rightShoulder) >= 0.08f
+    }
+
+    private fun hasBothWrists(frame: PoseFrame): Boolean {
+        return frame.landmark(PoseLandmark.LEFT_WRIST) != null &&
+            frame.landmark(PoseLandmark.RIGHT_WRIST) != null
     }
 
     private fun isArmReliable(
