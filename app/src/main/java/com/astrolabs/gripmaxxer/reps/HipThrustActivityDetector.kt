@@ -25,7 +25,11 @@ class HipThrustActivityDetector(
         frame: PoseFrame,
         nowMs: Long,
     ): Boolean {
-        val shoulderY = frame.averageY(PoseLandmark.LEFT_SHOULDER, PoseLandmark.RIGHT_SHOULDER) ?: return decayActive(nowMs)
+        val leftShoulder = frame.landmark(PoseLandmark.LEFT_SHOULDER) ?: return decayActive(nowMs)
+        val rightShoulder = frame.landmark(PoseLandmark.RIGHT_SHOULDER) ?: return decayActive(nowMs)
+        val shoulderWidth = abs(leftShoulder.x - rightShoulder.x)
+        if (shoulderWidth < MIN_SHOULDER_WIDTH) return decayActive(nowMs)
+        val shoulderY = (leftShoulder.y + rightShoulder.y) / 2f
         val hipAngle = featureExtractor.hipAngleDegrees(frame) ?: return decayActive(nowMs)
         val hipY = frame.averageY(PoseLandmark.LEFT_HIP, PoseLandmark.RIGHT_HIP) ?: return decayActive(nowMs)
         val kneeAngle = featureExtractor.kneeAngleDegrees(frame)
@@ -33,18 +37,18 @@ class HipThrustActivityDetector(
         if (kneeAngle != null && (kneeAngle < MIN_KNEE_ANGLE || kneeAngle > MAX_KNEE_ANGLE)) {
             return decayActive(nowMs)
         }
-        if (kotlin.math.abs(hipY - shoulderY) > MAX_HIP_TO_SHOULDER_Y_DELTA) {
+        if (abs(hipY - shoulderY) > MAX_HIP_TO_SHOULDER_Y_DELTA) {
             return decayActive(nowMs)
         }
 
         if (baselineHipY == null) baselineHipY = hipY
-        if (hipAngle > 158f) {
+        if (hipAngle > BASELINE_RESET_HIP_ANGLE_MIN) {
             baselineHipY = blend(baselineHipY ?: hipY, hipY, 0.08f)
         }
 
         val hipDrop = hipY - (baselineHipY ?: hipY)
-        val angleMotion = lastHipAngle?.let { abs(it - hipAngle) > 1.4f } ?: false
-        val motionDetected = angleMotion || hipAngle < 165f || hipDrop > 0.015f
+        val angleMotion = lastHipAngle?.let { abs(it - hipAngle) > HIP_ANGLE_MOTION_MIN_DELTA } ?: false
+        val motionDetected = angleMotion || hipAngle < ACTIVE_HIP_ANGLE_MAX || hipDrop > ACTIVE_HIP_DROP_MIN
         if (motionDetected) {
             active = true
             lastMotionMs = nowMs
@@ -70,8 +74,13 @@ class HipThrustActivityDetector(
 
     companion object {
         private const val IDLE_TIMEOUT_MS = 1700L
+        private const val MIN_SHOULDER_WIDTH = 0.075f
         private const val MIN_KNEE_ANGLE = 70f
         private const val MAX_KNEE_ANGLE = 178f
-        private const val MAX_HIP_TO_SHOULDER_Y_DELTA = 0.34f
+        private const val MAX_HIP_TO_SHOULDER_Y_DELTA = 0.32f
+        private const val BASELINE_RESET_HIP_ANGLE_MIN = 160f
+        private const val HIP_ANGLE_MOTION_MIN_DELTA = 1.6f
+        private const val ACTIVE_HIP_ANGLE_MAX = 164f
+        private const val ACTIVE_HIP_DROP_MIN = 0.016f
     }
 }

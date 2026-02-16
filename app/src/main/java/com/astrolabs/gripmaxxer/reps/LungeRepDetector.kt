@@ -11,8 +11,8 @@ class LungeRepDetector(
 ) : ModeRepDetector {
 
     private val cycleCounter = CycleRepCounter(
-        stableMs = 210L,
-        minRepIntervalMs = 550L,
+        stableMs = 220L,
+        minRepIntervalMs = 580L,
     )
 
     private val sideTracker = BodySideTracker(
@@ -43,8 +43,8 @@ class LungeRepDetector(
             ?: return RepCounterResult(reps = cycleCounter.currentReps(), repEvent = false)
         val rearKnee = featureExtractor.kneeAngleDegrees(frame, opposite(side))
 
-        val isDown = workingKnee < 112f && (rearKnee == null || rearKnee < 155f)
-        val isUp = workingKnee > 162f && (rearKnee == null || rearKnee > 142f)
+        val isDown = workingKnee < DOWN_WORKING_KNEE_MAX && (rearKnee == null || rearKnee < DOWN_REAR_KNEE_MAX)
+        val isUp = workingKnee > UP_WORKING_KNEE_MIN && (rearKnee == null || rearKnee > UP_REAR_KNEE_MIN)
         return cycleCounter.process(isDown = isDown, isUp = isUp, nowMs = nowMs)
     }
 
@@ -75,6 +75,10 @@ class LungeRepDetector(
     companion object {
         private const val SIDE_SWITCH_DELTA_DEG = 6f
         private const val SIDE_SWITCH_STABLE_MS = 280L
-        private const val MIN_ANKLE_TO_SHOULDER_WIDTH_RATIO = 0.55f
+        private const val MIN_ANKLE_TO_SHOULDER_WIDTH_RATIO = 0.68f
+        private const val DOWN_WORKING_KNEE_MAX = 114f
+        private const val DOWN_REAR_KNEE_MAX = 152f
+        private const val UP_WORKING_KNEE_MIN = 164f
+        private const val UP_REAR_KNEE_MIN = 145f
     }
 }

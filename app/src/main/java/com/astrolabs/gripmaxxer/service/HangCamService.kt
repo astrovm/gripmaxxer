@@ -261,6 +261,7 @@ class HangCamService : LifecycleService() {
         lastFrameRealtimeMs.set(0L)
         lastPosePresent = false
         activityDetectors.values.forEach { it.reset() }
+        applyModeCalibratedThresholds(settings = currentSettings, mode = currentMode)
         repEngine.setMode(currentMode, resetCurrent = true)
         updateOverlayVisibility()
 
@@ -281,52 +282,13 @@ class HangCamService : LifecycleService() {
         settingsJob = serviceScope.launch {
             settingsRepository.settingsFlow.collect { settings ->
                 currentSettings = settings
-                pullUpActivityDetector.updateConfig(
-                    HangDetectionConfig(
-                        wristShoulderMargin = settings.wristShoulderMargin.coerceAtLeast(MIN_WRIST_SHOULDER_MARGIN),
-                        missingPoseTimeoutMs = settings.missingPoseTimeoutMs,
-                    )
-                )
-                deadHangActivityDetector.updateConfig(
-                    HangDetectionConfig(
-                        wristShoulderMargin = settings.wristShoulderMargin.coerceAtLeast(MIN_WRIST_SHOULDER_MARGIN),
-                        missingPoseTimeoutMs = settings.missingPoseTimeoutMs,
-                    )
-                )
-                activeHangActivityDetector.updateConfig(
-                    HangDetectionConfig(
-                        wristShoulderMargin = settings.wristShoulderMargin.coerceAtLeast(MIN_WRIST_SHOULDER_MARGIN),
-                        missingPoseTimeoutMs = settings.missingPoseTimeoutMs,
-                    )
-                )
-                hangingLegRaiseActivityDetector.updateConfig(
-                    HangDetectionConfig(
-                        wristShoulderMargin = settings.wristShoulderMargin.coerceAtLeast(MIN_WRIST_SHOULDER_MARGIN),
-                        missingPoseTimeoutMs = settings.missingPoseTimeoutMs,
-                    )
-                )
-                muscleUpActivityDetector.updateConfig(
-                    HangDetectionConfig(
-                        wristShoulderMargin = settings.wristShoulderMargin.coerceAtLeast(MIN_WRIST_SHOULDER_MARGIN),
-                        missingPoseTimeoutMs = settings.missingPoseTimeoutMs,
-                    )
-                )
-                pullUpRepDetector.updateConfig(
-                    RepCounterConfig(
-                        elbowUpAngle = settings.elbowUpAngle,
-                        elbowDownAngle = settings.elbowDownAngle,
-                        marginUp = settings.marginUp,
-                        marginDown = settings.marginDown,
-                        stableMs = settings.stableMs,
-                        minRepIntervalMs = settings.minRepIntervalMs,
-                    )
-                )
                 poseDetectorWrapper?.setAccurateMode(settings.poseModeAccurate)
                 frameMutex.withLock {
                     val previousMode = currentMode
                     currentMode = settings.selectedExerciseMode
                     mediaControlEnabled = settings.mediaControlEnabled
                     repSoundEnabled = settings.repSoundEnabled
+                    applyModeCalibratedThresholds(settings = settings, mode = currentMode)
                     repEngine.setMode(currentMode, resetCurrent = previousMode != currentMode)
                     if (previousMode != currentMode) {
                         handleModeChangeLocked()
@@ -517,6 +479,147 @@ class HangCamService : LifecycleService() {
         publishStateAndNotification()
     }
 
+    private fun applyModeCalibratedThresholds(
+        settings: AppSettings,
+        mode: ExerciseMode,
+    ) {
+        val baseMargin = settings.wristShoulderMargin.coerceAtLeast(MIN_WRIST_SHOULDER_MARGIN)
+        val oneArmPullMode = mode == ExerciseMode.ONE_ARM_PULL_UP || mode == ExerciseMode.ONE_ARM_CHIN_UP
+        val oneArmDeadHangMode = mode == ExerciseMode.ONE_ARM_DEAD_HANG
+        val oneArmActiveHangMode = mode == ExerciseMode.ONE_ARM_ACTIVE_HANG
+
+        val pullMargin = if (oneArmPullMode) {
+            (baseMargin - ONE_ARM_HANG_MARGIN_RELAX).coerceAtLeast(MIN_ONE_ARM_WRIST_SHOULDER_MARGIN)
+        } else {
+            baseMargin
+        }
+        pullUpActivityDetector.updateConfig(
+            HangDetectionConfig(
+                wristShoulderMargin = pullMargin,
+                wristShoulderReleaseMargin = (pullMargin - WRIST_RELEASE_GAP).coerceAtLeast(MIN_WRIST_RELEASE_MARGIN),
+                missingPoseTimeoutMs = settings.missingPoseTimeoutMs,
+                partialPoseHoldMs = if (oneArmPullMode) 3600L else 3000L,
+                shoulderOnlyHoldMs = if (oneArmPullMode) 3900L else 3500L,
+                occlusionHoldMs = if (oneArmPullMode) 3900L else 3500L,
+                stableSwitchMs = if (oneArmPullMode) 600L else 500L,
+                minToggleIntervalMs = if (oneArmPullMode) 1700L else 1500L,
+            )
+        )
+
+        val deadHangMargin = if (oneArmDeadHangMode) {
+            (baseMargin - ONE_ARM_HANG_MARGIN_RELAX).coerceAtLeast(MIN_ONE_ARM_WRIST_SHOULDER_MARGIN)
+        } else {
+            baseMargin
+        }
+        deadHangActivityDetector.updateConfig(
+            HangDetectionConfig(
+                wristShoulderMargin = deadHangMargin,
+                wristShoulderReleaseMargin = (deadHangMargin - WRIST_RELEASE_GAP).coerceAtLeast(MIN_WRIST_RELEASE_MARGIN),
+                missingPoseTimeoutMs = settings.missingPoseTimeoutMs,
+                partialPoseHoldMs = if (oneArmDeadHangMode) 3600L else 3000L,
+                shoulderOnlyHoldMs = if (oneArmDeadHangMode) 3900L else 3500L,
+                occlusionHoldMs = if (oneArmDeadHangMode) 3900L else 3500L,
+                stableSwitchMs = if (oneArmDeadHangMode) 600L else 500L,
+                minToggleIntervalMs = if (oneArmDeadHangMode) 1700L else 1500L,
+            )
+        )
+
+        val activeHangMargin = if (oneArmActiveHangMode) {
+            (baseMargin - ONE_ARM_HANG_MARGIN_RELAX).coerceAtLeast(MIN_ONE_ARM_WRIST_SHOULDER_MARGIN)
+        } else {
+            baseMargin
+        }
+        activeHangActivityDetector.updateConfig(
+            HangDetectionConfig(
+                wristShoulderMargin = activeHangMargin,
+                wristShoulderReleaseMargin = (activeHangMargin - WRIST_RELEASE_GAP).coerceAtLeast(MIN_WRIST_RELEASE_MARGIN),
+                missingPoseTimeoutMs = settings.missingPoseTimeoutMs,
+                partialPoseHoldMs = if (oneArmActiveHangMode) 3600L else 3000L,
+                shoulderOnlyHoldMs = if (oneArmActiveHangMode) 3900L else 3500L,
+                occlusionHoldMs = if (oneArmActiveHangMode) 3900L else 3500L,
+                stableSwitchMs = if (oneArmActiveHangMode) 600L else 500L,
+                minToggleIntervalMs = if (oneArmActiveHangMode) 1700L else 1500L,
+            )
+        )
+
+        hangingLegRaiseActivityDetector.updateConfig(
+            HangDetectionConfig(
+                wristShoulderMargin = (baseMargin - HLR_MARGIN_RELAX).coerceAtLeast(MIN_HLR_WRIST_SHOULDER_MARGIN),
+                wristShoulderReleaseMargin = (baseMargin - HLR_MARGIN_RELAX - WRIST_RELEASE_GAP)
+                    .coerceAtLeast(MIN_WRIST_RELEASE_MARGIN),
+                missingPoseTimeoutMs = settings.missingPoseTimeoutMs,
+                partialPoseHoldMs = 3200L,
+                shoulderOnlyHoldMs = 3600L,
+                occlusionHoldMs = 3600L,
+            )
+        )
+
+        muscleUpActivityDetector.updateConfig(
+            HangDetectionConfig(
+                wristShoulderMargin = (baseMargin - MUSCLE_UP_MARGIN_RELAX).coerceAtLeast(MIN_MUSCLE_UP_WRIST_SHOULDER_MARGIN),
+                wristShoulderReleaseMargin = (baseMargin - MUSCLE_UP_MARGIN_RELAX - WRIST_RELEASE_GAP)
+                    .coerceAtLeast(MIN_WRIST_RELEASE_MARGIN),
+                missingPoseTimeoutMs = settings.missingPoseTimeoutMs,
+                partialPoseHoldMs = 3200L,
+                shoulderOnlyHoldMs = 3600L,
+                occlusionHoldMs = 3600L,
+                stableSwitchMs = 520L,
+                minToggleIntervalMs = 1600L,
+            )
+        )
+
+        pullUpRepDetector.updateConfig(buildPullRepConfig(settings = settings, mode = mode))
+    }
+
+    private fun buildPullRepConfig(
+        settings: AppSettings,
+        mode: ExerciseMode,
+    ): RepCounterConfig {
+        val base = RepCounterConfig(
+            elbowUpAngle = settings.elbowUpAngle,
+            elbowDownAngle = settings.elbowDownAngle,
+            marginUp = settings.marginUp,
+            marginDown = settings.marginDown,
+            stableMs = settings.stableMs,
+            minRepIntervalMs = settings.minRepIntervalMs,
+        )
+
+        return when (mode) {
+            ExerciseMode.PULL_UP -> base.copy(
+                stableMs = maxOf(base.stableMs, 220L),
+                minRepIntervalMs = maxOf(base.minRepIntervalMs, 560L),
+            )
+
+            ExerciseMode.CHIN_UP -> base.copy(
+                elbowUpAngle = (base.elbowUpAngle + 3f).coerceIn(90f, 145f),
+                elbowDownAngle = (base.elbowDownAngle - 2f).coerceIn(130f, 175f),
+                marginUp = (base.marginUp - 0.004f).coerceIn(0.015f, 0.10f),
+                stableMs = maxOf(base.stableMs, 210L),
+                minRepIntervalMs = maxOf(base.minRepIntervalMs, 540L),
+            )
+
+            ExerciseMode.ONE_ARM_PULL_UP -> base.copy(
+                elbowUpAngle = (base.elbowUpAngle + 10f).coerceIn(95f, 150f),
+                elbowDownAngle = (base.elbowDownAngle - 8f).coerceIn(125f, 175f),
+                marginUp = (base.marginUp - 0.012f).coerceIn(0.012f, 0.10f),
+                marginDown = (base.marginDown - 0.006f).coerceIn(0.008f, 0.08f),
+                stableMs = maxOf(base.stableMs, 260L),
+                minRepIntervalMs = maxOf(base.minRepIntervalMs, 760L),
+            )
+
+            ExerciseMode.ONE_ARM_CHIN_UP -> base.copy(
+                elbowUpAngle = (base.elbowUpAngle + 12f).coerceIn(95f, 150f),
+                elbowDownAngle = (base.elbowDownAngle - 8f).coerceIn(125f, 175f),
+                marginUp = (base.marginUp - 0.013f).coerceIn(0.012f, 0.10f),
+                marginDown = (base.marginDown - 0.007f).coerceIn(0.008f, 0.08f),
+                stableMs = maxOf(base.stableMs, 270L),
+                minRepIntervalMs = maxOf(base.minRepIntervalMs, 780L),
+            )
+
+            else -> base
+        }
+    }
+
     private suspend fun recordSessionIfMeaningful(completedAtMs: Long) {
         val hasAnySignal = currentReps > 0 || currentSessionElapsedMs >= MIN_SESSION_MS
         if (!hasAnySignal) return
@@ -661,6 +764,14 @@ class HangCamService : LifecycleService() {
         const val ACTION_START = "com.astrolabs.gripmaxxer.action.START"
         const val ACTION_STOP = "com.astrolabs.gripmaxxer.action.STOP"
         private const val MIN_WRIST_SHOULDER_MARGIN = 0.08f
+        private const val MIN_ONE_ARM_WRIST_SHOULDER_MARGIN = 0.06f
+        private const val MIN_HLR_WRIST_SHOULDER_MARGIN = 0.065f
+        private const val MIN_MUSCLE_UP_WRIST_SHOULDER_MARGIN = 0.06f
+        private const val ONE_ARM_HANG_MARGIN_RELAX = 0.012f
+        private const val HLR_MARGIN_RELAX = 0.008f
+        private const val MUSCLE_UP_MARGIN_RELAX = 0.015f
+        private const val WRIST_RELEASE_GAP = 0.015f
+        private const val MIN_WRIST_RELEASE_MARGIN = 0.035f
         private const val MIN_SESSION_MS = 400L
         private const val REP_TONE_DURATION_MS = 100
         private const val REP_TONE_VOLUME = 80

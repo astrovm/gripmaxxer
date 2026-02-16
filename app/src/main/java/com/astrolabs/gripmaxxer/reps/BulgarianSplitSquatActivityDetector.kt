@@ -35,10 +35,10 @@ class BulgarianSplitSquatActivityDetector(
         val workingKnee = featureExtractor.kneeAngleDegrees(frame, side) ?: return decayActive(nowMs)
         val rearKnee = featureExtractor.kneeAngleDegrees(frame, opposite(side))
 
-        val angleMotion = lastWorkingKneeAngle?.let { abs(it - workingKnee) > 1.5f } ?: false
+        val angleMotion = lastWorkingKneeAngle?.let { abs(it - workingKnee) > WORKING_KNEE_MOTION_MIN_DELTA } ?: false
         val motionDetected = angleMotion ||
-            workingKnee < 168f ||
-            (rearKnee != null && rearKnee < 165f)
+            workingKnee < ACTIVE_WORKING_KNEE_MAX ||
+            (rearKnee != null && rearKnee < ACTIVE_REAR_KNEE_MAX)
         if (motionDetected) {
             active = true
             lastMotionMs = nowMs
@@ -79,10 +79,13 @@ class BulgarianSplitSquatActivityDetector(
     }
 
     companion object {
-        private const val IDLE_TIMEOUT_MS = 1600L
+        private const val IDLE_TIMEOUT_MS = 1700L
         private const val SIDE_SWITCH_DELTA_DEG = 7f
         private const val SIDE_SWITCH_STABLE_MS = 320L
         private const val MIN_SHOULDER_WIDTH = 0.08f
-        private const val SPLIT_STANCE_MIN_RATIO = 0.95f
+        private const val SPLIT_STANCE_MIN_RATIO = 1.0f
+        private const val WORKING_KNEE_MOTION_MIN_DELTA = 1.6f
+        private const val ACTIVE_WORKING_KNEE_MAX = 166f
+        private const val ACTIVE_REAR_KNEE_MAX = 163f
     }
 }

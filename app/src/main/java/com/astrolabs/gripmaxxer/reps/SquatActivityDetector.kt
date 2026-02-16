@@ -26,16 +26,20 @@ class SquatActivityDetector(
         nowMs: Long,
     ): Boolean {
         val kneeAngle = featureExtractor.kneeAngleDegrees(frame) ?: return decayActive(nowMs)
+        val hipAngle = featureExtractor.hipAngleDegrees(frame)
         val hipY = frame.averageY(PoseLandmark.LEFT_HIP, PoseLandmark.RIGHT_HIP) ?: return decayActive(nowMs)
 
         if (baselineHipY == null) baselineHipY = hipY
-        if (kneeAngle > 160f) {
+        if (kneeAngle > BASELINE_RESET_KNEE_MIN) {
             baselineHipY = blend(baselineHipY ?: hipY, hipY, 0.06f)
         }
 
         val hipDrop = hipY - (baselineHipY ?: hipY)
-        val angleMotion = lastKneeAngle?.let { abs(it - kneeAngle) > 1.5f } ?: false
-        val motionDetected = angleMotion || kneeAngle < 165f || hipDrop > 0.02f
+        val angleMotion = lastKneeAngle?.let { abs(it - kneeAngle) > KNEE_MOTION_MIN_DELTA } ?: false
+        val motionDetected = angleMotion ||
+            kneeAngle < ACTIVE_KNEE_MAX ||
+            hipDrop > ACTIVE_HIP_DROP_MIN ||
+            (hipAngle != null && hipAngle < ACTIVE_HIP_ANGLE_MAX)
         if (motionDetected) {
             active = true
             lastMotionMs = nowMs
@@ -61,5 +65,10 @@ class SquatActivityDetector(
 
     companion object {
         private const val IDLE_TIMEOUT_MS = 1500L
+        private const val BASELINE_RESET_KNEE_MIN = 162f
+        private const val KNEE_MOTION_MIN_DELTA = 1.6f
+        private const val ACTIVE_KNEE_MAX = 163f
+        private const val ACTIVE_HIP_ANGLE_MAX = 152f
+        private const val ACTIVE_HIP_DROP_MIN = 0.022f
     }
 }

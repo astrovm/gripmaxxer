@@ -8,8 +8,8 @@ class SquatRepDetector(
 ) : ModeRepDetector {
 
     private val cycleCounter = CycleRepCounter(
-        stableMs = 200L,
-        minRepIntervalMs = 500L,
+        stableMs = 220L,
+        minRepIntervalMs = 560L,
     )
 
     override fun reset() {
@@ -29,8 +29,15 @@ class SquatRepDetector(
             ?: return RepCounterResult(reps = cycleCounter.currentReps(), repEvent = false)
         val hipAngle = featureExtractor.hipAngleDegrees(frame)
 
-        val isDown = kneeAngle < 100f || (hipAngle != null && hipAngle < 115f)
-        val isUp = kneeAngle > 160f && (hipAngle == null || hipAngle > 145f)
+        val isDown = kneeAngle < DOWN_KNEE_MAX || (hipAngle != null && hipAngle < DOWN_HIP_MAX)
+        val isUp = kneeAngle > UP_KNEE_MIN && (hipAngle == null || hipAngle > UP_HIP_MIN)
         return cycleCounter.process(isDown = isDown, isUp = isUp, nowMs = nowMs)
+    }
+
+    companion object {
+        private const val DOWN_KNEE_MAX = 104f
+        private const val DOWN_HIP_MAX = 120f
+        private const val UP_KNEE_MIN = 164f
+        private const val UP_HIP_MIN = 150f
     }
 }

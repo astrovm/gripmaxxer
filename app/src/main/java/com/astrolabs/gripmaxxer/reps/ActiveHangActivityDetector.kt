@@ -69,9 +69,9 @@ class ActiveHangActivityDetector(
     }
 
     companion object {
-        private const val ACTIVE_HANG_ENTRY_MAX_ELBOW_ANGLE = 132f
-        private const val ACTIVE_HANG_EXIT_MAX_ELBOW_ANGLE = 146f
-        private const val ACTIVE_HANG_ABOVE_THRESHOLD_GRACE_MS = 1200L
-        private const val ACTIVE_HANG_MISSING_ANGLE_GRACE_MS = 1200L
+        private const val ACTIVE_HANG_ENTRY_MAX_ELBOW_ANGLE = 130f
+        private const val ACTIVE_HANG_EXIT_MAX_ELBOW_ANGLE = 144f
+        private const val ACTIVE_HANG_ABOVE_THRESHOLD_GRACE_MS = 1300L
+        private const val ACTIVE_HANG_MISSING_ANGLE_GRACE_MS = 1400L
     }
 }

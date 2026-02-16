@@ -125,17 +125,17 @@ class MiddleSplitHoldActivityDetector(
     }
 
     companion object {
-        private const val ENTRY_STABLE_MS = 500L
-        private const val EXIT_STABLE_MS = 1000L
+        private const val ENTRY_STABLE_MS = 550L
+        private const val EXIT_STABLE_MS = 1100L
         private const val MISSING_POSE_GRACE_MS = 1000L
 
         private const val MIN_SHOULDER_WIDTH = 0.08f
-        private const val MIN_ANKLE_TO_SHOULDER_WIDTH_RATIO = 1.9f
+        private const val MIN_ANKLE_TO_SHOULDER_WIDTH_RATIO = 1.85f
         private const val HIP_CENTER_MARGIN_X = 0.10f
         private const val MIN_HIP_DROP_FROM_SHOULDERS = 0.10f
         private const val MAX_HIP_TO_ANKLE_Y_DELTA = 0.25f
-        private const val MAX_ANKLE_LEVEL_Y_DELTA = 0.14f
+        private const val MAX_ANKLE_LEVEL_Y_DELTA = 0.12f
         private const val MAX_KNEE_TO_ANKLE_Y_DELTA = 0.18f
-        private const val MIN_KNEE_ANGLE_DEG = 150f
+        private const val MIN_KNEE_ANGLE_DEG = 148f
     }
 }

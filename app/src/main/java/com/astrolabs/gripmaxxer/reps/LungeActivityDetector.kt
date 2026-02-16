@@ -35,8 +35,10 @@ class LungeActivityDetector(
         val workingKnee = featureExtractor.kneeAngleDegrees(frame, side) ?: return decayActive(nowMs)
         val rearKnee = featureExtractor.kneeAngleDegrees(frame, opposite(side))
 
-        val angleMotion = lastWorkingKneeAngle?.let { abs(it - workingKnee) > 1.5f } ?: false
-        val motionDetected = angleMotion || workingKnee < 165f || (rearKnee != null && rearKnee < 165f)
+        val angleMotion = lastWorkingKneeAngle?.let { abs(it - workingKnee) > WORKING_KNEE_MOTION_MIN_DELTA } ?: false
+        val motionDetected = angleMotion ||
+            workingKnee < ACTIVE_WORKING_KNEE_MAX ||
+            (rearKnee != null && rearKnee < ACTIVE_REAR_KNEE_MAX)
         if (motionDetected) {
             active = true
             lastMotionMs = nowMs
@@ -81,9 +83,12 @@ class LungeActivityDetector(
     }
 
     companion object {
-        private const val IDLE_TIMEOUT_MS = 1500L
+        private const val IDLE_TIMEOUT_MS = 1600L
         private const val SIDE_SWITCH_DELTA_DEG = 6f
         private const val SIDE_SWITCH_STABLE_MS = 280L
-        private const val MIN_ANKLE_TO_SHOULDER_WIDTH_RATIO = 0.55f
+        private const val MIN_ANKLE_TO_SHOULDER_WIDTH_RATIO = 0.68f
+        private const val WORKING_KNEE_MOTION_MIN_DELTA = 1.6f
+        private const val ACTIVE_WORKING_KNEE_MAX = 164f
+        private const val ACTIVE_REAR_KNEE_MAX = 162f
     }
 }

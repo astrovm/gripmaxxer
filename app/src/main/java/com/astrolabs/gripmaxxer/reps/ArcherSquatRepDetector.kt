@@ -11,8 +11,8 @@ class ArcherSquatRepDetector(
 ) : ModeRepDetector {
 
     private val cycleCounter = CycleRepCounter(
-        stableMs = 230L,
-        minRepIntervalMs = 620L,
+        stableMs = 240L,
+        minRepIntervalMs = 650L,
     )
 
     override fun reset() {
@@ -78,13 +78,13 @@ class ArcherSquatRepDetector(
 
     companion object {
         private const val MIN_SHOULDER_WIDTH = 0.08f
-        private const val MIN_ANKLE_TO_SHOULDER_WIDTH_RATIO = 1.35f
-        private const val DOWN_WORKING_KNEE_MAX = 112f
-        private const val DOWN_SUPPORT_KNEE_MIN = 150f
-        private const val MIN_KNEE_SEPARATION_DEG = 28f
-        private const val UP_KNEE_MIN = 160f
-        private const val UP_KNEE_BALANCE_MAX_DELTA = 16f
-        private const val DOWN_HIP_SHIFT_MIN_RATIO = 0.14f
-        private const val UP_HIP_SHIFT_MAX_RATIO = 0.11f
+        private const val MIN_ANKLE_TO_SHOULDER_WIDTH_RATIO = 1.4f
+        private const val DOWN_WORKING_KNEE_MAX = 110f
+        private const val DOWN_SUPPORT_KNEE_MIN = 152f
+        private const val MIN_KNEE_SEPARATION_DEG = 30f
+        private const val UP_KNEE_MIN = 162f
+        private const val UP_KNEE_BALANCE_MAX_DELTA = 14f
+        private const val DOWN_HIP_SHIFT_MIN_RATIO = 0.15f
+        private const val UP_HIP_SHIFT_MAX_RATIO = 0.10f
     }
 }

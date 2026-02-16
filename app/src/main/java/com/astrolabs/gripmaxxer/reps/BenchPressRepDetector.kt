@@ -10,8 +10,8 @@ class BenchPressRepDetector(
 ) : ModeRepDetector {
 
     private val cycleCounter = CycleRepCounter(
-        stableMs = 170L,
-        minRepIntervalMs = 450L,
+        stableMs = 190L,
+        minRepIntervalMs = 500L,
     )
 
     override fun reset() {
@@ -29,8 +29,8 @@ class BenchPressRepDetector(
 
         val elbowAngle = featureExtractor.elbowAngleDegrees(frame)
             ?: return RepCounterResult(reps = cycleCounter.currentReps(), repEvent = false)
-        val isDown = elbowAngle < 95f
-        val isUp = elbowAngle > 160f
+        val isDown = elbowAngle < DOWN_ELBOW_MAX
+        val isUp = elbowAngle > UP_ELBOW_MIN
         return cycleCounter.process(isDown = isDown, isUp = isUp, nowMs = nowMs)
     }
 
@@ -53,13 +53,18 @@ class BenchPressRepDetector(
         val elbowNearShoulderHeight = abs(elbowY - shoulderY) <= MAX_ELBOW_TO_SHOULDER_Y_DELTA
         val wristsNearShouldersX = abs(leftWrist.x - leftShoulder.x) < MAX_WRIST_TO_SHOULDER_X_DELTA &&
             abs(rightWrist.x - rightShoulder.x) < MAX_WRIST_TO_SHOULDER_X_DELTA
-        return wristNearShoulderHeight && elbowNearShoulderHeight && wristsNearShouldersX
+        val wristsNearElbowsX = abs(leftWrist.x - leftElbow.x) < MAX_WRIST_TO_ELBOW_X_DELTA &&
+            abs(rightWrist.x - rightElbow.x) < MAX_WRIST_TO_ELBOW_X_DELTA
+        return wristNearShoulderHeight && elbowNearShoulderHeight && wristsNearShouldersX && wristsNearElbowsX
     }
 
     companion object {
-        private const val MIN_SHOULDER_WIDTH = 0.07f
-        private const val MAX_WRIST_TO_SHOULDER_Y_DELTA = 0.24f
-        private const val MAX_ELBOW_TO_SHOULDER_Y_DELTA = 0.22f
-        private const val MAX_WRIST_TO_SHOULDER_X_DELTA = 0.34f
+        private const val MIN_SHOULDER_WIDTH = 0.075f
+        private const val DOWN_ELBOW_MAX = 98f
+        private const val UP_ELBOW_MIN = 161f
+        private const val MAX_WRIST_TO_SHOULDER_Y_DELTA = 0.22f
+        private const val MAX_ELBOW_TO_SHOULDER_Y_DELTA = 0.20f
+        private const val MAX_WRIST_TO_SHOULDER_X_DELTA = 0.32f
+        private const val MAX_WRIST_TO_ELBOW_X_DELTA = 0.22f
     }
 }

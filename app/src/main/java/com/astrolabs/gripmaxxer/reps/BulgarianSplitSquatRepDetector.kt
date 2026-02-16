@@ -11,8 +11,8 @@ class BulgarianSplitSquatRepDetector(
 ) : ModeRepDetector {
 
     private val cycleCounter = CycleRepCounter(
-        stableMs = 220L,
-        minRepIntervalMs = 600L,
+        stableMs = 230L,
+        minRepIntervalMs = 620L,
     )
 
     private val sideTracker = BodySideTracker(
@@ -40,7 +40,7 @@ class BulgarianSplitSquatRepDetector(
         val rearKnee = featureExtractor.kneeAngleDegrees(frame, opposite(side))
             ?: return RepCounterResult(reps = cycleCounter.currentReps(), repEvent = false)
 
-        val isDown = workingKnee < 108f && rearKnee < 150f
+        val isDown = workingKnee < DOWN_WORKING_KNEE_MAX && rearKnee < DOWN_REAR_KNEE_MAX
         val isUp = workingKnee > 160f && rearKnee in REAR_KNEE_UP_MIN..REAR_KNEE_UP_MAX
         return cycleCounter.process(isDown = isDown, isUp = isUp, nowMs = nowMs)
     }
@@ -69,8 +69,10 @@ class BulgarianSplitSquatRepDetector(
         private const val SIDE_SWITCH_DELTA_DEG = 7f
         private const val SIDE_SWITCH_STABLE_MS = 320L
         private const val MIN_SHOULDER_WIDTH = 0.08f
-        private const val SPLIT_STANCE_MIN_RATIO = 0.95f
-        private const val REAR_KNEE_UP_MIN = 108f
-        private const val REAR_KNEE_UP_MAX = 170f
+        private const val SPLIT_STANCE_MIN_RATIO = 1.0f
+        private const val DOWN_WORKING_KNEE_MAX = 110f
+        private const val DOWN_REAR_KNEE_MAX = 152f
+        private const val REAR_KNEE_UP_MIN = 112f
+        private const val REAR_KNEE_UP_MAX = 171f
     }
 }

@@ -93,12 +93,12 @@ class ArcherSquatActivityDetector(
     }
 
     companion object {
-        private const val IDLE_TIMEOUT_MS = 1600L
+        private const val IDLE_TIMEOUT_MS = 1700L
         private const val MIN_SHOULDER_WIDTH = 0.08f
-        private const val MIN_ANKLE_TO_SHOULDER_WIDTH_RATIO = 1.35f
-        private const val DOWN_WORKING_KNEE_MAX = 118f
-        private const val DOWN_SUPPORT_KNEE_MIN = 148f
-        private const val MIN_KNEE_SEPARATION_DEG = 24f
-        private const val MIN_ACTIVE_HIP_SHIFT_RATIO = 0.12f
+        private const val MIN_ANKLE_TO_SHOULDER_WIDTH_RATIO = 1.4f
+        private const val DOWN_WORKING_KNEE_MAX = 116f
+        private const val DOWN_SUPPORT_KNEE_MIN = 150f
+        private const val MIN_KNEE_SEPARATION_DEG = 26f
+        private const val MIN_ACTIVE_HIP_SHIFT_RATIO = 0.13f
     }
 }

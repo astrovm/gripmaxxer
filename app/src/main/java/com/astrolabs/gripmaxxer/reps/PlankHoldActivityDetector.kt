@@ -65,8 +65,12 @@ class PlankHoldActivityDetector(
     }
 
     private fun evaluatePose(frame: PoseFrame): PoseState {
-        val shoulderY = frame.averageY(PoseLandmark.LEFT_SHOULDER, PoseLandmark.RIGHT_SHOULDER)
-            ?: return PoseState.UNKNOWN
+        val leftShoulder = frame.landmark(PoseLandmark.LEFT_SHOULDER) ?: return PoseState.UNKNOWN
+        val rightShoulder = frame.landmark(PoseLandmark.RIGHT_SHOULDER) ?: return PoseState.UNKNOWN
+        val shoulderWidth = abs(leftShoulder.x - rightShoulder.x)
+        if (shoulderWidth < MIN_SHOULDER_WIDTH) return PoseState.UNKNOWN
+
+        val shoulderY = (leftShoulder.y + rightShoulder.y) / 2f
         val hipY = frame.averageY(PoseLandmark.LEFT_HIP, PoseLandmark.RIGHT_HIP)
             ?: return PoseState.UNKNOWN
 
@@ -99,13 +103,14 @@ class PlankHoldActivityDetector(
     }
 
     companion object {
-        private const val ENTRY_STABLE_MS = 450L
-        private const val EXIT_STABLE_MS = 900L
-        private const val MISSING_POSE_GRACE_MS = 900L
+        private const val ENTRY_STABLE_MS = 500L
+        private const val EXIT_STABLE_MS = 950L
+        private const val MISSING_POSE_GRACE_MS = 950L
 
-        private const val BODY_FLAT_MAX_DELTA = 0.10f
+        private const val MIN_SHOULDER_WIDTH = 0.07f
+        private const val BODY_FLAT_MAX_DELTA = 0.09f
         private const val LEGS_BEHIND_HIP_MIN_DELTA = 0.02f
-        private const val MIN_HIP_ANGLE_DEG = 145f
-        private const val MIN_KNEE_ANGLE_DEG = 140f
+        private const val MIN_HIP_ANGLE_DEG = 148f
+        private const val MIN_KNEE_ANGLE_DEG = 145f
     }
 }

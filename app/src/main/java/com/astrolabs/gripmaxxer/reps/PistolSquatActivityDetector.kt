@@ -33,16 +33,22 @@ class PistolSquatActivityDetector(
     ): Boolean {
         val side = selectTrackedSide(frame, nowMs) ?: return decayActive(nowMs)
         val kneeAngle = featureExtractor.kneeAngleDegrees(frame, side) ?: return decayActive(nowMs)
+        val supportKnee = featureExtractor.kneeAngleDegrees(frame, opposite(side))
         val hipY = hipYForSide(frame, side) ?: return decayActive(nowMs)
 
         if (baselineHipY == null) baselineHipY = hipY
-        if (kneeAngle > 165f) {
+        if (kneeAngle > BASELINE_RESET_KNEE_MIN) {
             baselineHipY = blend(baselineHipY ?: hipY, hipY, 0.08f)
         }
 
         val hipDrop = hipY - (baselineHipY ?: hipY)
-        val angleMotion = lastKneeAngle?.let { abs(it - kneeAngle) > 1.8f } ?: false
-        val motionDetected = angleMotion || kneeAngle < 170f || hipDrop > 0.02f
+        val supportLegReady = supportKnee == null || supportKnee > SUPPORT_KNEE_MIN
+        val angleMotion = lastKneeAngle?.let { abs(it - kneeAngle) > KNEE_MOTION_MIN_DELTA } ?: false
+        val motionDetected = supportLegReady && (
+            angleMotion ||
+                kneeAngle < ACTIVE_KNEE_MAX ||
+                hipDrop > ACTIVE_HIP_DROP_MIN
+            )
         if (motionDetected) {
             active = true
             lastMotionMs = nowMs
@@ -76,6 +82,10 @@ class PistolSquatActivityDetector(
         return frame.landmark(landmark)?.y
     }
 
+    private fun opposite(side: BodySide): BodySide {
+        return if (side == BodySide.LEFT) BodySide.RIGHT else BodySide.LEFT
+    }
+
     private fun blend(current: Float, target: Float, weight: Float): Float {
         return (current * (1f - weight)) + (target * weight)
     }
@@ -84,5 +94,10 @@ class PistolSquatActivityDetector(
         private const val IDLE_TIMEOUT_MS = 1500L
         private const val SIDE_SWITCH_DELTA_DEG = 12f
         private const val SIDE_SWITCH_STABLE_MS = 350L
+        private const val SUPPORT_KNEE_MIN = 146f
+        private const val BASELINE_RESET_KNEE_MIN = 167f
+        private const val KNEE_MOTION_MIN_DELTA = 1.8f
+        private const val ACTIVE_KNEE_MAX = 169f
+        private const val ACTIVE_HIP_DROP_MIN = 0.02f
     }
 }

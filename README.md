@@ -29,6 +29,7 @@ Gripmaxxer is an Android app (Kotlin + Compose) that uses the **front camera** a
 - Send **system-wide media play/pause** commands through active MediaSession controllers.
 - Show an always-on-top numeric overlay stopwatch while exercise is active.
 - Count reps in the selected exercise mode.
+- Exercise detectors are tuned per mode (timing, angle, posture, and side-stability thresholds are not shared globally).
 - Provide a simple workout shell with bottom tabs: `Log`, `Workout`, `Profile`.
 
 Made by **Astro Labs** (`astrolabs`).

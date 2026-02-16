@@ -69,9 +69,9 @@ class DeadHangActivityDetector(
     }
 
     companion object {
-        private const val DEAD_HANG_ENTRY_MIN_ELBOW_ANGLE = 148f
-        private const val DEAD_HANG_EXIT_MIN_ELBOW_ANGLE = 138f
-        private const val DEAD_HANG_BELOW_THRESHOLD_GRACE_MS = 1200L
-        private const val DEAD_HANG_MISSING_ANGLE_GRACE_MS = 1200L
+        private const val DEAD_HANG_ENTRY_MIN_ELBOW_ANGLE = 150f
+        private const val DEAD_HANG_EXIT_MIN_ELBOW_ANGLE = 140f
+        private const val DEAD_HANG_BELOW_THRESHOLD_GRACE_MS = 1300L
+        private const val DEAD_HANG_MISSING_ANGLE_GRACE_MS = 1400L
     }
 }

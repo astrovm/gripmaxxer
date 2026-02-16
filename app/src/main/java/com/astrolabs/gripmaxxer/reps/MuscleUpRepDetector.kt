@@ -52,7 +52,8 @@ class MuscleUpRepDetector(
 
         val isHang = elbowAngle > HANG_MIN_ELBOW_ANGLE &&
             wristY < shoulderY - WRIST_OVER_SHOULDER_MIN_DELTA
-        val isRising = elbowAngle < TRANSITION_MAX_ELBOW_ANGLE
+        val isRising = elbowAngle < TRANSITION_MAX_ELBOW_ANGLE &&
+            wristY < shoulderY + WRIST_TRANSITION_BELOW_SHOULDER_MAX_DELTA
         val isTopSupport = elbowAngle < TOP_MAX_ELBOW_ANGLE &&
             wristY > shoulderY + WRIST_UNDER_SHOULDER_MIN_DELTA &&
             wristsNearShoulders(frame)
@@ -125,21 +126,26 @@ class MuscleUpRepDetector(
         val rightShoulder = frame.landmark(PoseLandmark.RIGHT_SHOULDER) ?: return false
         val leftWrist = frame.landmark(PoseLandmark.LEFT_WRIST) ?: return false
         val rightWrist = frame.landmark(PoseLandmark.RIGHT_WRIST) ?: return false
-        return kotlin.math.abs(leftWrist.x - leftShoulder.x) < 0.28f &&
-            kotlin.math.abs(rightWrist.x - rightShoulder.x) < 0.28f
+        val shoulderWidth = kotlin.math.abs(leftShoulder.x - rightShoulder.x)
+        if (shoulderWidth < MIN_SHOULDER_WIDTH) return false
+        return kotlin.math.abs(leftWrist.x - leftShoulder.x) < shoulderWidth * WRIST_TO_SHOULDER_X_MAX_RATIO &&
+            kotlin.math.abs(rightWrist.x - rightShoulder.x) < shoulderWidth * WRIST_TO_SHOULDER_X_MAX_RATIO
     }
 
     companion object {
         private const val WRIST_OVER_SHOULDER_MIN_DELTA = 0.02f
         private const val WRIST_UNDER_SHOULDER_MIN_DELTA = 0.01f
+        private const val WRIST_TRANSITION_BELOW_SHOULDER_MAX_DELTA = 0.05f
+        private const val MIN_SHOULDER_WIDTH = 0.075f
+        private const val WRIST_TO_SHOULDER_X_MAX_RATIO = 3.1f
         private const val HANG_MIN_ELBOW_ANGLE = 152f
-        private const val TRANSITION_MAX_ELBOW_ANGLE = 146f
-        private const val TOP_MAX_ELBOW_ANGLE = 115f
+        private const val TRANSITION_MAX_ELBOW_ANGLE = 145f
+        private const val TOP_MAX_ELBOW_ANGLE = 113f
 
         private const val HANG_CONFIRM_STABLE_MS = 180L
-        private const val TRANSITION_STABLE_MS = 150L
-        private const val TOP_STABLE_MS = 180L
-        private const val HANG_RESET_STABLE_MS = 240L
-        private const val MIN_REP_INTERVAL_MS = 750L
+        private const val TRANSITION_STABLE_MS = 170L
+        private const val TOP_STABLE_MS = 200L
+        private const val HANG_RESET_STABLE_MS = 260L
+        private const val MIN_REP_INTERVAL_MS = 850L
     }
 }

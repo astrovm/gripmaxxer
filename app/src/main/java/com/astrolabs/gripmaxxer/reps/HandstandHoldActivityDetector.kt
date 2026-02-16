@@ -3,6 +3,7 @@ package com.astrolabs.gripmaxxer.reps
 import com.astrolabs.gripmaxxer.pose.PoseFeatureExtractor
 import com.astrolabs.gripmaxxer.pose.PoseFrame
 import com.google.mlkit.vision.pose.PoseLandmark
+import kotlin.math.abs
 
 class HandstandHoldActivityDetector(
     private val featureExtractor: PoseFeatureExtractor,
@@ -64,10 +65,18 @@ class HandstandHoldActivityDetector(
     }
 
     private fun evaluatePose(frame: PoseFrame): PoseState {
-        val shoulderY = frame.averageY(PoseLandmark.LEFT_SHOULDER, PoseLandmark.RIGHT_SHOULDER)
-            ?: return PoseState.UNKNOWN
-        val wristY = frame.averageY(PoseLandmark.LEFT_WRIST, PoseLandmark.RIGHT_WRIST)
-            ?: return PoseState.UNKNOWN
+        val leftShoulder = frame.landmark(PoseLandmark.LEFT_SHOULDER) ?: return PoseState.UNKNOWN
+        val rightShoulder = frame.landmark(PoseLandmark.RIGHT_SHOULDER) ?: return PoseState.UNKNOWN
+        val leftWrist = frame.landmark(PoseLandmark.LEFT_WRIST) ?: return PoseState.UNKNOWN
+        val rightWrist = frame.landmark(PoseLandmark.RIGHT_WRIST) ?: return PoseState.UNKNOWN
+        val shoulderWidth = abs(leftShoulder.x - rightShoulder.x)
+        if (shoulderWidth < MIN_SHOULDER_WIDTH) return PoseState.UNKNOWN
+
+        val wristWidth = abs(leftWrist.x - rightWrist.x)
+        if (wristWidth < shoulderWidth * MIN_WRIST_TO_SHOULDER_WIDTH_RATIO) return PoseState.NOT_HANDSTAND
+
+        val shoulderY = (leftShoulder.y + rightShoulder.y) / 2f
+        val wristY = (leftWrist.y + rightWrist.y) / 2f
         val hipY = frame.averageY(PoseLandmark.LEFT_HIP, PoseLandmark.RIGHT_HIP)
             ?: return PoseState.UNKNOWN
 
@@ -101,12 +110,14 @@ class HandstandHoldActivityDetector(
     }
 
     companion object {
-        private const val ENTRY_STABLE_MS = 450L
-        private const val EXIT_STABLE_MS = 850L
+        private const val ENTRY_STABLE_MS = 500L
+        private const val EXIT_STABLE_MS = 900L
         private const val MISSING_POSE_GRACE_MS = 900L
 
-        private const val SHOULDER_OVER_HANDS_MIN_DELTA = 0.03f
-        private const val HIPS_ABOVE_SHOULDERS_MIN_DELTA = 0.04f
+        private const val MIN_SHOULDER_WIDTH = 0.075f
+        private const val MIN_WRIST_TO_SHOULDER_WIDTH_RATIO = 0.40f
+        private const val SHOULDER_OVER_HANDS_MIN_DELTA = 0.02f
+        private const val HIPS_ABOVE_SHOULDERS_MIN_DELTA = 0.045f
         private const val FEET_ABOVE_HIPS_MIN_DELTA = 0.03f
         private const val KNEES_ABOVE_HIPS_MIN_DELTA = 0.02f
         private const val MIN_SUPPORT_ELBOW_ANGLE_DEG = 145f
