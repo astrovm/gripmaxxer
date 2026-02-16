@@ -17,7 +17,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Hangmaxxer">
+        android:theme="@style/Theme.Gripmaxxer">
 
         <meta-data
             android:name="com.astrolabs.hangmaxxer.DEVELOPER_NAME"

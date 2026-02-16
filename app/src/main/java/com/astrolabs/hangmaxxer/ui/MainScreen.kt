@@ -88,7 +88,7 @@ fun MainScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Text(
-            text = "Hangmaxxer",
+            text = "Gripmaxxer",
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onBackground
         )

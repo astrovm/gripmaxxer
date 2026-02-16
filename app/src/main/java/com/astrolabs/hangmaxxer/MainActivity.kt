@@ -6,7 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import com.astrolabs.hangmaxxer.ui.MainScreen
 import com.astrolabs.hangmaxxer.ui.MainViewModel
-import com.astrolabs.hangmaxxer.ui.theme.HangmaxxerTheme
+import com.astrolabs.hangmaxxer.ui.theme.GripmaxxerTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -15,7 +15,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            HangmaxxerTheme {
+            GripmaxxerTheme {
                 MainScreen(viewModel = viewModel)
             }
         }

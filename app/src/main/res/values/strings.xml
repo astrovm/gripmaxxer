@@ -1,9 +1,9 @@
 <resources>
-    <string name="app_name">Hangmaxxer</string>
-    <string name="notification_channel_name">Hang Monitoring</string>
+    <string name="app_name">Gripmaxxer</string>
+    <string name="notification_channel_name">Grip Monitoring</string>
     <string name="notification_channel_description">Foreground camera service for hang and rep detection</string>
-    <string name="notification_title">Hangmaxxer monitoring</string>
-    <string name="notification_listener_label">Hangmaxxer Notification Access</string>
+    <string name="notification_title">Gripmaxxer monitoring</string>
+    <string name="notification_listener_label">Gripmaxxer Notification Access</string>
     <string name="notification_stop">Stop monitoring</string>
     <string name="developer_name">Astro Labs</string>
     <string name="developer_id">astrolabs</string>

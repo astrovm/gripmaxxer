@@ -74,18 +74,17 @@ class RepCounter(
         val wristY = frame.averageY(
             com.google.mlkit.vision.pose.PoseLandmark.LEFT_WRIST,
             com.google.mlkit.vision.pose.PoseLandmark.RIGHT_WRIST,
-        ) ?: return RepCounterResult(reps = reps, repEvent = false)
-
+        )
         val shoulderY = frame.averageY(
             com.google.mlkit.vision.pose.PoseLandmark.LEFT_SHOULDER,
             com.google.mlkit.vision.pose.PoseLandmark.RIGHT_SHOULDER,
-        ) ?: return RepCounterResult(reps = reps, repEvent = false)
+        )
         val noseY = frame.noseOrMouthY()
         val elbowAngle = featureExtractor.elbowAngleDegrees(frame) ?: return RepCounterResult(reps = reps, repEvent = false)
 
-        val smoothWrist = pushAndAverage(wristWindow, wristY)
-        val smoothShoulder = pushAndAverage(shoulderWindow, shoulderY)
         val smoothElbow = pushAndAverage(elbowWindow, elbowAngle)
+        val smoothWrist = wristY?.let { pushAndAverage(wristWindow, it) }
+        val smoothShoulder = shoulderY?.let { pushAndAverage(shoulderWindow, it) }
         val smoothNose = if (noseY != null) {
             pushAndAverage(noseWindow, noseY)
         } else {
@@ -93,17 +92,22 @@ class RepCounter(
             null
         }
 
-        val (isDown, isUp) = if (smoothNose != null) {
+        val (isDown, isUp) = if (smoothNose != null && smoothWrist != null) {
             val down = smoothElbow > config.elbowDownAngle && smoothNose > smoothWrist + config.marginDown
             val up = smoothElbow < config.elbowUpAngle && smoothNose < smoothWrist - config.marginUp
             down to up
-        } else {
+        } else if (smoothShoulder != null && smoothWrist != null) {
             // Face can leave frame near the top on door-mounted bars; fall back to shoulder-vs-wrist travel.
             val shoulderToWristDelta = smoothShoulder - smoothWrist
             val down = smoothElbow > config.elbowDownAngle &&
                 shoulderToWristDelta > (config.marginDown + SHOULDER_DOWN_EXTRA_DELTA)
             val up = smoothElbow < config.elbowUpAngle &&
                 shoulderToWristDelta < (config.marginUp + SHOULDER_UP_EXTRA_DELTA)
+            down to up
+        } else {
+            // If wrists/head are occluded, rely on elbow angle only so reps still count.
+            val down = smoothElbow > (config.elbowDownAngle + ELBOW_ONLY_DOWN_EXTRA_DEG)
+            val up = smoothElbow < (config.elbowUpAngle - ELBOW_ONLY_UP_EXTRA_DEG)
             down to up
         }
 
@@ -164,5 +168,7 @@ class RepCounter(
     companion object {
         private const val SHOULDER_DOWN_EXTRA_DELTA = 0.15f
         private const val SHOULDER_UP_EXTRA_DELTA = 0.07f
+        private const val ELBOW_ONLY_DOWN_EXTRA_DEG = 4f
+        private const val ELBOW_ONLY_UP_EXTRA_DEG = 4f
     }
 }
