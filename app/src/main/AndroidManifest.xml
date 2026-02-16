@@ -20,10 +20,10 @@
         android:theme="@style/Theme.Gripmaxxer">
 
         <meta-data
-            android:name="com.astrolabs.hangmaxxer.DEVELOPER_NAME"
+            android:name="com.astrolabs.gripmaxxer.DEVELOPER_NAME"
             android:value="@string/developer_name" />
         <meta-data
-            android:name="com.astrolabs.hangmaxxer.DEVELOPER_ID"
+            android:name="com.astrolabs.gripmaxxer.DEVELOPER_ID"
             android:value="@string/developer_id" />
 
         <activity

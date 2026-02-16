@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.astrolabs.hangmaxxer"
+    namespace = "com.astrolabs.gripmaxxer"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.astrolabs.hangmaxxer"
+        applicationId = "com.astrolabs.gripmaxxer"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
