@@ -9,6 +9,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.os.Build
 import android.os.SystemClock
 import android.util.Log
@@ -127,6 +129,7 @@ class HangCamService : LifecycleService() {
     private var currentMode = ExerciseMode.PULL_UP
     private var currentSettings = AppSettings()
     private var mediaControlEnabled = true
+    private var repSoundEnabled = true
     private var currentHangState = false
     private var currentReps = 0
     private var currentSessionElapsedMs = 0L
@@ -135,12 +138,16 @@ class HangCamService : LifecycleService() {
     private val rawFramesSinceTick = AtomicInteger(0)
     private val lastFrameRealtimeMs = AtomicLong(0L)
     private var lastPosePresent = false
+    private var repToneGenerator: ToneGenerator? = null
 
     override fun onCreate() {
         super.onCreate()
         settingsRepository = SettingsRepository(applicationContext)
         mediaControlManager = MediaControlManager(applicationContext)
         overlayTimerManager = OverlayTimerManager(applicationContext)
+        repToneGenerator = runCatching {
+            ToneGenerator(AudioManager.STREAM_MUSIC, REP_TONE_VOLUME)
+        }.getOrNull()
         createNotificationChannel()
     }
 
@@ -167,6 +174,8 @@ class HangCamService : LifecycleService() {
 
     override fun onDestroy() {
         stopMonitoring()
+        repToneGenerator?.release()
+        repToneGenerator = null
         serviceScope.cancel()
         super.onDestroy()
     }
@@ -177,6 +186,7 @@ class HangCamService : LifecycleService() {
         currentReps = 0
         currentMode = currentSettings.selectedExerciseMode
         mediaControlEnabled = currentSettings.mediaControlEnabled
+        repSoundEnabled = currentSettings.repSoundEnabled
         hangStartRealtimeMs = 0L
         currentSessionElapsedMs = 0L
         latestFps = 0
@@ -243,6 +253,7 @@ class HangCamService : LifecycleService() {
                     val previousMode = currentMode
                     currentMode = settings.selectedExerciseMode
                     mediaControlEnabled = settings.mediaControlEnabled
+                    repSoundEnabled = settings.repSoundEnabled
                     repEngine.setMode(currentMode, resetCurrent = previousMode != currentMode)
                     if (previousMode != currentMode) {
                         handleModeChangeLocked()
@@ -404,6 +415,9 @@ class HangCamService : LifecycleService() {
                 nowMs = nowMs,
             )
             currentReps = repResult.reps
+            if (repResult.repEvent && repSoundEnabled) {
+                repToneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP2, REP_TONE_DURATION_MS)
+            }
 
             overlayTimerManager?.onRepCountChanged(currentReps)
 
@@ -575,6 +589,8 @@ class HangCamService : LifecycleService() {
         const val ACTION_STOP = "com.astrolabs.gripmaxxer.action.STOP"
         private const val MIN_WRIST_SHOULDER_MARGIN = 0.08f
         private const val MIN_SESSION_MS = 400L
+        private const val REP_TONE_DURATION_MS = 100
+        private const val REP_TONE_VOLUME = 80
 
         private const val NOTIFICATION_ID = 1001
         private const val NOTIFICATION_CHANNEL_ID = "hang_monitoring"

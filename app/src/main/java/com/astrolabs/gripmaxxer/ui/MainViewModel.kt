@@ -229,6 +229,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun setRepSoundEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setRepSoundEnabled(enabled)
+        }
+    }
+
     fun setColorPalette(palette: ColorPalette) {
         viewModelScope.launch {
             settingsRepository.setColorPalette(palette)
