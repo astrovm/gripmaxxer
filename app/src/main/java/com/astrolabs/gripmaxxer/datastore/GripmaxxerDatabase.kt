@@ -85,7 +85,8 @@ data class CalendarDayRow(
     val workoutCount: Int,
 )
 
-data class ProfileBaseRow(
+data class ProfileModeRow(
+    val modeName: String,
     val totalWorkouts: Int,
     val maxReps: Int,
     val maxHoldMs: Long,
@@ -168,12 +169,17 @@ interface WorkoutDao {
     @Query(
         """
         SELECT
-            (SELECT COUNT(*) FROM workouts WHERE completedAtMs IS NOT NULL) AS totalWorkouts,
-            (SELECT COALESCE(MAX(reps), 0) FROM workout_sets) AS maxReps,
-            (SELECT COALESCE(MAX(durationMs), 0) FROM workout_sets) AS maxHoldMs
+            w.exerciseModeName AS modeName,
+            COUNT(DISTINCT w.id) AS totalWorkouts,
+            COALESCE(MAX(ws.reps), 0) AS maxReps,
+            COALESCE(MAX(ws.durationMs), 0) AS maxHoldMs
+        FROM workouts w
+        LEFT JOIN workout_sets ws ON ws.workoutId = w.id
+        WHERE w.completedAtMs IS NOT NULL
+        GROUP BY w.exerciseModeName
         """
     )
-    fun observeProfileBase(): Flow<ProfileBaseRow>
+    fun observeProfileByMode(): Flow<List<ProfileModeRow>>
 
     @Query("SELECT id FROM workouts WHERE completedAtMs IS NULL ORDER BY startedAtMs DESC LIMIT 1")
     suspend fun getActiveWorkoutId(): Long?

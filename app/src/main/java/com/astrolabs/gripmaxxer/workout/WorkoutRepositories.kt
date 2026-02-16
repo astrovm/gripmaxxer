@@ -1,7 +1,7 @@
 package com.astrolabs.gripmaxxer.workout
 
 import com.astrolabs.gripmaxxer.datastore.GripmaxxerDatabase
-import com.astrolabs.gripmaxxer.datastore.ProfileBaseRow
+import com.astrolabs.gripmaxxer.datastore.ProfileModeRow
 import com.astrolabs.gripmaxxer.datastore.WorkoutEntity
 import com.astrolabs.gripmaxxer.datastore.WorkoutFeedRow
 import com.astrolabs.gripmaxxer.datastore.WorkoutSetEntity
@@ -15,7 +15,7 @@ interface WorkoutRepository {
     val activeWorkoutFlow: Flow<ActiveWorkoutState?>
     val completedWorkoutFeedFlow: Flow<List<WorkoutFeedItem>>
     val calendarSummaryFlow: Flow<List<CalendarDaySummary>>
-    val profileStatsFlow: Flow<ProfileStats>
+    val profileStatsFlow: Flow<List<ExerciseProfileStats>>
 
     suspend fun startWorkout(mode: ExerciseMode): Long
     suspend fun pauseWorkout(workoutId: Long): Boolean
@@ -43,8 +43,11 @@ class RoomWorkoutRepository(
     override val calendarSummaryFlow: Flow<List<CalendarDaySummary>> = workoutDao.observeCalendarSummary()
         .map { rows -> rows.map { CalendarDaySummary(dayEpochMs = it.dayEpochMs, workoutCount = it.workoutCount) } }
 
-    override val profileStatsFlow: Flow<ProfileStats> = workoutDao.observeProfileBase()
-        .map { base -> base.toDomain() }
+    override val profileStatsFlow: Flow<List<ExerciseProfileStats>> = workoutDao.observeProfileByMode()
+        .map { rows ->
+            rows.mapNotNull { it.toDomain() }
+                .sortedBy { CameraTrackableModes.indexOf(it.mode).takeIf { idx -> idx >= 0 } ?: Int.MAX_VALUE }
+        }
 
     override suspend fun startWorkout(mode: ExerciseMode): Long {
         val activeId = workoutDao.getActiveWorkoutId()
@@ -241,8 +244,10 @@ class RoomWorkoutRepository(
         )
     }
 
-    private fun ProfileBaseRow.toDomain(): ProfileStats {
-        return ProfileStats(
+    private fun ProfileModeRow.toDomain(): ExerciseProfileStats? {
+        val mode = parseMode(modeName) ?: return null
+        return ExerciseProfileStats(
+            mode = mode,
             totalWorkouts = totalWorkouts,
             maxReps = maxReps,
             maxHoldMs = maxHoldMs,

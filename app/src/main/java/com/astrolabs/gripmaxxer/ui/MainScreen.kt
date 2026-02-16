@@ -1212,10 +1212,24 @@ private fun ProfileTab(
             verticalArrangement = Arrangement.spacedBy(if (isWindows98) 8.dp else 8.dp),
         ) {
             Text("Stats", style = MaterialTheme.typography.titleMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                MetricTile("Workouts", uiState.profileStats.totalWorkouts.toString(), Modifier.weight(1f))
-                MetricTile("Max Reps", uiState.profileStats.maxReps.toString(), Modifier.weight(1f))
-                MetricTile("Max Hold", formatDuration(uiState.profileStats.maxHoldMs), Modifier.weight(1f))
+            if (uiState.profileStats.isEmpty()) {
+                Text(
+                    text = "No completed workouts yet",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            } else {
+                uiState.profileStats.forEach { modeStats ->
+                    Text(
+                        text = modeStats.mode.label,
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        MetricTile("Workouts", modeStats.totalWorkouts.toString(), Modifier.weight(1f))
+                        MetricTile("Max Reps", modeStats.maxReps.toString(), Modifier.weight(1f))
+                        MetricTile("Max Hold", formatDuration(modeStats.maxHoldMs), Modifier.weight(1f))
+                    }
+                }
             }
         }
     }

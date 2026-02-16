@@ -44,6 +44,7 @@ Made by **Astro Labs** (`astrolabs`).
 - Workouts with zero sets are discarded when ended (not saved to Log).
 - Log entries can be deleted directly from the `Log` feed.
 - Log tab shows completed sessions feed, calendar aggregation, and editable detail.
+- Profile stats are separated by exercise mode (not global across all exercises).
 - Profile tab shows essential stats/settings (media control, rep sound, overlay, camera preview).
 - App theme defaults to Black/White and supports additional palettes in Profile settings (Black/Pink, Black/Blue, Black/Red, Black/Green, Black/Purple, Black/Orange, Windows 98 with classic beveled controls).
 

@@ -36,7 +36,8 @@ data class CalendarDaySummary(
     val workoutCount: Int,
 )
 
-data class ProfileStats(
+data class ExerciseProfileStats(
+    val mode: ExerciseMode,
     val totalWorkouts: Int,
     val maxReps: Int,
     val maxHoldMs: Long,

@@ -23,7 +23,7 @@ import com.astrolabs.gripmaxxer.service.MonitoringStateStore
 import com.astrolabs.gripmaxxer.workout.ActiveWorkoutState
 import com.astrolabs.gripmaxxer.workout.CalendarDaySummary
 import com.astrolabs.gripmaxxer.workout.CompletedWorkoutDetail
-import com.astrolabs.gripmaxxer.workout.ProfileStats
+import com.astrolabs.gripmaxxer.workout.ExerciseProfileStats
 import com.astrolabs.gripmaxxer.workout.RoomWorkoutRepository
 import com.astrolabs.gripmaxxer.workout.WorkoutFeedItem
 import com.astrolabs.gripmaxxer.workout.WorkoutSetState
@@ -75,11 +75,7 @@ data class MainUiState(
     val monitoring: MonitoringSnapshot = MonitoringSnapshot(),
     val completedWorkouts: List<WorkoutFeedItem> = emptyList(),
     val calendarDays: List<CalendarDaySummary> = emptyList(),
-    val profileStats: ProfileStats = ProfileStats(
-        totalWorkouts = 0,
-        maxReps = 0,
-        maxHoldMs = 0L,
-    ),
+    val profileStats: List<ExerciseProfileStats> = emptyList(),
     val selectedWorkoutDetail: CompletedWorkoutDetail? = null,
     val workoutSession: WorkoutSessionUiState? = null,
     val showCameraPreview: Boolean = true,
@@ -122,11 +118,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val profileStatsState = workoutRepository.profileStatsFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = ProfileStats(
-            totalWorkouts = 0,
-            maxReps = 0,
-            maxHoldMs = 0L,
-        ),
+        initialValue = emptyList(),
     )
 
     private val activeWorkoutState = workoutRepository.activeWorkoutFlow.stateIn(
@@ -173,7 +165,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val monitoring = values[3] as MonitoringSnapshot
         val completedWorkouts = values[4] as List<WorkoutFeedItem>
         val calendarDays = values[5] as List<CalendarDaySummary>
-        val profileStats = values[6] as ProfileStats
+        val profileStats = values[6] as List<ExerciseProfileStats>
         val selectedWorkoutDetail = values[7] as CompletedWorkoutDetail?
         val activeWorkout = values[8] as ActiveWorkoutState?
         val showCameraPreview = values[9] as Boolean
