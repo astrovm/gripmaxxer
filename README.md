@@ -4,7 +4,7 @@ Gripmaxxer is an Android app (Kotlin + Compose) that uses the **front camera** a
 - Detect when you are hanging from a pull-up bar.
 - Send **system-wide media play/pause** commands through active MediaSession controllers.
 - Show an always-on-top numeric overlay stopwatch while hanging.
-- Count pull-up/chin-up reps during hanging sessions.
+- Count pull-up reps during hanging sessions.
 
 Made by **Astro Labs** (`astrolabs`).
 
@@ -17,7 +17,7 @@ Made by **Astro Labs** (`astrolabs`).
   - On rep event: temporarily shows only rep number (for 800ms), then returns to stopwatch value.
   - Overlay can be dragged and dropped anywhere on screen; its position is remembered.
 - While this app screen is open and monitoring is active, the display is kept awake to avoid screen timeout mid-set.
-- Rep mode selector is manual (`Pull-up` / `Chin-up`) and only labels the rep counter.
+- Reps are tracked as a single pull-up category (chin-up/pull-up are treated the same).
 
 ## Why Notification Access Is Required
 Android does not allow unrestricted access to active media sessions without privileged permissions.

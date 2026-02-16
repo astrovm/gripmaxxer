@@ -103,7 +103,7 @@ fun MainScreen(
             color = MaterialTheme.colorScheme.onBackground
         )
         Text(
-            text = "Real-time hang monitoring with automatic pull-up/chin-up detection.",
+            text = "Real-time hang monitoring with pull-up rep tracking.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

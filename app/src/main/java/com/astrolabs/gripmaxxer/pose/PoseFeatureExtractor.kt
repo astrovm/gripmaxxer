@@ -58,53 +58,7 @@ class PoseFeatureExtractor {
     }
 
     fun inferExerciseMode(frame: PoseFrame): ExerciseMode {
-        val leftShoulder = frame.landmark(PoseLandmark.LEFT_SHOULDER)
-        val rightShoulder = frame.landmark(PoseLandmark.RIGHT_SHOULDER)
-        val shoulderWidth = if (leftShoulder != null && rightShoulder != null) {
-            kotlin.math.abs(rightShoulder.x - leftShoulder.x)
-        } else {
-            0f
-        }
-        if (shoulderWidth < 0.08f) return ExerciseMode.UNKNOWN
-
-        var pullScore = 0
-        var chinScore = 0
-
-        val leftWrist = frame.landmark(PoseLandmark.LEFT_WRIST)
-        val rightWrist = frame.landmark(PoseLandmark.RIGHT_WRIST)
-        if (leftWrist != null && rightWrist != null) {
-            val wristRatio = kotlin.math.abs(rightWrist.x - leftWrist.x) / shoulderWidth
-            when {
-                wristRatio >= 1.14f -> pullScore += 2
-                wristRatio <= 0.95f -> chinScore += 2
-            }
-        }
-
-        val leftElbow = frame.landmark(PoseLandmark.LEFT_ELBOW)
-        val rightElbow = frame.landmark(PoseLandmark.RIGHT_ELBOW)
-        if (leftElbow != null && rightElbow != null) {
-            val elbowRatio = kotlin.math.abs(rightElbow.x - leftElbow.x) / shoulderWidth
-            when {
-                elbowRatio >= 1.04f -> pullScore += 1
-                elbowRatio <= 0.90f -> chinScore += 1
-            }
-        }
-
-        if (leftShoulder != null && rightShoulder != null && leftElbow != null && rightElbow != null) {
-            val elbowOutLeft = leftShoulder.x - leftElbow.x
-            val elbowOutRight = rightElbow.x - rightShoulder.x
-            val elbowOutAvg = (elbowOutLeft + elbowOutRight) / 2f
-            when {
-                elbowOutAvg > 0.01f -> pullScore += 1
-                elbowOutAvg < -0.01f -> chinScore += 1
-            }
-        }
-
-        return when {
-            pullScore >= chinScore + 2 -> ExerciseMode.PULL_UP
-            chinScore >= pullScore + 2 -> ExerciseMode.CHIN_UP
-            else -> ExerciseMode.UNKNOWN
-        }
+        return if (frame.posePresent) ExerciseMode.PULL_UP else ExerciseMode.UNKNOWN
     }
 
     private fun computeAngle(frame: PoseFrame, shoulderType: Int, elbowType: Int, wristType: Int): Float? {

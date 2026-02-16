@@ -71,8 +71,6 @@ class HangCamService : LifecycleService() {
     @Volatile
     private var running = false
     private var currentMode = ExerciseMode.UNKNOWN
-    private var pullUpVotes = 0
-    private var chinUpVotes = 0
     private var currentSettings = AppSettings()
     private var currentHangState = false
     private var currentReps = 0
@@ -123,8 +121,6 @@ class HangCamService : LifecycleService() {
         currentHangState = false
         currentReps = 0
         currentMode = ExerciseMode.UNKNOWN
-        pullUpVotes = 0
-        chinUpVotes = 0
         hangStartRealtimeMs = 0L
         currentSessionElapsedMs = 0L
         latestFps = 0
@@ -247,8 +243,6 @@ class HangCamService : LifecycleService() {
         currentHangState = false
         currentReps = 0
         currentMode = ExerciseMode.UNKNOWN
-        pullUpVotes = 0
-        chinUpVotes = 0
         hangStartRealtimeMs = 0L
         currentSessionElapsedMs = 0L
         latestFps = 0
@@ -328,30 +322,7 @@ class HangCamService : LifecycleService() {
     }
 
     private fun updateDetectedMode(frame: PoseFrame) {
-        if (!frame.posePresent) return
-
-        when (featureExtractor.inferExerciseMode(frame)) {
-            ExerciseMode.PULL_UP -> {
-                pullUpVotes = (pullUpVotes + 2).coerceAtMost(30)
-                chinUpVotes = (chinUpVotes - 1).coerceAtLeast(0)
-            }
-
-            ExerciseMode.CHIN_UP -> {
-                chinUpVotes = (chinUpVotes + 2).coerceAtMost(30)
-                pullUpVotes = (pullUpVotes - 1).coerceAtLeast(0)
-            }
-
-            ExerciseMode.UNKNOWN -> {
-                pullUpVotes = (pullUpVotes - 1).coerceAtLeast(0)
-                chinUpVotes = (chinUpVotes - 1).coerceAtLeast(0)
-            }
-        }
-
-        currentMode = when {
-            pullUpVotes >= chinUpVotes + 4 -> ExerciseMode.PULL_UP
-            chinUpVotes >= pullUpVotes + 4 -> ExerciseMode.CHIN_UP
-            else -> ExerciseMode.UNKNOWN
-        }
+        currentMode = featureExtractor.inferExerciseMode(frame)
     }
 
     private fun startTicker() {

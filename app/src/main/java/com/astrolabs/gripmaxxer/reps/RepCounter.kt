@@ -6,7 +6,6 @@ import com.astrolabs.gripmaxxer.pose.PoseFrame
 enum class ExerciseMode(val label: String) {
     UNKNOWN("Detecting"),
     PULL_UP("Pull-up"),
-    CHIN_UP("Chin-up"),
 }
 
 data class RepCounterConfig(
