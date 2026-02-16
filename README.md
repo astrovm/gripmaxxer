@@ -43,7 +43,7 @@ Made by **Astro Labs** (`astrolabs`).
 - Set correction (edit/delete) is available both during tracking and in `Log` session detail.
 - Log tab shows completed sessions feed, calendar aggregation, and editable detail.
 - Profile tab shows essential stats/settings (media control, overlay, camera preview).
-- App theme uses black-based palettes, defaulting to Black/White with selectable variants (Black/Pink, Black/Blue, Black/Red) in Profile settings.
+- App theme defaults to Black/White and supports additional Black/X and White/X palettes in Profile settings (Pink, Blue, Red, Green, Purple, Orange).
 
 ## Why Notification Access Is Required
 Android does not allow unrestricted access to active media sessions without privileged permissions.
