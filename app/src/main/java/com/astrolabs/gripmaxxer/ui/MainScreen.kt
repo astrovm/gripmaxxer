@@ -259,6 +259,7 @@ fun MainScreen(
                         selectedDetail = uiState.selectedWorkoutDetail,
                         onOpenDetail = viewModel::openWorkoutDetail,
                         onCloseDetail = viewModel::closeWorkoutDetail,
+                        onDeleteWorkout = viewModel::deleteCompletedWorkout,
                         onEditSet = viewModel::editDetailSet,
                         onDeleteSet = viewModel::deleteDetailSet,
                     )
@@ -566,10 +567,12 @@ private fun LogTab(
     selectedDetail: CompletedWorkoutDetail?,
     onOpenDetail: (Long) -> Unit,
     onCloseDetail: () -> Unit,
+    onDeleteWorkout: (Long) -> Unit,
     onEditSet: (Long, Int, Long) -> Unit,
     onDeleteSet: (Long) -> Unit,
 ) {
     val isWindows98 = LocalIsWindows98Theme.current
+    var deleteTarget by remember { mutableStateOf<WorkoutFeedItem?>(null) }
     ScreenHeader("Log")
     WeeklyActivityBar(workouts = workouts)
 
@@ -605,8 +608,19 @@ private fun LogTab(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    OutlinedButton(onClick = { onOpenDetail(workout.workoutId) }) {
-                        Text("View session")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = { onOpenDetail(workout.workoutId) },
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text("View session")
+                        }
+                        OutlinedButton(
+                            onClick = { deleteTarget = workout },
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text("Delete")
+                        }
                     }
                 }
             }
@@ -619,6 +633,35 @@ private fun LogTab(
             onDismiss = onCloseDetail,
             onEditSet = onEditSet,
             onDeleteSet = onDeleteSet,
+        )
+    }
+
+    if (deleteTarget != null) {
+        val target = deleteTarget!!
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text("Delete workout?") },
+            text = {
+                Text(
+                    "Delete ${target.mode.label} from ${formatSessionTime(target.completedAtMs)}?",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDeleteWorkout(target.workoutId)
+                        deleteTarget = null
+                    }
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { deleteTarget = null }) {
+                    Text("Cancel")
+                }
+            },
         )
     }
 }

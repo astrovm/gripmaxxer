@@ -327,6 +327,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun deleteCompletedWorkout(workoutId: Long) {
+        viewModelScope.launch {
+            val success = workoutRepository.deleteWorkout(workoutId)
+            if (success) {
+                if (selectedWorkoutDetailState.value?.workoutId == workoutId) {
+                    selectedWorkoutDetailState.value = null
+                }
+                clearWorkoutMessageLater("Workout deleted")
+            }
+        }
+    }
+
     fun clearWorkoutMessage() {
         workoutMessageState.value = null
     }

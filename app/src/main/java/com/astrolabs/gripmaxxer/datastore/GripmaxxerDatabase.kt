@@ -107,6 +107,9 @@ interface WorkoutDao {
     @Update
     suspend fun updateWorkout(entity: WorkoutEntity)
 
+    @Query("DELETE FROM workouts WHERE id = :workoutId")
+    suspend fun deleteWorkoutById(workoutId: Long)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWorkoutSet(entity: WorkoutSetEntity): Long
 

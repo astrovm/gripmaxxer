@@ -24,6 +24,7 @@ interface WorkoutRepository {
     suspend fun appendAutoSet(workoutId: Long, event: AutoSetEvent): WorkoutSetState?
     suspend fun editSet(setId: Long, reps: Int, durationMs: Long): Boolean
     suspend fun deleteSet(setId: Long): Boolean
+    suspend fun deleteWorkout(workoutId: Long): Boolean
     suspend fun getCompletedWorkoutDetail(workoutId: Long): CompletedWorkoutDetail?
     suspend fun getSetById(setId: Long): WorkoutSetState?
 }
@@ -97,6 +98,10 @@ class RoomWorkoutRepository(
         val full = workoutDao.getWorkoutWithSets(workoutId) ?: return false
         val workout = full.workout
         if (workout.completedAtMs != null) return true
+        if (full.sets.isEmpty()) {
+            workoutDao.deleteWorkoutById(workoutId)
+            return true
+        }
 
         val now = System.currentTimeMillis()
         val finalPausedAccumulated = if (workout.isPaused) {
@@ -154,7 +159,16 @@ class RoomWorkoutRepository(
         val workoutId = workoutDao.getWorkoutIdBySetId(setId) ?: return false
         workoutDao.deleteWorkoutSetById(setId)
 
-        val resequenced = workoutDao.getSetsForWorkout(workoutId)
+        val remaining = workoutDao.getSetsForWorkout(workoutId)
+        if (remaining.isEmpty()) {
+            val workout = workoutDao.getWorkoutWithSets(workoutId)?.workout
+            if (workout?.completedAtMs != null) {
+                workoutDao.deleteWorkoutById(workoutId)
+            }
+            return true
+        }
+
+        val resequenced = remaining
             .sortedBy { it.setNumber }
             .mapIndexed { index, set ->
                 if (set.setNumber == index + 1) set else set.copy(setNumber = index + 1)
@@ -163,6 +177,13 @@ class RoomWorkoutRepository(
         if (resequenced.isNotEmpty()) {
             workoutDao.updateWorkoutSets(resequenced)
         }
+        return true
+    }
+
+    override suspend fun deleteWorkout(workoutId: Long): Boolean {
+        val existing = workoutDao.getWorkoutWithSets(workoutId) ?: return false
+        if (existing.workout.completedAtMs == null) return false
+        workoutDao.deleteWorkoutById(workoutId)
         return true
     }
 
