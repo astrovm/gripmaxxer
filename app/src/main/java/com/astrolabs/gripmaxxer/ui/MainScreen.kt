@@ -9,10 +9,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,21 +33,25 @@ import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.List
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import androidx.compose.material3.Button as M3Button
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.CardColors
+import androidx.compose.material3.Checkbox as M3Checkbox
+import androidx.compose.material3.ElevatedCard as M3ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.NavigationBar as M3NavigationBar
+import androidx.compose.material3.NavigationBarItem as M3NavigationBarItem
+import androidx.compose.material3.OutlinedButton as M3OutlinedButton
+import androidx.compose.material3.OutlinedTextField as M3OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Switch
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch as M3Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -55,8 +63,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -71,6 +81,12 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.astrolabs.gripmaxxer.datastore.ColorPalette
 import com.astrolabs.gripmaxxer.reps.ExerciseMode
 import com.astrolabs.gripmaxxer.service.DebugPreviewFrame
+import com.astrolabs.gripmaxxer.ui.theme.LocalIsWindows98Theme
+import com.astrolabs.gripmaxxer.ui.theme.White
+import com.astrolabs.gripmaxxer.ui.theme.Win98Surface
+import com.astrolabs.gripmaxxer.ui.theme.Win98SurfaceVariant
+import com.astrolabs.gripmaxxer.ui.theme.win98RaisedBorder
+import com.astrolabs.gripmaxxer.ui.theme.win98SunkenBorder
 import com.astrolabs.gripmaxxer.workout.CameraTrackableModes
 import com.astrolabs.gripmaxxer.workout.CompletedWorkoutDetail
 import com.astrolabs.gripmaxxer.workout.WorkoutFeedItem
@@ -227,6 +243,261 @@ fun MainScreen(
 }
 
 @Composable
+private fun ElevatedCard(
+    modifier: Modifier = Modifier,
+    colors: CardColors = CardDefaults.elevatedCardColors(),
+    content: @Composable () -> Unit,
+) {
+    if (LocalIsWindows98Theme.current) {
+        Box(
+            modifier = modifier
+                .background(Win98Surface)
+                .win98RaisedBorder(),
+        ) {
+            content()
+        }
+    } else {
+        M3ElevatedCard(
+            modifier = modifier,
+            colors = colors,
+            content = { content() },
+        )
+    }
+}
+
+@Composable
+private fun Button(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    content: @Composable RowScope.() -> Unit,
+) {
+    if (LocalIsWindows98Theme.current) {
+        val interactionSource = remember { MutableInteractionSource() }
+        val pressed by interactionSource.collectIsPressedAsState()
+        Surface(
+            modifier = modifier
+                .then(if (pressed) Modifier.win98SunkenBorder() else Modifier.win98RaisedBorder())
+                .alpha(if (enabled) 1f else 0.6f),
+            color = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            shape = RectangleShape,
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        enabled = enabled,
+                        onClick = onClick,
+                    )
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+                content = content,
+            )
+        }
+    } else {
+        M3Button(
+            onClick = onClick,
+            modifier = modifier,
+            enabled = enabled,
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun OutlinedButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    content: @Composable RowScope.() -> Unit,
+) {
+    if (LocalIsWindows98Theme.current) {
+        val interactionSource = remember { MutableInteractionSource() }
+        val pressed by interactionSource.collectIsPressedAsState()
+        Surface(
+            modifier = modifier
+                .then(if (pressed) Modifier.win98SunkenBorder() else Modifier.win98RaisedBorder())
+                .alpha(if (enabled) 1f else 0.6f),
+            color = Win98SurfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            shape = RectangleShape,
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        enabled = enabled,
+                        onClick = onClick,
+                    )
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+                content = content,
+            )
+        }
+    } else {
+        M3OutlinedButton(
+            onClick = onClick,
+            modifier = modifier,
+            enabled = enabled,
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun NavigationBar(
+    content: @Composable RowScope.() -> Unit,
+) {
+    if (LocalIsWindows98Theme.current) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Win98Surface)
+                .win98RaisedBorder()
+                .padding(horizontal = 6.dp, vertical = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            content = content,
+        )
+    } else {
+        M3NavigationBar(content = content)
+    }
+}
+
+@Composable
+private fun RowScope.NavigationBarItem(
+    selected: Boolean,
+    onClick: () -> Unit,
+    icon: @Composable () -> Unit,
+    label: @Composable (() -> Unit)? = null,
+) {
+    if (LocalIsWindows98Theme.current) {
+        val interactionSource = remember { MutableInteractionSource() }
+        val pressed by interactionSource.collectIsPressedAsState()
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .background(if (selected) Win98SurfaceVariant else Win98Surface)
+                .then(
+                    if (selected || pressed) {
+                        Modifier.win98SunkenBorder()
+                    } else {
+                        Modifier.win98RaisedBorder()
+                    }
+                )
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick,
+                )
+                .padding(vertical = 6.dp, horizontal = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            icon()
+            label?.invoke()
+        }
+    } else {
+        M3NavigationBarItem(
+            selected = selected,
+            onClick = onClick,
+            icon = icon,
+            label = label,
+        )
+    }
+}
+
+@Composable
+private fun OutlinedTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    label: @Composable (() -> Unit)? = null,
+    singleLine: Boolean = false,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+) {
+    if (LocalIsWindows98Theme.current) {
+        M3OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = modifier
+                .background(White)
+                .win98SunkenBorder(),
+            label = label,
+            singleLine = singleLine,
+            keyboardOptions = keyboardOptions,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = White,
+                unfocusedContainerColor = White,
+                disabledContainerColor = White,
+                focusedBorderColor = Color.Transparent,
+                unfocusedBorderColor = Color.Transparent,
+                disabledBorderColor = Color.Transparent,
+            ),
+        )
+    } else {
+        M3OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = modifier,
+            label = label,
+            singleLine = singleLine,
+            keyboardOptions = keyboardOptions,
+        )
+    }
+}
+
+@Composable
+private fun Switch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    if (LocalIsWindows98Theme.current) {
+        M3Checkbox(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+        )
+    } else {
+        M3Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+        )
+    }
+}
+
+@Composable
+private fun ScreenHeader(title: String) {
+    if (LocalIsWindows98Theme.current) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.primary)
+                .win98RaisedBorder()
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onPrimary,
+            )
+        }
+    } else {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+    }
+}
+
+@Composable
 private fun LogTab(
     workouts: List<WorkoutFeedItem>,
     selectedDetail: CompletedWorkoutDetail?,
@@ -235,11 +506,7 @@ private fun LogTab(
     onEditSet: (Long, Int, Long) -> Unit,
     onDeleteSet: (Long) -> Unit,
 ) {
-    Text(
-        text = "Log",
-        style = MaterialTheme.typography.headlineMedium,
-        color = MaterialTheme.colorScheme.onBackground,
-    )
+    ScreenHeader("Log")
     WeeklyActivityBar(workouts = workouts)
 
     if (workouts.isEmpty()) {
@@ -294,6 +561,7 @@ private fun LogTab(
 
 @Composable
 private fun WeeklyActivityBar(workouts: List<WorkoutFeedItem>) {
+    val isWindows98 = LocalIsWindows98Theme.current
     val zoneId = ZoneId.systemDefault()
     val dayFormatter = remember { DateTimeFormatter.ofPattern("EEE", Locale.US) }
     val today = LocalDate.now(zoneId)
@@ -316,17 +584,31 @@ private fun WeeklyActivityBar(workouts: List<WorkoutFeedItem>) {
             lastSevenDays.forEach { day ->
                 val exercised = exercisedDays.contains(day)
                 Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(
-                            color = if (exercised) {
-                                MaterialTheme.colorScheme.primaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.surfaceVariant
-                            },
-                            shape = MaterialTheme.shapes.small,
-                        )
-                        .padding(vertical = 8.dp),
+                    modifier = if (isWindows98) {
+                        Modifier
+                            .weight(1f)
+                            .background(
+                                color = if (exercised) {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                } else {
+                                    Win98SurfaceVariant
+                                },
+                            )
+                            .win98SunkenBorder()
+                            .padding(vertical = 8.dp)
+                    } else {
+                        Modifier
+                            .weight(1f)
+                            .background(
+                                color = if (exercised) {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant
+                                },
+                                shape = MaterialTheme.shapes.small,
+                            )
+                            .padding(vertical = 8.dp)
+                    },
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
@@ -373,11 +655,7 @@ private fun WorkoutStartTab(
     val overlayPermissionRequired = overlayEnabled && !overlayPermissionGranted
     val canStart = cameraGranted && !notificationAccessRequired && !overlayPermissionRequired
 
-    Text(
-        text = "Workout",
-        style = MaterialTheme.typography.headlineMedium,
-        color = MaterialTheme.colorScheme.onBackground,
-    )
+    ScreenHeader("Workout")
 
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -724,11 +1002,7 @@ private fun ProfileTab(
     onPreviewToggle: (Boolean) -> Unit,
     onPaletteSelect: (ColorPalette) -> Unit,
 ) {
-    Text(
-        text = "Profile",
-        style = MaterialTheme.typography.headlineMedium,
-        color = MaterialTheme.colorScheme.onBackground,
-    )
+    ScreenHeader("Profile")
 
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -842,13 +1116,21 @@ private fun MetricTile(
     value: String,
     modifier: Modifier = Modifier,
 ) {
+    val isWindows98 = LocalIsWindows98Theme.current
     Column(
-        modifier = modifier
-            .background(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = MaterialTheme.shapes.small,
-            )
-            .padding(10.dp),
+        modifier = if (isWindows98) {
+            modifier
+                .background(Win98SurfaceVariant)
+                .win98SunkenBorder()
+                .padding(10.dp)
+        } else {
+            modifier
+                .background(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = MaterialTheme.shapes.small,
+                )
+                .padding(10.dp)
+        },
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         Text(

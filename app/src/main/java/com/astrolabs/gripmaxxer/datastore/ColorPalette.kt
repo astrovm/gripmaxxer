@@ -8,4 +8,5 @@ enum class ColorPalette(val label: String) {
     BLACK_GREEN("Black / Green"),
     BLACK_PURPLE("Black / Purple"),
     BLACK_ORANGE("Black / Orange"),
+    WINDOWS_98("Windows 98"),
 }
