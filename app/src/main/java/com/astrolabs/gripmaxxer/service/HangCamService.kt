@@ -396,6 +396,12 @@ class HangCamService : LifecycleService() {
     private suspend fun recordSessionIfMeaningful(completedAtMs: Long) {
         val hasAnySignal = currentReps > 0 || currentSessionElapsedMs >= MIN_SESSION_MS
         if (!hasAnySignal) return
+        AutoSetEventStore.emit(
+            mode = currentMode,
+            reps = currentReps,
+            activeMs = currentSessionElapsedMs,
+            timestampMs = completedAtMs,
+        )
         settingsRepository.recordWorkoutSession(
             WorkoutSession(
                 completedAtMs = completedAtMs,

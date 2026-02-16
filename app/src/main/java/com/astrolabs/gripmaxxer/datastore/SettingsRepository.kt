@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.astrolabs.gripmaxxer.reps.ExerciseMode
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.gripDataStore by preferencesDataStore(name = "gripmaxxer_settings")
@@ -20,6 +21,7 @@ class SettingsRepository(private val context: Context) {
     private object Keys {
         val overlayEnabled = booleanPreferencesKey("overlayEnabled")
         val mediaControlEnabled = booleanPreferencesKey("mediaControlEnabled")
+        val weightUnit = stringPreferencesKey("weightUnit")
         val selectedExerciseMode = stringPreferencesKey("selectedExerciseMode")
         val poseModeAccurate = booleanPreferencesKey("poseModeAccurate")
         val wristShoulderMargin = floatPreferencesKey("wristShoulderMargin")
@@ -33,6 +35,7 @@ class SettingsRepository(private val context: Context) {
         val historyMaxReps = intPreferencesKey("historyMaxReps")
         val historyMaxActiveMs = longPreferencesKey("historyMaxActiveMs")
         val historySessions = stringPreferencesKey("historySessions")
+        val roomHistoryMigrated = booleanPreferencesKey("roomHistoryMigrated")
     }
 
     val settingsFlow: Flow<AppSettings> = context.gripDataStore.data.map { preferences ->
@@ -47,6 +50,7 @@ class SettingsRepository(private val context: Context) {
         return AppSettings(
             overlayEnabled = this[Keys.overlayEnabled] ?: true,
             mediaControlEnabled = this[Keys.mediaControlEnabled] ?: true,
+            weightUnit = parseWeightUnit(this[Keys.weightUnit]),
             selectedExerciseMode = parseExerciseMode(this[Keys.selectedExerciseMode]),
             poseModeAccurate = this[Keys.poseModeAccurate] ?: false,
             wristShoulderMargin = this[Keys.wristShoulderMargin] ?: 0.08f,
@@ -70,6 +74,7 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setOverlayEnabled(value: Boolean) = editBool(Keys.overlayEnabled, value)
     suspend fun setMediaControlEnabled(value: Boolean) = editBool(Keys.mediaControlEnabled, value)
+    suspend fun setWeightUnit(value: WeightUnit) = editString(Keys.weightUnit, value.name)
     suspend fun setSelectedExerciseMode(value: ExerciseMode) = editString(Keys.selectedExerciseMode, value.name)
     suspend fun setPoseModeAccurate(value: Boolean) = editBool(Keys.poseModeAccurate, value)
     suspend fun setWristShoulderMargin(value: Float) = editFloat(Keys.wristShoulderMargin, value)
@@ -94,6 +99,22 @@ class SettingsRepository(private val context: Context) {
         }
     }
 
+    suspend fun isRoomHistoryMigrated(): Boolean {
+        return context.gripDataStore.data.map { prefs ->
+            prefs[Keys.roomHistoryMigrated] ?: false
+        }.first()
+    }
+
+    suspend fun markRoomHistoryMigrated() {
+        editBool(Keys.roomHistoryMigrated, true)
+    }
+
+    suspend fun readLegacySessions(): List<WorkoutSession> {
+        return context.gripDataStore.data.map { prefs ->
+            parseSessions(prefs[Keys.historySessions]).sortedBy { it.completedAtMs }
+        }.first()
+    }
+
     private suspend fun editBool(key: Preferences.Key<Boolean>, value: Boolean) {
         context.gripDataStore.edit { it[key] = value }
     }
@@ -114,6 +135,12 @@ class SettingsRepository(private val context: Context) {
         if (raw.isNullOrBlank()) return ExerciseMode.PULL_UP
         return runCatching { ExerciseMode.valueOf(raw) }
             .getOrElse { ExerciseMode.PULL_UP }
+    }
+
+    private fun parseWeightUnit(raw: String?): WeightUnit {
+        if (raw.isNullOrBlank()) return WeightUnit.KG
+        return runCatching { WeightUnit.valueOf(raw) }
+            .getOrElse { WeightUnit.KG }
     }
 
     private fun parseSessions(raw: String?): List<WorkoutSession> {

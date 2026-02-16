@@ -10,7 +10,7 @@ Gripmaxxer is an Android app (Kotlin + Compose) that uses the **front camera** a
 - Send **system-wide media play/pause** commands through active MediaSession controllers.
 - Show an always-on-top numeric overlay stopwatch while exercise is active.
 - Count reps in the selected exercise mode.
-- Provide a workout-tracker style UI with `Workout`, `Planner`, and `History` tabs.
+- Provide a Hevy-style workout tracker shell with bottom tabs: `Home`, `Workout`, `Profile`.
 
 Made by **Astro Labs** (`astrolabs`).
 
@@ -24,9 +24,15 @@ Made by **Astro Labs** (`astrolabs`).
   - On rep event: temporarily shows only rep number (for 800ms), then returns to stopwatch value.
   - Overlay can be dragged and dropped anywhere on screen; its position is remembered.
 - While this app screen is open and monitoring is active, the display is kept awake to avoid screen timeout mid-set.
-- Exercise mode is selected manually in the app and persisted.
-- A History tab shows max reps, max active time, and recent completed sessions.
-- Planner tab includes quick routine templates that can set mode and start tracking.
+- Workout tab includes:
+  - `Start Empty Workout`
+  - `Routines` with create/duplicate/rename/delete
+  - `Explore` local exercise library
+  - `Start Routine` cards
+- Active workout logging includes per-exercise set rows (`kg`, `reps`, `done`) and auto rest timer.
+- Home tab shows completed workout feed and workout details.
+- Profile tab shows stats/records and settings (unit toggle `kg/lb`, media, overlay, camera feedback).
+- Camera auto-detection emits auto-set suggestions that can be applied/discarded; sets are still user-confirmed.
 
 ## Why Notification Access Is Required
 Android does not allow unrestricted access to active media sessions without privileged permissions.
@@ -53,13 +59,15 @@ Some system screens or OEM-specific UIs may still hide overlays.
    - Notification access
    - Overlay permission (if overlay is enabled)
 5. Start playback in your target app (YouTube, TikTok, browser, etc.).
-6. Tap **Start monitoring**.
-   - Or open **Planner** and tap **Start Plan** on a template.
+6. Open `Workout` tab and either:
+   - Tap **Start Empty Workout**, or
+   - Tap **Start Routine** from `My Routines`.
+7. During an active workout, optionally use **Auto Track** on supported camera exercises.
 
 ## Troubleshooting
 - Start media playback first in the target app before monitoring.
 - If `play()` does not work for a specific app/player, `pause()` may still work.
-- Mode framing tips:
+- Mode framing tips for auto-track:
   - Pull-up: front bar framing with shoulders/arms visible
   - Push-up: front view with shoulders/elbows/torso visible
   - Squat: front full-body framing with hips/knees/ankles visible

@@ -5,6 +5,7 @@ import com.astrolabs.gripmaxxer.reps.ExerciseMode
 data class AppSettings(
     val overlayEnabled: Boolean = true,
     val mediaControlEnabled: Boolean = true,
+    val weightUnit: WeightUnit = WeightUnit.KG,
     val selectedExerciseMode: ExerciseMode = ExerciseMode.PULL_UP,
     val poseModeAccurate: Boolean = false,
     val wristShoulderMargin: Float = 0.08f,
