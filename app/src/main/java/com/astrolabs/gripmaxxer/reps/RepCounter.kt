@@ -47,6 +47,7 @@ class RepCounter(
     private var downCandidateSince: Long? = null
     private var downAnchorElbow: Float? = null
     private var upAnchorElbow: Float? = null
+    private var releaseLockUntilMs = 0L
 
     fun updateConfig(config: RepCounterConfig) {
         this.config = config
@@ -64,6 +65,7 @@ class RepCounter(
         downCandidateSince = null
         downAnchorElbow = null
         upAnchorElbow = null
+        releaseLockUntilMs = 0L
     }
 
     fun process(
@@ -85,6 +87,18 @@ class RepCounter(
         )
         val noseY = frame.noseOrMouthY()
         val elbowAngle = featureExtractor.elbowAngleDegrees(frame)
+
+        if (nowMs < releaseLockUntilMs) {
+            forceDownState()
+            return RepCounterResult(reps = reps, repEvent = false)
+        }
+
+        if (isLikelyReleased(frame, shoulderY, wristY)) {
+            releaseLockUntilMs = nowMs + RELEASE_LOCK_MS
+            forceDownState()
+            return RepCounterResult(reps = reps, repEvent = false)
+        }
+
         val smoothElbow = if (elbowAngle != null) {
             pushAndAverage(elbowWindow, elbowAngle)
         } else {
@@ -216,6 +230,31 @@ class RepCounter(
         return RepCounterResult(reps = reps, repEvent = false)
     }
 
+    private fun forceDownState() {
+        state = State.DOWN
+        upCandidateSince = null
+        downCandidateSince = null
+        downAnchorElbow = null
+        upAnchorElbow = null
+    }
+
+    private fun isLikelyReleased(
+        frame: PoseFrame,
+        shoulderY: Float?,
+        wristY: Float?,
+    ): Boolean {
+        if (shoulderY == null || wristY == null) return false
+        val bothShouldersPresent =
+            frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.LEFT_SHOULDER) != null &&
+                frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.RIGHT_SHOULDER) != null
+        val bothWristsPresent =
+            frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.LEFT_WRIST) != null &&
+                frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.RIGHT_WRIST) != null
+        if (!bothShouldersPresent || !bothWristsPresent) return false
+
+        return wristY > shoulderY + WRIST_BELOW_SHOULDER_RELEASE_DELTA
+    }
+
     private fun pushAndAverage(window: ArrayDeque<Float>, value: Float): Float {
         window.addLast(value)
         if (window.size > movingAverageWindow) {
@@ -235,5 +274,7 @@ class RepCounter(
         private const val ELBOW_UP_TRAVEL_DEG = 24f
         private const val ELBOW_DOWN_TRAVEL_DEG = 22f
         private const val ELBOW_TRAVEL_STABLE_MS = 120L
+        private const val WRIST_BELOW_SHOULDER_RELEASE_DELTA = 0.03f
+        private const val RELEASE_LOCK_MS = 1200L
     }
 }
