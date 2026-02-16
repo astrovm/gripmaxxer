@@ -8,6 +8,7 @@ data class HangDetectionConfig(
     val wristShoulderMargin: Float = 0.06f,
     val missingPoseTimeoutMs: Long = 300L,
     val partialPoseHoldMs: Long = 3000L,
+    val shoulderOnlyHoldMs: Long = 900L,
     val stableSwitchMs: Long = 500L,
     val minToggleIntervalMs: Long = 1500L,
 )
@@ -24,6 +25,7 @@ class HangDetector(
     private var isHanging = false
     private var missingSinceMs: Long? = null
     private var partialSinceMs: Long? = null
+    private var shoulderOnlySinceMs: Long? = null
     private var candidateState: Boolean? = null
     private var candidateSinceMs: Long = 0L
     private var lastToggleMs: Long = 0L
@@ -36,6 +38,7 @@ class HangDetector(
         isHanging = false
         missingSinceMs = null
         partialSinceMs = null
+        shoulderOnlySinceMs = null
         candidateState = null
         candidateSinceMs = 0L
         lastToggleMs = 0L
@@ -75,18 +78,29 @@ class HangDetector(
         if (canComputeHangNow) {
             missingSinceMs = null
             partialSinceMs = null
+            shoulderOnlySinceMs = null
             return wristY < (shoulderY - config.wristShoulderMargin)
         }
 
         // At top position, wrists can leave frame on door bars. Keep hanging briefly if upper body is still reliable.
         if (isHanging && hasUpperBodyCore(frame)) {
             if (partialSinceMs == null) partialSinceMs = nowMs
+            shoulderOnlySinceMs = null
             val partialDuration = nowMs - (partialSinceMs ?: nowMs)
             if (partialDuration <= config.partialPoseHoldMs) {
                 return true
             }
         } else {
             partialSinceMs = null
+            if (isHanging && hasShoulderPair(frame)) {
+                if (shoulderOnlySinceMs == null) shoulderOnlySinceMs = nowMs
+                val shoulderOnlyDuration = nowMs - (shoulderOnlySinceMs ?: nowMs)
+                if (shoulderOnlyDuration <= config.shoulderOnlyHoldMs) {
+                    return true
+                }
+            } else {
+                shoulderOnlySinceMs = null
+            }
         }
 
         if (missingSinceMs == null) missingSinceMs = nowMs
@@ -102,9 +116,11 @@ class HangDetector(
         val rightShoulder = frame.landmark(PoseLandmark.RIGHT_SHOULDER)
         if (leftShoulder == null && rightShoulder == null) return false
 
-        val hasLeftElbow = frame.landmark(PoseLandmark.LEFT_ELBOW) != null
-        val hasRightElbow = frame.landmark(PoseLandmark.RIGHT_ELBOW) != null
-        if (!hasLeftElbow && !hasRightElbow) return false
+        val hasLeftArmAnchor = frame.landmark(PoseLandmark.LEFT_ELBOW) != null ||
+            frame.landmark(PoseLandmark.LEFT_WRIST) != null
+        val hasRightArmAnchor = frame.landmark(PoseLandmark.RIGHT_ELBOW) != null ||
+            frame.landmark(PoseLandmark.RIGHT_WRIST) != null
+        if (!hasLeftArmAnchor && !hasRightArmAnchor) return false
 
         if (leftShoulder != null && rightShoulder != null) {
             val shoulderWidth = distance(leftShoulder, rightShoulder)
@@ -125,21 +141,25 @@ class HangDetector(
         val rightElbow = frame.landmark(PoseLandmark.RIGHT_ELBOW)
         val leftWrist = frame.landmark(PoseLandmark.LEFT_WRIST)
         val rightWrist = frame.landmark(PoseLandmark.RIGHT_WRIST)
+        if (leftWrist == null && rightWrist == null) return false
 
-        val leftArmLength = if (leftElbow != null && leftWrist != null) {
-            distance(leftShoulder, leftElbow) + distance(leftElbow, leftWrist)
-        } else {
-            null
-        }
-        val rightArmLength = if (rightElbow != null && rightWrist != null) {
-            distance(rightShoulder, rightElbow) + distance(rightElbow, rightWrist)
-        } else {
-            null
-        }
+        val minArmLengthWithElbow = shoulderWidth * 0.55f
+        val minShoulderWristWithoutElbow = shoulderWidth * 0.25f
 
-        val minArmLength = shoulderWidth * 0.85f
-        val leftArmReliable = leftArmLength != null && leftArmLength >= minArmLength
-        val rightArmReliable = rightArmLength != null && rightArmLength >= minArmLength
+        val leftArmReliable = isArmReliable(
+            shoulder = leftShoulder,
+            elbow = leftElbow,
+            wrist = leftWrist,
+            minArmLengthWithElbow = minArmLengthWithElbow,
+            minShoulderWristWithoutElbow = minShoulderWristWithoutElbow,
+        )
+        val rightArmReliable = isArmReliable(
+            shoulder = rightShoulder,
+            elbow = rightElbow,
+            wrist = rightWrist,
+            minArmLengthWithElbow = minArmLengthWithElbow,
+            minShoulderWristWithoutElbow = minShoulderWristWithoutElbow,
+        )
         if (!leftArmReliable && !rightArmReliable) return false
 
         if (leftWrist != null && rightWrist != null) {
@@ -148,6 +168,29 @@ class HangDetector(
         }
 
         return true
+    }
+
+    private fun hasShoulderPair(frame: PoseFrame): Boolean {
+        val leftShoulder = frame.landmark(PoseLandmark.LEFT_SHOULDER) ?: return false
+        val rightShoulder = frame.landmark(PoseLandmark.RIGHT_SHOULDER) ?: return false
+        return distance(leftShoulder, rightShoulder) >= 0.08f
+    }
+
+    private fun isArmReliable(
+        shoulder: NormalizedLandmark,
+        elbow: NormalizedLandmark?,
+        wrist: NormalizedLandmark?,
+        minArmLengthWithElbow: Float,
+        minShoulderWristWithoutElbow: Float,
+    ): Boolean {
+        wrist ?: return false
+
+        return if (elbow != null) {
+            val armLength = distance(shoulder, elbow) + distance(elbow, wrist)
+            armLength >= minArmLengthWithElbow
+        } else {
+            distance(shoulder, wrist) >= minShoulderWristWithoutElbow
+        }
     }
 
     private fun distance(a: NormalizedLandmark, b: NormalizedLandmark): Float {

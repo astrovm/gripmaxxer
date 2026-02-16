@@ -47,6 +47,6 @@ Some system screens or OEM-specific UIs may still hide overlays.
 ## Troubleshooting
 - Start media playback first in the target app before monitoring.
 - If `play()` does not work for a specific app/player, `pause()` may still work.
-- Improve pose detection with better lighting and a front camera angle that clearly sees wrists/shoulders/face.
+- Improve pose detection with better lighting and a front camera angle that keeps shoulders and at least one arm visible; face visibility at the top is optional.
 - FAST mode is lighter on battery/heat; ACCURATE mode is heavier but can improve robustness.
 - Long continuous camera processing can increase battery usage and device temperature.
