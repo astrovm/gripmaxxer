@@ -10,6 +10,7 @@ Gripmaxxer is an Android app (Kotlin + Compose) that uses the **front camera** a
 - Send **system-wide media play/pause** commands through active MediaSession controllers.
 - Show an always-on-top numeric overlay stopwatch while exercise is active.
 - Count reps in the selected exercise mode.
+- Provide a workout-tracker style UI with `Workout`, `Planner`, and `History` tabs.
 
 Made by **Astro Labs** (`astrolabs`).
 
@@ -25,6 +26,7 @@ Made by **Astro Labs** (`astrolabs`).
 - While this app screen is open and monitoring is active, the display is kept awake to avoid screen timeout mid-set.
 - Exercise mode is selected manually in the app and persisted.
 - A History tab shows max reps, max active time, and recent completed sessions.
+- Planner tab includes quick routine templates that can set mode and start tracking.
 
 ## Why Notification Access Is Required
 Android does not allow unrestricted access to active media sessions without privileged permissions.
@@ -52,6 +54,7 @@ Some system screens or OEM-specific UIs may still hide overlays.
    - Overlay permission (if overlay is enabled)
 5. Start playback in your target app (YouTube, TikTok, browser, etc.).
 6. Tap **Start monitoring**.
+   - Or open **Planner** and tap **Start Plan** on a template.
 
 ## Troubleshooting
 - Start media playback first in the target app before monitoring.

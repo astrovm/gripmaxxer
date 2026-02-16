@@ -7,11 +7,11 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
@@ -63,7 +63,7 @@ fun MainScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val view = LocalView.current
-    var selectedTab by rememberSaveable { mutableStateOf(MainTab.LIVE.name) }
+    var selectedTab by rememberSaveable { mutableStateOf(MainTab.WORKOUT.name) }
 
     DisposableEffect(uiState.monitoring.serviceRunning, view) {
         view.keepScreenOn = uiState.monitoring.serviceRunning
@@ -108,24 +108,225 @@ fun MainScreen(
             .padding(bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(
-            text = "Gripmaxxer",
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            text = "Real-time monitoring with selectable exercise rep tracking.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = "Gripmaxxer",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Workout tracker and planner for camera-based reps.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
 
         MainTabSelector(
             selectedTab = selectedTab,
             onTabSelected = { selectedTab = it },
         )
 
-        if (selectedTab == MainTab.LIVE.name) {
-            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        when (selectedTab) {
+            MainTab.WORKOUT.name -> WorkoutTabContent(
+                uiState = uiState,
+                notificationsEnabled = notificationsEnabled,
+                onStart = viewModel::startMonitoring,
+                onStop = viewModel::stopMonitoring,
+                onModeSelected = viewModel::setSelectedExerciseMode,
+                onMediaToggle = viewModel::setMediaControlEnabled,
+                onPreviewToggle = viewModel::setShowCameraPreview,
+                onRequestCamera = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) },
+                onOpenNotificationAccess = openNotificationAccessSettings,
+                onOpenOverlaySettings = openOverlaySettings,
+            )
+
+            MainTab.PLANNER.name -> PlannerTabContent(
+                selectedMode = uiState.settings.selectedExerciseMode,
+                onUsePlan = viewModel::setSelectedExerciseMode,
+                onStartPlan = viewModel::startMonitoringWithMode,
+            )
+
+            MainTab.HISTORY.name -> HistoryTabContent(history = uiState.history)
+        }
+    }
+}
+
+@Composable
+private fun WorkoutTabContent(
+    uiState: MainUiState,
+    notificationsEnabled: Boolean,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
+    onModeSelected: (ExerciseMode) -> Unit,
+    onMediaToggle: (Boolean) -> Unit,
+    onPreviewToggle: (Boolean) -> Unit,
+    onRequestCamera: () -> Unit,
+    onOpenNotificationAccess: () -> Unit,
+    onOpenOverlaySettings: () -> Unit,
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = if (uiState.monitoring.serviceRunning) "Workout in progress" else "Ready to train",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "Exercise: ${uiState.settings.selectedExerciseMode.label}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                MetricTile(
+                    label = "Reps",
+                    value = uiState.monitoring.reps.toString(),
+                    modifier = Modifier.weight(1f),
+                )
+                MetricTile(
+                    label = "Active Time",
+                    value = formatDuration(uiState.monitoring.elapsedHangMs),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            if (uiState.monitoring.serviceRunning) {
+                OutlinedButton(
+                    onClick = onStop,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Finish Workout")
+                }
+            } else {
+                Button(
+                    onClick = onStart,
+                    enabled = uiState.permissions.cameraGranted,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Start Workout")
+                }
+                if (!uiState.permissions.cameraGranted) {
+                    OutlinedButton(
+                        onClick = onRequestCamera,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Grant Camera Access")
+                    }
+                }
+            }
+        }
+    }
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = "Exercise Library",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            ExerciseModeSelector(
+                selectedMode = uiState.settings.selectedExerciseMode,
+                onSelect = onModeSelected,
+            )
+            Text(
+                text = "Framing: ${framingHintForMode(uiState.settings.selectedExerciseMode)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = "Setup checklist",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            ChecklistLine(label = "Camera permission", ready = uiState.permissions.cameraGranted)
+            if (!uiState.permissions.cameraGranted) {
+                OutlinedButton(
+                    onClick = onRequestCamera,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Enable Camera")
+                }
+            }
+            ChecklistLine(
+                label = "Notification access",
+                ready = uiState.permissions.notificationAccessEnabled,
+            )
+            if (!uiState.permissions.notificationAccessEnabled) {
+                OutlinedButton(
+                    onClick = onOpenNotificationAccess,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Enable Notification Access")
+                }
+            }
+            ChecklistLine(label = "Overlay permission", ready = uiState.permissions.overlayPermissionGranted)
+            if (!uiState.permissions.overlayPermissionGranted) {
+                OutlinedButton(
+                    onClick = onOpenOverlaySettings,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Enable Overlay")
+                }
+            }
+            ChecklistLine(label = "System notifications", ready = notificationsEnabled)
+        }
+    }
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = "Workout options",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            SettingToggle(
+                label = "Enable media play/pause",
+                checked = uiState.settings.mediaControlEnabled,
+                onToggle = onMediaToggle,
+            )
+            SettingToggle(
+                label = "Show live camera feedback",
+                checked = uiState.showCameraPreview,
+                onToggle = onPreviewToggle,
+            )
+        }
+    }
+
+    if (uiState.showCameraPreview) {
+        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -133,191 +334,122 @@ fun MainScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
-                    text = "Live Overview",
+                    text = "Live camera feedback",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                val frame = uiState.cameraPreviewFrame
+                if (frame != null) {
+                    CameraPreviewWithTracking(frame = frame)
+                } else {
+                    Text(
+                        text = "Start a workout to stream camera tracking feedback.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlannerTabContent(
+    selectedMode: ExerciseMode,
+    onUsePlan: (ExerciseMode) -> Unit,
+    onStartPlan: (ExerciseMode) -> Unit,
+) {
+    val templates = remember {
+        listOf(
+            RoutineTemplate(
+                title = "Upper Body Strength",
+                subtitle = "Pull-up + Push-up focus",
+                exercises = listOf(ExerciseMode.PULL_UP, ExerciseMode.PUSH_UP, ExerciseMode.DIP),
+            ),
+            RoutineTemplate(
+                title = "Leg Day",
+                subtitle = "Build volume and control",
+                exercises = listOf(ExerciseMode.SQUAT),
+            ),
+            RoutineTemplate(
+                title = "Press Focus",
+                subtitle = "Bench and support work",
+                exercises = listOf(ExerciseMode.BENCH_PRESS, ExerciseMode.DIP),
+            ),
+            RoutineTemplate(
+                title = "Bodyweight Circuit",
+                subtitle = "Minimal equipment plan",
+                exercises = listOf(ExerciseMode.PUSH_UP, ExerciseMode.SQUAT, ExerciseMode.PULL_UP),
+            ),
+        )
+    }
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = "Planner",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "Pick a routine template, then start tracking from the first exercise.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "Currently selected: ${selectedMode.label}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+
+    templates.forEach { template ->
+        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = template.title,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "Selected mode: ${uiState.settings.selectedExerciseMode.label}",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    text = template.subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = "Reps: ${uiState.monitoring.reps}",
-                    style = MaterialTheme.typography.headlineSmall,
+                    text = "Exercises: ${template.exercises.joinToString(" • ") { it.label }}",
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    MetricTile(
-                        label = "Active Time",
-                        value = formatDuration(uiState.monitoring.elapsedHangMs),
-                        modifier = Modifier.weight(1f),
-                    )
-                    MetricTile(
-                        label = "Camera FPS",
-                        value = uiState.monitoring.cameraFps.toString(),
-                        modifier = Modifier.weight(1f),
-                    )
-                    MetricTile(
-                        label = "Last Frame",
-                        value = formatLastFrameAge(uiState.monitoring.lastFrameAgeMs),
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                HorizontalDivider()
-                StatusLine("Monitoring service", uiState.monitoring.serviceRunning)
-                StatusLine("Exercise active", uiState.monitoring.hanging)
-                StatusLine("Pose detected", uiState.monitoring.posePresent)
-                StatusLine("Notifications enabled", notificationsEnabled)
-            }
-        }
-
-        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Text(
-                    text = "Controls",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Button(
-                    onClick = { viewModel.startMonitoring() },
-                    enabled = uiState.permissions.cameraGranted,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Start Monitoring")
-                }
-                OutlinedButton(
-                    onClick = { viewModel.stopMonitoring() },
-                    enabled = uiState.monitoring.serviceRunning,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Stop Monitoring")
-                }
-                Text(
-                    text = "Active media source: ${uiState.monitoring.mediaControllerPackage ?: "Not connected"}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Text(
-                    text = "Permissions",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                StatusLine("Camera permission", uiState.permissions.cameraGranted)
-                if (!uiState.permissions.cameraGranted) {
-                    Button(
-                        onClick = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Grant Camera Permission")
-                    }
-                }
-                StatusLine("Notification access", uiState.permissions.notificationAccessEnabled)
-                if (!uiState.permissions.notificationAccessEnabled) {
-                    Button(
-                        onClick = { openNotificationAccessSettings() },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Open Notification Access Settings")
-                    }
-                }
-                StatusLine("Overlay permission", uiState.permissions.overlayPermissionGranted)
-                if (!uiState.permissions.overlayPermissionGranted) {
                     OutlinedButton(
-                        onClick = { openOverlaySettings() },
-                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { onUsePlan(template.exercises.first()) },
+                        modifier = Modifier.weight(1f),
                     ) {
-                        Text("Grant Overlay Permission")
+                        Text("Use Plan")
+                    }
+                    Button(
+                        onClick = { onStartPlan(template.exercises.first()) },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text("Start Plan")
                     }
                 }
             }
-        }
-
-        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Text(
-                    text = "Preferences",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = "Overlay is shown automatically while monitoring.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = "Camera framing: ${framingHintForMode(uiState.settings.selectedExerciseMode)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                ExerciseModeSelector(
-                    selectedMode = uiState.settings.selectedExerciseMode,
-                    onSelect = viewModel::setSelectedExerciseMode,
-                )
-                SettingToggle(
-                    label = "Enable media play/pause",
-                    checked = uiState.settings.mediaControlEnabled,
-                    onToggle = viewModel::setMediaControlEnabled,
-                )
-                SettingToggle(
-                    label = "Show live camera preview",
-                    checked = uiState.showCameraPreview,
-                    onToggle = viewModel::setShowCameraPreview,
-                )
-            }
-        }
-
-            if (uiState.showCameraPreview) {
-                ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Text(
-                            text = "Live Camera Preview",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        val frame = uiState.cameraPreviewFrame
-                        if (frame != null) {
-                            CameraPreviewWithTracking(frame = frame)
-                        } else {
-                            Text(
-                                text = "Waiting for camera frames. Start monitoring and keep this screen open.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
-        } else {
-            HistoryTabContent(history = uiState.history)
         }
     }
 }
@@ -327,17 +459,21 @@ private fun MainTabSelector(
     selectedTab: String,
     onTabSelected: (String) -> Unit,
 ) {
-    TabRow(selectedTabIndex = if (selectedTab == MainTab.LIVE.name) 0 else 1) {
-        Tab(
-            selected = selectedTab == MainTab.LIVE.name,
-            onClick = { onTabSelected(MainTab.LIVE.name) },
-            text = { Text("Live") },
-        )
-        Tab(
-            selected = selectedTab == MainTab.HISTORY.name,
-            onClick = { onTabSelected(MainTab.HISTORY.name) },
-            text = { Text("History") },
-        )
+    val tabs = listOf(
+        MainTab.WORKOUT,
+        MainTab.PLANNER,
+        MainTab.HISTORY,
+    )
+    val selectedIndex = tabs.indexOfFirst { it.name == selectedTab }.coerceAtLeast(0)
+
+    TabRow(selectedTabIndex = selectedIndex) {
+        tabs.forEach { tab ->
+            Tab(
+                selected = selectedTab == tab.name,
+                onClick = { onTabSelected(tab.name) },
+                text = { Text(tab.label) },
+            )
+        }
     }
 }
 
@@ -351,8 +487,8 @@ private fun HistoryTabContent(history: WorkoutHistory) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                text = "History",
-                style = MaterialTheme.typography.titleMedium,
+                text = "Training history",
+                style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Row(
@@ -369,11 +505,16 @@ private fun HistoryTabContent(history: WorkoutHistory) {
                     value = formatDuration(history.maxActiveMs),
                     modifier = Modifier.weight(1f),
                 )
+                MetricTile(
+                    label = "Sessions",
+                    value = history.sessions.size.toString(),
+                    modifier = Modifier.weight(1f),
+                )
             }
             HorizontalDivider()
             if (history.sessions.isEmpty()) {
                 Text(
-                    text = "No completed sessions yet.",
+                    text = "No workouts yet. Start your first session from Workout or Planner.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -432,11 +573,6 @@ private fun ExerciseModeSelector(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            text = "Exercise Mode",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
         modes.forEach { mode ->
             val selected = mode == selectedMode
             if (selected) {
@@ -459,7 +595,7 @@ private fun ExerciseModeSelector(
 }
 
 @Composable
-private fun StatusLine(label: String, value: Boolean) {
+private fun ChecklistLine(label: String, ready: Boolean) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -467,12 +603,12 @@ private fun StatusLine(label: String, value: Boolean) {
     ) {
         Text(text = label, color = MaterialTheme.colorScheme.onSurface)
         Text(
-            text = if (value) "Ready" else "Needs action",
-            color = if (value) {
+            text = if (ready) "Ready" else "Required",
+            color = if (ready) {
                 MaterialTheme.colorScheme.primary
             } else {
                 MaterialTheme.colorScheme.error
-            }
+            },
         )
     }
 }
@@ -491,7 +627,7 @@ private fun SettingToggle(
         Text(
             text = label,
             modifier = Modifier.weight(1f),
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Switch(
             checked = checked,
@@ -535,7 +671,7 @@ private fun CameraPreviewWithTracking(frame: DebugPreviewFrame) {
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(aspect.coerceIn(0.4f, 2.5f))
-            .background(Color.Black)
+            .background(Color.Black),
     ) {
         Image(
             bitmap = frame.bitmap.asImageBitmap(),
@@ -556,14 +692,6 @@ private fun CameraPreviewWithTracking(frame: DebugPreviewFrame) {
                 )
             }
         }
-    }
-}
-
-private fun formatLastFrameAge(lastFrameAgeMs: Long): String {
-    return if (lastFrameAgeMs == Long.MAX_VALUE) {
-        "No frames"
-    } else {
-        "${lastFrameAgeMs}ms"
     }
 }
 
@@ -589,7 +717,14 @@ private fun framingHintForMode(mode: ExerciseMode): String {
     }
 }
 
-private enum class MainTab {
-    LIVE,
-    HISTORY,
+private data class RoutineTemplate(
+    val title: String,
+    val subtitle: String,
+    val exercises: List<ExerciseMode>,
+)
+
+private enum class MainTab(val label: String) {
+    WORKOUT("Workout"),
+    PLANNER("Planner"),
+    HISTORY("History"),
 }

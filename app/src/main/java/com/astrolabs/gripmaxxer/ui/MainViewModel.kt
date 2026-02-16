@@ -114,6 +114,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         HangCamService.start(appContext)
     }
 
+    fun startMonitoringWithMode(mode: ExerciseMode) {
+        viewModelScope.launch {
+            settingsRepository.setSelectedExerciseMode(mode)
+            HangCamService.start(appContext)
+        }
+    }
+
     fun stopMonitoring() {
         HangCamService.stop(appContext)
     }

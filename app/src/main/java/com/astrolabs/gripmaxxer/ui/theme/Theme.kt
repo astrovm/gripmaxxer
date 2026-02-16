@@ -10,28 +10,37 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Teal,
-    secondary = Teal,
-    tertiary = Teal
+    primary = Mint500,
+    secondary = Mint300,
+    tertiary = Mint500,
+    background = Iron950,
+    surface = Iron900,
+    surfaceVariant = Iron800,
+    error = Danger400,
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Teal,
-    secondary = Teal,
-    tertiary = Teal
+    primary = Mint500,
+    secondary = Mint300,
+    tertiary = Mint500,
+    background = Color(0xFFF4F7F9),
+    surface = Color(0xFFFFFFFF),
+    surfaceVariant = Color(0xFFE7EDF2),
+    error = Danger400,
 )
 
 @Composable
 fun GripmaxxerTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
