@@ -34,7 +34,8 @@ class ArcherSquatActivityDetector(
 
         val leftMotion = lastLeftKneeAngle?.let { abs(it - leftKnee) > 1.4f } ?: false
         val rightMotion = lastRightKneeAngle?.let { abs(it - rightKnee) > 1.4f } ?: false
-        val sideDepth = isSideDown(leftKnee, rightKnee) || isSideDown(rightKnee, leftKnee)
+        val sideDepth = (isSideDown(leftKnee, rightKnee) || isSideDown(rightKnee, leftKnee)) &&
+            hasLateralHipShift(frame, MIN_ACTIVE_HIP_SHIFT_RATIO)
         val motionDetected = leftMotion || rightMotion || sideDepth
 
         if (motionDetected) {
@@ -69,6 +70,21 @@ class ArcherSquatActivityDetector(
             (supportKnee - workingKnee) > MIN_KNEE_SEPARATION_DEG
     }
 
+    private fun hasLateralHipShift(frame: PoseFrame, minShiftRatio: Float): Boolean {
+        val leftHip = frame.landmark(PoseLandmark.LEFT_HIP) ?: return false
+        val rightHip = frame.landmark(PoseLandmark.RIGHT_HIP) ?: return false
+        val leftAnkle = frame.landmark(PoseLandmark.LEFT_ANKLE) ?: return false
+        val rightAnkle = frame.landmark(PoseLandmark.RIGHT_ANKLE) ?: return false
+
+        val hipCenter = (leftHip.x + rightHip.x) / 2f
+        val ankleCenter = (leftAnkle.x + rightAnkle.x) / 2f
+        val ankleSpan = abs(leftAnkle.x - rightAnkle.x)
+        if (ankleSpan < 0.12f) return false
+
+        val normalizedShift = abs(hipCenter - ankleCenter) / (ankleSpan / 2f)
+        return normalizedShift >= minShiftRatio
+    }
+
     private fun decayActive(nowMs: Long): Boolean {
         if (active && nowMs - lastMotionMs > IDLE_TIMEOUT_MS) {
             active = false
@@ -83,5 +99,6 @@ class ArcherSquatActivityDetector(
         private const val DOWN_WORKING_KNEE_MAX = 118f
         private const val DOWN_SUPPORT_KNEE_MIN = 148f
         private const val MIN_KNEE_SEPARATION_DEG = 24f
+        private const val MIN_ACTIVE_HIP_SHIFT_RATIO = 0.12f
     }
 }

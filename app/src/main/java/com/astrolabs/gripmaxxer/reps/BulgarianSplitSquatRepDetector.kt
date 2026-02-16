@@ -15,11 +15,14 @@ class BulgarianSplitSquatRepDetector(
         minRepIntervalMs = 600L,
     )
 
-    private var trackedSide: BodySide? = null
+    private val sideTracker = BodySideTracker(
+        switchDelta = SIDE_SWITCH_DELTA_DEG,
+        switchStableMs = SIDE_SWITCH_STABLE_MS,
+    )
 
     override fun reset() {
         cycleCounter.reset()
-        trackedSide = null
+        sideTracker.reset()
     }
 
     override fun process(
@@ -31,7 +34,7 @@ class BulgarianSplitSquatRepDetector(
             return RepCounterResult(reps = cycleCounter.currentReps(), repEvent = false)
         }
 
-        val side = selectTrackedSide(frame) ?: return RepCounterResult(reps = cycleCounter.currentReps(), repEvent = false)
+        val side = selectTrackedSide(frame, nowMs) ?: return RepCounterResult(reps = cycleCounter.currentReps(), repEvent = false)
         val workingKnee = featureExtractor.kneeAngleDegrees(frame, side)
             ?: return RepCounterResult(reps = cycleCounter.currentReps(), repEvent = false)
         val rearKnee = featureExtractor.kneeAngleDegrees(frame, opposite(side))
@@ -45,24 +48,17 @@ class BulgarianSplitSquatRepDetector(
     private fun hasSplitStance(frame: PoseFrame): Boolean {
         val leftAnkle = frame.landmark(PoseLandmark.LEFT_ANKLE) ?: return false
         val rightAnkle = frame.landmark(PoseLandmark.RIGHT_ANKLE) ?: return false
-        return abs(leftAnkle.x - rightAnkle.x) > SPLIT_STANCE_MIN_X_DELTA
+        val leftShoulder = frame.landmark(PoseLandmark.LEFT_SHOULDER) ?: return false
+        val rightShoulder = frame.landmark(PoseLandmark.RIGHT_SHOULDER) ?: return false
+        val shoulderWidth = abs(leftShoulder.x - rightShoulder.x)
+        if (shoulderWidth < MIN_SHOULDER_WIDTH) return false
+        return abs(leftAnkle.x - rightAnkle.x) > shoulderWidth * SPLIT_STANCE_MIN_RATIO
     }
 
-    private fun selectTrackedSide(frame: PoseFrame): BodySide? {
+    private fun selectTrackedSide(frame: PoseFrame, nowMs: Long): BodySide? {
         val leftKnee = featureExtractor.kneeAngleDegrees(frame, BodySide.LEFT)
         val rightKnee = featureExtractor.kneeAngleDegrees(frame, BodySide.RIGHT)
-        val selected = when {
-            leftKnee != null && rightKnee != null -> {
-                if (leftKnee <= rightKnee - SIDE_SWITCH_DELTA_DEG) BodySide.LEFT
-                else if (rightKnee <= leftKnee - SIDE_SWITCH_DELTA_DEG) BodySide.RIGHT
-                else trackedSide ?: if (leftKnee <= rightKnee) BodySide.LEFT else BodySide.RIGHT
-            }
-            leftKnee != null -> BodySide.LEFT
-            rightKnee != null -> BodySide.RIGHT
-            else -> null
-        }
-        trackedSide = selected ?: trackedSide
-        return trackedSide
+        return sideTracker.selectLower(leftKnee, rightKnee, nowMs)
     }
 
     private fun opposite(side: BodySide): BodySide {
@@ -71,7 +67,9 @@ class BulgarianSplitSquatRepDetector(
 
     companion object {
         private const val SIDE_SWITCH_DELTA_DEG = 7f
-        private const val SPLIT_STANCE_MIN_X_DELTA = 0.12f
+        private const val SIDE_SWITCH_STABLE_MS = 320L
+        private const val MIN_SHOULDER_WIDTH = 0.08f
+        private const val SPLIT_STANCE_MIN_RATIO = 0.95f
         private const val REAR_KNEE_UP_MIN = 108f
         private const val REAR_KNEE_UP_MAX = 170f
     }

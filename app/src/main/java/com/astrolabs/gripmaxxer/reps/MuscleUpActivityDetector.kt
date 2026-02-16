@@ -13,6 +13,7 @@ class MuscleUpActivityDetector(
     private val hangDetector = HangDetector()
     private var active = false
     private var lastMotionMs = 0L
+    private var lastStructuredPoseMs = 0L
 
     fun updateConfig(config: HangDetectionConfig) {
         hangDetector.updateConfig(config)
@@ -22,6 +23,7 @@ class MuscleUpActivityDetector(
         hangDetector.reset()
         active = false
         lastMotionMs = 0L
+        lastStructuredPoseMs = 0L
     }
 
     override fun process(
@@ -33,7 +35,13 @@ class MuscleUpActivityDetector(
         val elbowAngle = featureExtractor.elbowAngleDegrees(frame)
         val transitionMotion = elbowAngle != null && elbowAngle < TRANSITION_MAX_ELBOW_ANGLE
 
-        if (hanging || support || transitionMotion) {
+        if (hanging || support) {
+            lastStructuredPoseMs = nowMs
+        }
+        val transitionWithContext = transitionMotion &&
+            (nowMs - lastStructuredPoseMs) <= TRANSITION_CONTEXT_MS
+
+        if (hanging || support || transitionWithContext) {
             active = true
             lastMotionMs = nowMs
         }
@@ -60,5 +68,6 @@ class MuscleUpActivityDetector(
     companion object {
         private const val TRANSITION_MAX_ELBOW_ANGLE = 145f
         private const val IDLE_TIMEOUT_MS = 1800L
+        private const val TRANSITION_CONTEXT_MS = 1200L
     }
 }

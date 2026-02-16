@@ -25,8 +25,17 @@ class HipThrustActivityDetector(
         frame: PoseFrame,
         nowMs: Long,
     ): Boolean {
+        val shoulderY = frame.averageY(PoseLandmark.LEFT_SHOULDER, PoseLandmark.RIGHT_SHOULDER) ?: return decayActive(nowMs)
         val hipAngle = featureExtractor.hipAngleDegrees(frame) ?: return decayActive(nowMs)
         val hipY = frame.averageY(PoseLandmark.LEFT_HIP, PoseLandmark.RIGHT_HIP) ?: return decayActive(nowMs)
+        val kneeAngle = featureExtractor.kneeAngleDegrees(frame)
+
+        if (kneeAngle != null && (kneeAngle < MIN_KNEE_ANGLE || kneeAngle > MAX_KNEE_ANGLE)) {
+            return decayActive(nowMs)
+        }
+        if (kotlin.math.abs(hipY - shoulderY) > MAX_HIP_TO_SHOULDER_Y_DELTA) {
+            return decayActive(nowMs)
+        }
 
         if (baselineHipY == null) baselineHipY = hipY
         if (hipAngle > 158f) {
@@ -61,5 +70,8 @@ class HipThrustActivityDetector(
 
     companion object {
         private const val IDLE_TIMEOUT_MS = 1700L
+        private const val MIN_KNEE_ANGLE = 70f
+        private const val MAX_KNEE_ANGLE = 178f
+        private const val MAX_HIP_TO_SHOULDER_Y_DELTA = 0.34f
     }
 }

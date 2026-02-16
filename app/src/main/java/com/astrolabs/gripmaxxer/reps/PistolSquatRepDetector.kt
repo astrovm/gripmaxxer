@@ -13,11 +13,14 @@ class PistolSquatRepDetector(
         minRepIntervalMs = 600L,
     )
 
-    private var trackedSide: BodySide? = null
+    private val sideTracker = BodySideTracker(
+        switchDelta = SIDE_SWITCH_DELTA_DEG,
+        switchStableMs = SIDE_SWITCH_STABLE_MS,
+    )
 
     override fun reset() {
         cycleCounter.reset()
-        trackedSide = null
+        sideTracker.reset()
     }
 
     override fun process(
@@ -29,7 +32,7 @@ class PistolSquatRepDetector(
             return RepCounterResult(reps = cycleCounter.currentReps(), repEvent = false)
         }
 
-        val side = selectTrackedSide(frame)
+        val side = selectTrackedSide(frame, nowMs)
             ?: return RepCounterResult(reps = cycleCounter.currentReps(), repEvent = false)
         val kneeAngle = featureExtractor.kneeAngleDegrees(frame, side)
             ?: return RepCounterResult(reps = cycleCounter.currentReps(), repEvent = false)
@@ -40,24 +43,14 @@ class PistolSquatRepDetector(
         return cycleCounter.process(isDown = isDown, isUp = isUp, nowMs = nowMs)
     }
 
-    private fun selectTrackedSide(frame: PoseFrame): BodySide? {
+    private fun selectTrackedSide(frame: PoseFrame, nowMs: Long): BodySide? {
         val leftKnee = featureExtractor.kneeAngleDegrees(frame, BodySide.LEFT)
         val rightKnee = featureExtractor.kneeAngleDegrees(frame, BodySide.RIGHT)
-        val chosen = when {
-            leftKnee != null && rightKnee != null -> {
-                if (leftKnee <= rightKnee - SIDE_SWITCH_DELTA_DEG) BodySide.LEFT
-                else if (rightKnee <= leftKnee - SIDE_SWITCH_DELTA_DEG) BodySide.RIGHT
-                else trackedSide
-            }
-            leftKnee != null -> BodySide.LEFT
-            rightKnee != null -> BodySide.RIGHT
-            else -> null
-        }
-        trackedSide = chosen ?: trackedSide
-        return trackedSide
+        return sideTracker.selectLower(leftKnee, rightKnee, nowMs)
     }
 
     companion object {
         private const val SIDE_SWITCH_DELTA_DEG = 12f
+        private const val SIDE_SWITCH_STABLE_MS = 350L
     }
 }

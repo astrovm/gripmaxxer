@@ -35,10 +35,12 @@ class ArcherSquatRepDetector(
 
         val downLeft = isSideDown(leftKnee, rightKnee)
         val downRight = isSideDown(rightKnee, leftKnee)
-        val isDown = downLeft || downRight
+        val hipShift = lateralHipShiftRatio(frame)
+        val isDown = (downLeft || downRight) && hipShift >= DOWN_HIP_SHIFT_MIN_RATIO
         val isUp = leftKnee > UP_KNEE_MIN &&
             rightKnee > UP_KNEE_MIN &&
-            abs(leftKnee - rightKnee) < UP_KNEE_BALANCE_MAX_DELTA
+            abs(leftKnee - rightKnee) < UP_KNEE_BALANCE_MAX_DELTA &&
+            hipShift <= UP_HIP_SHIFT_MAX_RATIO
 
         return cycleCounter.process(isDown = isDown, isUp = isUp, nowMs = nowMs)
     }
@@ -61,6 +63,19 @@ class ArcherSquatRepDetector(
             (supportKnee - workingKnee) > MIN_KNEE_SEPARATION_DEG
     }
 
+    private fun lateralHipShiftRatio(frame: PoseFrame): Float {
+        val leftHip = frame.landmark(PoseLandmark.LEFT_HIP) ?: return 0f
+        val rightHip = frame.landmark(PoseLandmark.RIGHT_HIP) ?: return 0f
+        val leftAnkle = frame.landmark(PoseLandmark.LEFT_ANKLE) ?: return 0f
+        val rightAnkle = frame.landmark(PoseLandmark.RIGHT_ANKLE) ?: return 0f
+
+        val hipCenter = (leftHip.x + rightHip.x) / 2f
+        val ankleCenter = (leftAnkle.x + rightAnkle.x) / 2f
+        val ankleSpan = abs(leftAnkle.x - rightAnkle.x)
+        if (ankleSpan < 0.12f) return 0f
+        return abs(hipCenter - ankleCenter) / (ankleSpan / 2f)
+    }
+
     companion object {
         private const val MIN_SHOULDER_WIDTH = 0.08f
         private const val MIN_ANKLE_TO_SHOULDER_WIDTH_RATIO = 1.35f
@@ -69,5 +84,7 @@ class ArcherSquatRepDetector(
         private const val MIN_KNEE_SEPARATION_DEG = 28f
         private const val UP_KNEE_MIN = 160f
         private const val UP_KNEE_BALANCE_MAX_DELTA = 16f
+        private const val DOWN_HIP_SHIFT_MIN_RATIO = 0.14f
+        private const val UP_HIP_SHIFT_MAX_RATIO = 0.11f
     }
 }

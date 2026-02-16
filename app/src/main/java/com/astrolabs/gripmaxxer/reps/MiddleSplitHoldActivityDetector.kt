@@ -71,6 +71,8 @@ class MiddleSplitHoldActivityDetector(
         val rightShoulder = frame.landmark(PoseLandmark.RIGHT_SHOULDER) ?: return PoseState.UNKNOWN
         val leftHip = frame.landmark(PoseLandmark.LEFT_HIP) ?: return PoseState.UNKNOWN
         val rightHip = frame.landmark(PoseLandmark.RIGHT_HIP) ?: return PoseState.UNKNOWN
+        val leftKnee = frame.landmark(PoseLandmark.LEFT_KNEE)
+        val rightKnee = frame.landmark(PoseLandmark.RIGHT_KNEE)
         val leftAnkle = frame.landmark(PoseLandmark.LEFT_ANKLE) ?: return PoseState.UNKNOWN
         val rightAnkle = frame.landmark(PoseLandmark.RIGHT_ANKLE) ?: return PoseState.UNKNOWN
 
@@ -97,6 +99,17 @@ class MiddleSplitHoldActivityDetector(
         val hipsNearLegPlane = abs(hipY - anklesY) <= MAX_HIP_TO_ANKLE_Y_DELTA
         if (!hipsNearLegPlane) return PoseState.NOT_MIDDLE_SPLIT
 
+        val anklesLevel = abs(leftAnkle.y - rightAnkle.y) <= MAX_ANKLE_LEVEL_Y_DELTA
+        if (!anklesLevel) return PoseState.NOT_MIDDLE_SPLIT
+
+        val kneesExtended = if (leftKnee != null && rightKnee != null) {
+            abs(leftKnee.y - leftAnkle.y) <= MAX_KNEE_TO_ANKLE_Y_DELTA &&
+                abs(rightKnee.y - rightAnkle.y) <= MAX_KNEE_TO_ANKLE_Y_DELTA
+        } else {
+            true
+        }
+        if (!kneesExtended) return PoseState.NOT_MIDDLE_SPLIT
+
         val kneeAngle = featureExtractor.kneeAngleDegrees(frame)
         if (kneeAngle != null && kneeAngle < MIN_KNEE_ANGLE_DEG) {
             return PoseState.NOT_MIDDLE_SPLIT
@@ -121,6 +134,8 @@ class MiddleSplitHoldActivityDetector(
         private const val HIP_CENTER_MARGIN_X = 0.10f
         private const val MIN_HIP_DROP_FROM_SHOULDERS = 0.10f
         private const val MAX_HIP_TO_ANKLE_Y_DELTA = 0.25f
+        private const val MAX_ANKLE_LEVEL_Y_DELTA = 0.14f
+        private const val MAX_KNEE_TO_ANKLE_Y_DELTA = 0.18f
         private const val MIN_KNEE_ANGLE_DEG = 150f
     }
 }

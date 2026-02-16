@@ -10,20 +10,30 @@ class PikePushUpActivityDetector(
 
     private var active = false
     private var lastMotionMs = 0L
+    private var baselineShoulderY: Float? = null
 
     override fun reset() {
         active = false
         lastMotionMs = 0L
+        baselineShoulderY = null
     }
 
     override fun process(
         frame: PoseFrame,
         nowMs: Long,
     ): Boolean {
-        if (!isPikePosture(frame)) return decayActive(nowMs)
+        val shoulderY = frame.averageY(PoseLandmark.LEFT_SHOULDER, PoseLandmark.RIGHT_SHOULDER)
+            ?: return decayActive(nowMs)
+        if (!isPikePosture(frame, shoulderY)) return decayActive(nowMs)
 
         val elbowAngle = featureExtractor.elbowAngleDegrees(frame) ?: return decayActive(nowMs)
-        val motionDetected = elbowAngle < 162f
+        if (baselineShoulderY == null) baselineShoulderY = shoulderY
+        if (elbowAngle > 150f) {
+            baselineShoulderY = blend(baselineShoulderY ?: shoulderY, shoulderY, 0.1f)
+        }
+        val shoulderDrop = shoulderY - (baselineShoulderY ?: shoulderY)
+
+        val motionDetected = elbowAngle < 162f || shoulderDrop > MIN_SHOULDER_DROP_FOR_ACTIVE
         if (motionDetected) {
             active = true
             lastMotionMs = nowMs
@@ -34,8 +44,7 @@ class PikePushUpActivityDetector(
         return active
     }
 
-    private fun isPikePosture(frame: PoseFrame): Boolean {
-        val shoulderY = frame.averageY(PoseLandmark.LEFT_SHOULDER, PoseLandmark.RIGHT_SHOULDER) ?: return false
+    private fun isPikePosture(frame: PoseFrame, shoulderY: Float): Boolean {
         val hipY = frame.averageY(PoseLandmark.LEFT_HIP, PoseLandmark.RIGHT_HIP) ?: return false
         val kneeAngle = featureExtractor.kneeAngleDegrees(frame)
 
@@ -51,9 +60,14 @@ class PikePushUpActivityDetector(
         return active
     }
 
+    private fun blend(current: Float, target: Float, weight: Float): Float {
+        return (current * (1f - weight)) + (target * weight)
+    }
+
     companion object {
         private const val IDLE_TIMEOUT_MS = 1400L
         private const val HIPS_ABOVE_SHOULDERS_MIN_DELTA = 0.05f
         private const val MIN_KNEE_ANGLE = 140f
+        private const val MIN_SHOULDER_DROP_FOR_ACTIVE = 0.009f
     }
 }
