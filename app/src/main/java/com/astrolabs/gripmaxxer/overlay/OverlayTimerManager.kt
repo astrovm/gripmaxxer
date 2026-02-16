@@ -9,23 +9,34 @@ import android.os.Looper
 import android.os.SystemClock
 import android.provider.Settings
 import android.view.Gravity
+import android.view.MotionEvent
+import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.widget.TextView
 import java.util.Locale
+import kotlin.math.abs
 
 class OverlayTimerManager(context: Context) {
 
     private val appContext = context.applicationContext
     private val windowManager = appContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private val handler = Handler(Looper.getMainLooper())
+    private val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val touchSlop = ViewConfiguration.get(appContext).scaledTouchSlop
 
     private var textView: TextView? = null
+    private var layoutParams: WindowManager.LayoutParams? = null
     private var isAdded = false
     private var isMonitoring = false
     private var isRunning = false
     private var sessionReps = 0
     private var frozenElapsedMs = 0L
     private var startElapsedMs = 0L
+    private var dragStartRawX = 0f
+    private var dragStartRawY = 0f
+    private var dragStartWindowX = 0
+    private var dragStartWindowY = 0
+    private var dragging = false
 
     private val updateRunnable = object : Runnable {
         override fun run() {
@@ -102,6 +113,7 @@ class OverlayTimerManager(context: Context) {
                 runCatching { windowManager.removeView(textView) }
                 isAdded = false
             }
+            layoutParams = null
             textView = null
         }
     }
@@ -115,6 +127,7 @@ class OverlayTimerManager(context: Context) {
             setBackgroundColor(Color.TRANSPARENT)
             gravity = Gravity.CENTER
             setShadowLayer(8f, 0f, 0f, Color.BLACK)
+            setOnTouchListener { _, event -> onOverlayTouch(event) }
         }
     }
 
@@ -126,12 +139,14 @@ class OverlayTimerManager(context: Context) {
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT,
         ).apply {
-            gravity = Gravity.CENTER
+            gravity = Gravity.TOP or Gravity.START
+            x = prefs.getInt(KEY_OVERLAY_X, DEFAULT_OVERLAY_X)
+            y = prefs.getInt(KEY_OVERLAY_Y, DEFAULT_OVERLAY_Y)
         }
+        layoutParams = params
         windowManager.addView(view, params)
         isAdded = true
     }
@@ -142,7 +157,57 @@ class OverlayTimerManager(context: Context) {
             runCatching { windowManager.removeView(textView) }
             isAdded = false
         }
+        layoutParams = null
     }
+
+    private fun onOverlayTouch(event: MotionEvent): Boolean {
+        val view = textView ?: return false
+        val params = layoutParams ?: return false
+
+        return when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                dragStartRawX = event.rawX
+                dragStartRawY = event.rawY
+                dragStartWindowX = params.x
+                dragStartWindowY = params.y
+                dragging = false
+                true
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                val dx = (event.rawX - dragStartRawX).toInt()
+                val dy = (event.rawY - dragStartRawY).toInt()
+                if (!dragging && (abs(dx) > touchSlop || abs(dy) > touchSlop)) {
+                    dragging = true
+                }
+                if (dragging) {
+                    val maxX = (screenWidthPx() - view.width).coerceAtLeast(0)
+                    val maxY = (screenHeightPx() - view.height).coerceAtLeast(0)
+                    params.x = (dragStartWindowX + dx).coerceIn(0, maxX)
+                    params.y = (dragStartWindowY + dy).coerceIn(0, maxY)
+                    runCatching { windowManager.updateViewLayout(view, params) }
+                }
+                true
+            }
+
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (dragging) {
+                    prefs.edit()
+                        .putInt(KEY_OVERLAY_X, params.x)
+                        .putInt(KEY_OVERLAY_Y, params.y)
+                        .apply()
+                }
+                dragging = false
+                true
+            }
+
+            else -> false
+        }
+    }
+
+    private fun screenWidthPx(): Int = appContext.resources.displayMetrics.widthPixels
+
+    private fun screenHeightPx(): Int = appContext.resources.displayMetrics.heightPixels
 
     private fun formatOverlayText(elapsedMs: Long, reps: Int): String {
         val elapsedSeconds = (elapsedMs / 1000f).coerceAtLeast(0f)
@@ -151,6 +216,11 @@ class OverlayTimerManager(context: Context) {
 
     companion object {
         private const val UPDATE_INTERVAL_MS = 100L
+        private const val PREFS_NAME = "gripmaxxer_overlay"
+        private const val KEY_OVERLAY_X = "overlay_x"
+        private const val KEY_OVERLAY_Y = "overlay_y"
+        private const val DEFAULT_OVERLAY_X = 24
+        private const val DEFAULT_OVERLAY_Y = 180
 
         fun isOverlayPermissionGranted(context: Context): Boolean {
             return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {

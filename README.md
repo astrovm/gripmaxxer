@@ -15,6 +15,8 @@ Made by **Astro Labs** (`astrolabs`).
   - While hanging: shows only seconds with 1 decimal (`12.3`) and updates every 100ms.
   - While not hanging: hides overlay and resets to `0.0`.
   - On rep event: temporarily shows only rep number (for 800ms), then returns to stopwatch value.
+  - Overlay can be dragged and dropped anywhere on screen; its position is remembered.
+- While this app screen is open and monitoring is active, the display is kept awake to avoid screen timeout mid-set.
 - Rep mode selector is manual (`Pull-up` / `Chin-up`) and only labels the rep counter.
 
 ## Why Notification Access Is Required
