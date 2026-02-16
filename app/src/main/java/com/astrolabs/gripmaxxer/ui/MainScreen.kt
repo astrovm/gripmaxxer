@@ -42,6 +42,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.astrolabs.gripmaxxer.reps.ExerciseMode
 import com.astrolabs.gripmaxxer.service.DebugPreviewFrame
 import java.util.Locale
 
@@ -103,7 +104,7 @@ fun MainScreen(
             color = MaterialTheme.colorScheme.onBackground
         )
         Text(
-            text = "Real-time hang monitoring with pull-up rep tracking.",
+            text = "Real-time monitoring with selectable exercise rep tracking.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -121,7 +122,7 @@ fun MainScreen(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "Detected mode: ${uiState.monitoring.mode.label}",
+                    text = "Selected mode: ${uiState.settings.selectedExerciseMode.label}",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -135,7 +136,7 @@ fun MainScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     MetricTile(
-                        label = "Hang Time",
+                        label = "Active Time",
                         value = formatDuration(uiState.monitoring.elapsedHangMs),
                         modifier = Modifier.weight(1f),
                     )
@@ -152,7 +153,7 @@ fun MainScreen(
                 }
                 HorizontalDivider()
                 StatusLine("Monitoring service", uiState.monitoring.serviceRunning)
-                StatusLine("Hang state", uiState.monitoring.hanging)
+                StatusLine("Exercise active", uiState.monitoring.hanging)
                 StatusLine("Pose detected", uiState.monitoring.posePresent)
                 StatusLine("Notifications enabled", notificationsEnabled)
             }
@@ -251,6 +252,20 @@ fun MainScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Text(
+                    text = "Camera framing: ${framingHintForMode(uiState.settings.selectedExerciseMode)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                ExerciseModeSelector(
+                    selectedMode = uiState.settings.selectedExerciseMode,
+                    onSelect = viewModel::setSelectedExerciseMode,
+                )
+                SettingToggle(
+                    label = "Enable media play/pause",
+                    checked = uiState.settings.mediaControlEnabled,
+                    onToggle = viewModel::setMediaControlEnabled,
+                )
                 SettingToggle(
                     label = "Show live camera preview",
                     checked = uiState.showCameraPreview,
@@ -282,6 +297,48 @@ fun MainScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExerciseModeSelector(
+    selectedMode: ExerciseMode,
+    onSelect: (ExerciseMode) -> Unit,
+) {
+    val modes = listOf(
+        ExerciseMode.PULL_UP,
+        ExerciseMode.PUSH_UP,
+        ExerciseMode.SQUAT,
+        ExerciseMode.BENCH_PRESS,
+        ExerciseMode.DIP,
+    )
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = "Exercise Mode",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        modes.forEach { mode ->
+            val selected = mode == selectedMode
+            if (selected) {
+                Button(
+                    onClick = { onSelect(mode) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(mode.label)
+                }
+            } else {
+                OutlinedButton(
+                    onClick = { onSelect(mode) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(mode.label)
                 }
             }
         }
@@ -402,4 +459,14 @@ private fun formatDuration(elapsedMs: Long): String {
     val minutes = totalSeconds / 60L
     val seconds = totalSeconds % 60L
     return String.format(Locale.US, "%d:%02d", minutes, seconds)
+}
+
+private fun framingHintForMode(mode: ExerciseMode): String {
+    return when (mode) {
+        ExerciseMode.PULL_UP -> "Front bar framing with shoulders and arms visible"
+        ExerciseMode.PUSH_UP -> "Front view with shoulders, elbows, and torso visible"
+        ExerciseMode.SQUAT -> "Front full-body framing (hips, knees, ankles visible)"
+        ExerciseMode.BENCH_PRESS -> "Side profile view focused on shoulder-elbow-wrist chain"
+        ExerciseMode.DIP -> "Front upper-body framing with shoulders, elbows, wrists visible"
+    }
 }

@@ -23,15 +23,24 @@ import com.astrolabs.gripmaxxer.camera.PoseFrameAnalyzer
 import com.astrolabs.gripmaxxer.datastore.AppSettings
 import com.astrolabs.gripmaxxer.datastore.SettingsRepository
 import com.astrolabs.gripmaxxer.hang.HangDetectionConfig
-import com.astrolabs.gripmaxxer.hang.HangDetector
 import com.astrolabs.gripmaxxer.media.MediaControlManager
 import com.astrolabs.gripmaxxer.overlay.OverlayTimerManager
 import com.astrolabs.gripmaxxer.pose.PoseDetectorWrapper
 import com.astrolabs.gripmaxxer.pose.PoseFeatureExtractor
 import com.astrolabs.gripmaxxer.pose.PoseFrame
+import com.astrolabs.gripmaxxer.reps.BenchPressActivityDetector
+import com.astrolabs.gripmaxxer.reps.BenchPressRepDetector
+import com.astrolabs.gripmaxxer.reps.DipActivityDetector
+import com.astrolabs.gripmaxxer.reps.DipRepDetector
 import com.astrolabs.gripmaxxer.reps.ExerciseMode
-import com.astrolabs.gripmaxxer.reps.RepCounter
+import com.astrolabs.gripmaxxer.reps.PullUpActivityDetector
+import com.astrolabs.gripmaxxer.reps.PullUpRepDetector
+import com.astrolabs.gripmaxxer.reps.PushUpActivityDetector
+import com.astrolabs.gripmaxxer.reps.PushUpRepDetector
 import com.astrolabs.gripmaxxer.reps.RepCounterConfig
+import com.astrolabs.gripmaxxer.reps.RepEngine
+import com.astrolabs.gripmaxxer.reps.SquatActivityDetector
+import com.astrolabs.gripmaxxer.reps.SquatRepDetector
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -65,13 +74,39 @@ class HangCamService : LifecycleService() {
     private var overlayTimerManager: OverlayTimerManager? = null
 
     private val featureExtractor = PoseFeatureExtractor()
-    private val hangDetector = HangDetector()
-    private val repCounter = RepCounter(featureExtractor)
+    private val pullUpActivityDetector = PullUpActivityDetector()
+    private val pushUpActivityDetector = PushUpActivityDetector(featureExtractor)
+    private val squatActivityDetector = SquatActivityDetector(featureExtractor)
+    private val benchPressActivityDetector = BenchPressActivityDetector(featureExtractor)
+    private val dipActivityDetector = DipActivityDetector(featureExtractor)
+    private val pullUpRepDetector = PullUpRepDetector(featureExtractor)
+    private val pushUpRepDetector = PushUpRepDetector(featureExtractor)
+    private val squatRepDetector = SquatRepDetector(featureExtractor)
+    private val benchPressRepDetector = BenchPressRepDetector(featureExtractor)
+    private val dipRepDetector = DipRepDetector(featureExtractor)
+    private val repEngine = RepEngine(
+        detectors = mapOf(
+            ExerciseMode.PULL_UP to pullUpRepDetector,
+            ExerciseMode.PUSH_UP to pushUpRepDetector,
+            ExerciseMode.SQUAT to squatRepDetector,
+            ExerciseMode.BENCH_PRESS to benchPressRepDetector,
+            ExerciseMode.DIP to dipRepDetector,
+        ),
+        initialMode = ExerciseMode.PULL_UP,
+    )
+    private val activityDetectors = mapOf(
+        ExerciseMode.PULL_UP to pullUpActivityDetector,
+        ExerciseMode.PUSH_UP to pushUpActivityDetector,
+        ExerciseMode.SQUAT to squatActivityDetector,
+        ExerciseMode.BENCH_PRESS to benchPressActivityDetector,
+        ExerciseMode.DIP to dipActivityDetector,
+    )
 
     @Volatile
     private var running = false
-    private var currentMode = ExerciseMode.UNKNOWN
+    private var currentMode = ExerciseMode.PULL_UP
     private var currentSettings = AppSettings()
+    private var mediaControlEnabled = true
     private var currentHangState = false
     private var currentReps = 0
     private var currentSessionElapsedMs = 0L
@@ -120,15 +155,16 @@ class HangCamService : LifecycleService() {
         running = true
         currentHangState = false
         currentReps = 0
-        currentMode = ExerciseMode.UNKNOWN
+        currentMode = currentSettings.selectedExerciseMode
+        mediaControlEnabled = currentSettings.mediaControlEnabled
         hangStartRealtimeMs = 0L
         currentSessionElapsedMs = 0L
         latestFps = 0
         rawFramesSinceTick.set(0)
         lastFrameRealtimeMs.set(0L)
         lastPosePresent = false
-        repCounter.reset()
-        hangDetector.reset()
+        activityDetectors.values.forEach { it.reset() }
+        repEngine.setMode(currentMode, resetCurrent = true)
         updateOverlayVisibility()
 
         MonitoringStateStore.update {
@@ -148,13 +184,13 @@ class HangCamService : LifecycleService() {
         settingsJob = serviceScope.launch {
             settingsRepository.settingsFlow.collect { settings ->
                 currentSettings = settings
-                hangDetector.updateConfig(
+                pullUpActivityDetector.updateConfig(
                     HangDetectionConfig(
                         wristShoulderMargin = settings.wristShoulderMargin.coerceAtLeast(MIN_WRIST_SHOULDER_MARGIN),
                         missingPoseTimeoutMs = settings.missingPoseTimeoutMs,
                     )
                 )
-                repCounter.updateConfig(
+                pullUpRepDetector.updateConfig(
                     RepCounterConfig(
                         elbowUpAngle = settings.elbowUpAngle,
                         elbowDownAngle = settings.elbowDownAngle,
@@ -165,6 +201,15 @@ class HangCamService : LifecycleService() {
                     )
                 )
                 poseDetectorWrapper?.setAccurateMode(settings.poseModeAccurate)
+                frameMutex.withLock {
+                    val previousMode = currentMode
+                    currentMode = settings.selectedExerciseMode
+                    mediaControlEnabled = settings.mediaControlEnabled
+                    repEngine.setMode(currentMode, resetCurrent = previousMode != currentMode)
+                    if (previousMode != currentMode) {
+                        handleModeChangeLocked()
+                    }
+                }
                 updateOverlayVisibility()
             }
         }
@@ -242,13 +287,15 @@ class HangCamService : LifecycleService() {
         running = false
         currentHangState = false
         currentReps = 0
-        currentMode = ExerciseMode.UNKNOWN
+        currentMode = currentSettings.selectedExerciseMode
         hangStartRealtimeMs = 0L
         currentSessionElapsedMs = 0L
         latestFps = 0
         rawFramesSinceTick.set(0)
         lastFrameRealtimeMs.set(0L)
         lastPosePresent = false
+        activityDetectors.values.forEach { it.reset() }
+        repEngine.resetCurrent()
 
         settingsJob?.cancel()
         settingsJob = null
@@ -285,18 +332,20 @@ class HangCamService : LifecycleService() {
             if (!running) return
             val nowMs = System.currentTimeMillis()
             lastPosePresent = frame.posePresent
-            updateDetectedMode(frame)
+            val activityDetector = activityDetectors[currentMode] ?: pullUpActivityDetector
+            val nextActive = activityDetector.process(frame = frame, nowMs = nowMs)
 
-            val hangResult = hangDetector.process(frame, nowMs)
-            if (hangResult.transitioned) {
-                if (hangResult.isHanging) {
+            if (nextActive != currentHangState) {
+                if (nextActive) {
                     currentHangState = true
                     currentReps = 0
                     currentSessionElapsedMs = 0L
-                    repCounter.reset()
+                    repEngine.resetCurrent()
                     hangStartRealtimeMs = SystemClock.elapsedRealtime()
                     overlayTimerManager?.onHangStateChanged(true)
-                    mediaControlManager.play()
+                    if (mediaControlEnabled) {
+                        mediaControlManager.play()
+                    }
                 } else {
                     currentHangState = false
                     if (hangStartRealtimeMs > 0L) {
@@ -304,13 +353,15 @@ class HangCamService : LifecycleService() {
                     }
                     hangStartRealtimeMs = 0L
                     overlayTimerManager?.onHangStateChanged(false)
-                    mediaControlManager.pause()
+                    if (mediaControlEnabled) {
+                        mediaControlManager.pause()
+                    }
                 }
             }
 
-            val repResult = repCounter.process(
+            val repResult = repEngine.process(
                 frame = frame,
-                hanging = currentHangState,
+                active = currentHangState,
                 nowMs = nowMs,
             )
             currentReps = repResult.reps
@@ -321,8 +372,19 @@ class HangCamService : LifecycleService() {
         }
     }
 
-    private fun updateDetectedMode(frame: PoseFrame) {
-        currentMode = featureExtractor.inferExerciseMode(frame)
+    private suspend fun handleModeChangeLocked() {
+        activityDetectors.values.forEach { it.reset() }
+        repEngine.resetCurrent()
+        currentHangState = false
+        currentReps = 0
+        currentSessionElapsedMs = 0L
+        hangStartRealtimeMs = 0L
+        overlayTimerManager?.onHangStateChanged(false)
+        overlayTimerManager?.onRepCountChanged(0)
+        if (mediaControlEnabled) {
+            mediaControlManager.pause()
+        }
+        publishStateAndNotification()
     }
 
     private fun startTicker() {
@@ -366,7 +428,7 @@ class HangCamService : LifecycleService() {
         NotificationManagerCompat.from(this).notify(
             NOTIFICATION_ID,
             buildNotification(
-                text = "${if (currentHangState) "HANGING" else "NOT HANGING"} | Reps: $currentReps | ${formatSeconds(elapsedMs)}s | Cam:${latestFps}fps ${if (lastPosePresent) "pose" else "no-pose"}"
+                text = "${if (currentHangState) "ACTIVE" else "IDLE"} | Reps: $currentReps | ${formatSeconds(elapsedMs)}s | Cam:${latestFps}fps ${if (lastPosePresent) "pose" else "no-pose"} | ${currentMode.label}"
             )
         )
     }

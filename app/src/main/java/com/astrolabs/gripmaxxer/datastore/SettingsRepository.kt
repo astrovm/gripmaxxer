@@ -6,7 +6,9 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.astrolabs.gripmaxxer.reps.ExerciseMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -16,6 +18,8 @@ class SettingsRepository(private val context: Context) {
 
     private object Keys {
         val overlayEnabled = booleanPreferencesKey("overlayEnabled")
+        val mediaControlEnabled = booleanPreferencesKey("mediaControlEnabled")
+        val selectedExerciseMode = stringPreferencesKey("selectedExerciseMode")
         val poseModeAccurate = booleanPreferencesKey("poseModeAccurate")
         val wristShoulderMargin = floatPreferencesKey("wristShoulderMargin")
         val missingPoseTimeoutMs = longPreferencesKey("missingPoseTimeoutMs")
@@ -34,6 +38,8 @@ class SettingsRepository(private val context: Context) {
     private fun Preferences.toAppSettings(): AppSettings {
         return AppSettings(
             overlayEnabled = this[Keys.overlayEnabled] ?: true,
+            mediaControlEnabled = this[Keys.mediaControlEnabled] ?: true,
+            selectedExerciseMode = parseExerciseMode(this[Keys.selectedExerciseMode]),
             poseModeAccurate = this[Keys.poseModeAccurate] ?: false,
             wristShoulderMargin = this[Keys.wristShoulderMargin] ?: 0.08f,
             missingPoseTimeoutMs = this[Keys.missingPoseTimeoutMs] ?: 300L,
@@ -47,6 +53,8 @@ class SettingsRepository(private val context: Context) {
     }
 
     suspend fun setOverlayEnabled(value: Boolean) = editBool(Keys.overlayEnabled, value)
+    suspend fun setMediaControlEnabled(value: Boolean) = editBool(Keys.mediaControlEnabled, value)
+    suspend fun setSelectedExerciseMode(value: ExerciseMode) = editString(Keys.selectedExerciseMode, value.name)
     suspend fun setPoseModeAccurate(value: Boolean) = editBool(Keys.poseModeAccurate, value)
     suspend fun setWristShoulderMargin(value: Float) = editFloat(Keys.wristShoulderMargin, value)
     suspend fun setMissingPoseTimeoutMs(value: Long) = editLong(Keys.missingPoseTimeoutMs, value)
@@ -67,5 +75,15 @@ class SettingsRepository(private val context: Context) {
 
     private suspend fun editLong(key: Preferences.Key<Long>, value: Long) {
         context.gripDataStore.edit { it[key] = value }
+    }
+
+    private suspend fun editString(key: Preferences.Key<String>, value: String) {
+        context.gripDataStore.edit { it[key] = value }
+    }
+
+    private fun parseExerciseMode(raw: String?): ExerciseMode {
+        if (raw.isNullOrBlank()) return ExerciseMode.PULL_UP
+        return runCatching { ExerciseMode.valueOf(raw) }
+            .getOrElse { ExerciseMode.PULL_UP }
     }
 }

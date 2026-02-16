@@ -1,8 +1,13 @@
 package com.astrolabs.gripmaxxer.pose
 
+import com.astrolabs.gripmaxxer.reps.ExerciseMode
 import com.google.mlkit.vision.pose.Pose
 import com.google.mlkit.vision.pose.PoseLandmark
-import com.astrolabs.gripmaxxer.reps.ExerciseMode
+
+enum class BodySide {
+    LEFT,
+    RIGHT,
+}
 
 class PoseFeatureExtractor {
 
@@ -16,6 +21,12 @@ class PoseFeatureExtractor {
         PoseLandmark.RIGHT_ELBOW,
         PoseLandmark.LEFT_WRIST,
         PoseLandmark.RIGHT_WRIST,
+        PoseLandmark.LEFT_HIP,
+        PoseLandmark.RIGHT_HIP,
+        PoseLandmark.LEFT_KNEE,
+        PoseLandmark.RIGHT_KNEE,
+        PoseLandmark.LEFT_ANKLE,
+        PoseLandmark.RIGHT_ANKLE,
     )
 
     fun toPoseFrame(
@@ -47,18 +58,52 @@ class PoseFeatureExtractor {
     }
 
     fun elbowAngleDegrees(frame: PoseFrame): Float? {
-        val left = computeAngle(frame, PoseLandmark.LEFT_SHOULDER, PoseLandmark.LEFT_ELBOW, PoseLandmark.LEFT_WRIST)
-        val right = computeAngle(frame, PoseLandmark.RIGHT_SHOULDER, PoseLandmark.RIGHT_ELBOW, PoseLandmark.RIGHT_WRIST)
-        return when {
-            left != null && right != null -> (left + right) / 2f
-            left != null -> left
-            right != null -> right
-            else -> null
+        return average(
+            elbowAngleDegrees(frame, BodySide.LEFT),
+            elbowAngleDegrees(frame, BodySide.RIGHT),
+        )
+    }
+
+    fun elbowAngleDegrees(frame: PoseFrame, side: BodySide): Float? {
+        val (shoulder, elbow, wrist) = when (side) {
+            BodySide.LEFT -> Triple(PoseLandmark.LEFT_SHOULDER, PoseLandmark.LEFT_ELBOW, PoseLandmark.LEFT_WRIST)
+            BodySide.RIGHT -> Triple(PoseLandmark.RIGHT_SHOULDER, PoseLandmark.RIGHT_ELBOW, PoseLandmark.RIGHT_WRIST)
         }
+        return computeAngle(frame, shoulder, elbow, wrist)
+    }
+
+    fun kneeAngleDegrees(frame: PoseFrame): Float? {
+        return average(
+            kneeAngleDegrees(frame, BodySide.LEFT),
+            kneeAngleDegrees(frame, BodySide.RIGHT),
+        )
+    }
+
+    fun kneeAngleDegrees(frame: PoseFrame, side: BodySide): Float? {
+        val (hip, knee, ankle) = when (side) {
+            BodySide.LEFT -> Triple(PoseLandmark.LEFT_HIP, PoseLandmark.LEFT_KNEE, PoseLandmark.LEFT_ANKLE)
+            BodySide.RIGHT -> Triple(PoseLandmark.RIGHT_HIP, PoseLandmark.RIGHT_KNEE, PoseLandmark.RIGHT_ANKLE)
+        }
+        return computeAngle(frame, hip, knee, ankle)
+    }
+
+    fun hipAngleDegrees(frame: PoseFrame): Float? {
+        return average(
+            hipAngleDegrees(frame, BodySide.LEFT),
+            hipAngleDegrees(frame, BodySide.RIGHT),
+        )
+    }
+
+    fun hipAngleDegrees(frame: PoseFrame, side: BodySide): Float? {
+        val (shoulder, hip, knee) = when (side) {
+            BodySide.LEFT -> Triple(PoseLandmark.LEFT_SHOULDER, PoseLandmark.LEFT_HIP, PoseLandmark.LEFT_KNEE)
+            BodySide.RIGHT -> Triple(PoseLandmark.RIGHT_SHOULDER, PoseLandmark.RIGHT_HIP, PoseLandmark.RIGHT_KNEE)
+        }
+        return computeAngle(frame, shoulder, hip, knee)
     }
 
     fun inferExerciseMode(frame: PoseFrame): ExerciseMode {
-        return if (frame.posePresent) ExerciseMode.PULL_UP else ExerciseMode.UNKNOWN
+        return ExerciseMode.PULL_UP
     }
 
     private fun computeAngle(frame: PoseFrame, shoulderType: Int, elbowType: Int, wristType: Int): Float? {
@@ -78,5 +123,14 @@ class PoseFeatureExtractor {
 
         val cosine = (dot / (mag1 * mag2)).coerceIn(-1.0, 1.0)
         return Math.toDegrees(kotlin.math.acos(cosine)).toFloat()
+    }
+
+    private fun average(a: Float?, b: Float?): Float? {
+        return when {
+            a != null && b != null -> (a + b) / 2f
+            a != null -> a
+            b != null -> b
+            else -> null
+        }
     }
 }

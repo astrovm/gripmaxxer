@@ -9,6 +9,7 @@ import com.astrolabs.gripmaxxer.datastore.AppSettings
 import com.astrolabs.gripmaxxer.datastore.SettingsRepository
 import com.astrolabs.gripmaxxer.media.MediaControlManager
 import com.astrolabs.gripmaxxer.overlay.OverlayTimerManager
+import com.astrolabs.gripmaxxer.reps.ExerciseMode
 import com.astrolabs.gripmaxxer.service.DebugPreviewFrame
 import com.astrolabs.gripmaxxer.service.DebugPreviewStore
 import com.astrolabs.gripmaxxer.service.HangCamService
@@ -90,6 +91,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setOverlayEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsRepository.setOverlayEnabled(enabled)
+        }
+    }
+
+    fun setMediaControlEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setMediaControlEnabled(enabled)
+        }
+    }
+
+    fun setSelectedExerciseMode(mode: ExerciseMode) {
+        viewModelScope.launch {
+            settingsRepository.setSelectedExerciseMode(mode)
         }
     }
 

@@ -13,7 +13,7 @@ data class MonitoringSnapshot(
     val cameraFps: Int = 0,
     val posePresent: Boolean = false,
     val lastFrameAgeMs: Long = Long.MAX_VALUE,
-    val mode: ExerciseMode = ExerciseMode.UNKNOWN,
+    val mode: ExerciseMode = ExerciseMode.PULL_UP,
     val hasMediaController: Boolean = false,
     val mediaControllerPackage: String? = null,
 )

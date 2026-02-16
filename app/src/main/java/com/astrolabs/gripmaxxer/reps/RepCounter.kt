@@ -3,11 +3,6 @@ package com.astrolabs.gripmaxxer.reps
 import com.astrolabs.gripmaxxer.pose.PoseFeatureExtractor
 import com.astrolabs.gripmaxxer.pose.PoseFrame
 
-enum class ExerciseMode(val label: String) {
-    UNKNOWN("Detecting"),
-    PULL_UP("Pull-up"),
-}
-
 data class RepCounterConfig(
     val elbowUpAngle: Float = 110f,
     val elbowDownAngle: Float = 155f,
