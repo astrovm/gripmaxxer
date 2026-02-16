@@ -6,10 +6,11 @@ import com.google.mlkit.vision.pose.PoseLandmark
 
 data class HangDetectionConfig(
     val wristShoulderMargin: Float = 0.06f,
+    val wristShoulderReleaseMargin: Float = 0.05f,
     val missingPoseTimeoutMs: Long = 300L,
     val partialPoseHoldMs: Long = 3000L,
-    val shoulderOnlyHoldMs: Long = 2200L,
-    val occlusionHoldMs: Long = 2200L,
+    val shoulderOnlyHoldMs: Long = 3500L,
+    val occlusionHoldMs: Long = 3500L,
     val stableSwitchMs: Long = 500L,
     val minToggleIntervalMs: Long = 1500L,
 )
@@ -79,8 +80,14 @@ class HangDetector(
         val canComputeHangNow = shoulderY != null && wristY != null && hasReliableUpperBodyPose(frame)
 
         if (canComputeHangNow) {
-            val computedHanging = wristY < (shoulderY - config.wristShoulderMargin)
-            val weakExitEvidence = isHanging && !computedHanging && !hasBothWrists(frame)
+            val shoulderToWristDelta = shoulderY - wristY
+            val computedHanging = when {
+                shoulderToWristDelta >= config.wristShoulderMargin -> true
+                shoulderToWristDelta <= -config.wristShoulderReleaseMargin -> false
+                else -> isHanging
+            }
+            val weakExitEvidence = isHanging && !computedHanging &&
+                (!hasBothWrists(frame) || !hasAnyElbow(frame))
             if (!weakExitEvidence) {
                 missingSinceMs = null
                 partialSinceMs = null
@@ -94,6 +101,7 @@ class HangDetector(
             if (occlusionSinceMs == null) occlusionSinceMs = nowMs
             val occlusionDuration = nowMs - (occlusionSinceMs ?: nowMs)
             if (occlusionDuration <= config.occlusionHoldMs) {
+                missingSinceMs = null
                 return true
             }
         } else {
@@ -106,6 +114,7 @@ class HangDetector(
             shoulderOnlySinceMs = null
             val partialDuration = nowMs - (partialSinceMs ?: nowMs)
             if (partialDuration <= config.partialPoseHoldMs) {
+                missingSinceMs = null
                 return true
             }
         } else {
@@ -114,6 +123,7 @@ class HangDetector(
                 if (shoulderOnlySinceMs == null) shoulderOnlySinceMs = nowMs
                 val shoulderOnlyDuration = nowMs - (shoulderOnlySinceMs ?: nowMs)
                 if (shoulderOnlyDuration <= config.shoulderOnlyHoldMs) {
+                    missingSinceMs = null
                     return true
                 }
             } else {
@@ -197,6 +207,11 @@ class HangDetector(
     private fun hasBothWrists(frame: PoseFrame): Boolean {
         return frame.landmark(PoseLandmark.LEFT_WRIST) != null &&
             frame.landmark(PoseLandmark.RIGHT_WRIST) != null
+    }
+
+    private fun hasAnyElbow(frame: PoseFrame): Boolean {
+        return frame.landmark(PoseLandmark.LEFT_ELBOW) != null ||
+            frame.landmark(PoseLandmark.RIGHT_ELBOW) != null
     }
 
     private fun isArmReliable(

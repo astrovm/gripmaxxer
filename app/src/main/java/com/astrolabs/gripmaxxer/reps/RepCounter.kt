@@ -67,7 +67,7 @@ class RepCounter(
         hanging: Boolean,
         nowMs: Long = System.currentTimeMillis(),
     ): RepCounterResult {
-        if (!hanging || !frame.posePresent) {
+        if (!hanging) {
             return RepCounterResult(reps = reps, repEvent = false)
         }
 
@@ -80,9 +80,13 @@ class RepCounter(
             com.google.mlkit.vision.pose.PoseLandmark.RIGHT_SHOULDER,
         )
         val noseY = frame.noseOrMouthY()
-        val elbowAngle = featureExtractor.elbowAngleDegrees(frame) ?: return RepCounterResult(reps = reps, repEvent = false)
+        val elbowAngle = featureExtractor.elbowAngleDegrees(frame)
+        val smoothElbow = if (elbowAngle != null) {
+            pushAndAverage(elbowWindow, elbowAngle)
+        } else {
+            elbowWindow.lastOrNull() ?: return RepCounterResult(reps = reps, repEvent = false)
+        }
 
-        val smoothElbow = pushAndAverage(elbowWindow, elbowAngle)
         val smoothWrist = wristY?.let { pushAndAverage(wristWindow, it) }
         val smoothShoulder = shoulderY?.let { pushAndAverage(shoulderWindow, it) }
         val smoothNose = if (noseY != null) {
