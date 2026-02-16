@@ -24,6 +24,7 @@ Made by **Astro Labs** (`astrolabs`).
   - Overlay can be dragged and dropped anywhere on screen; its position is remembered.
 - While this app screen is open and monitoring is active, the display is kept awake to avoid screen timeout mid-set.
 - Exercise mode is selected manually in the app and persisted.
+- A History tab shows max reps, max active time, and recent completed sessions.
 
 ## Why Notification Access Is Required
 Android does not allow unrestricted access to active media sessions without privileged permissions.

@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.astrolabs.gripmaxxer.datastore.AppSettings
 import com.astrolabs.gripmaxxer.datastore.SettingsRepository
+import com.astrolabs.gripmaxxer.datastore.WorkoutHistory
 import com.astrolabs.gripmaxxer.media.MediaControlManager
 import com.astrolabs.gripmaxxer.overlay.OverlayTimerManager
 import com.astrolabs.gripmaxxer.reps.ExerciseMode
@@ -31,6 +32,7 @@ data class PermissionSnapshot(
 
 data class MainUiState(
     val settings: AppSettings = AppSettings(),
+    val history: WorkoutHistory = WorkoutHistory(),
     val permissions: PermissionSnapshot = PermissionSnapshot(),
     val monitoring: MonitoringSnapshot = MonitoringSnapshot(),
     val showCameraPreview: Boolean = true,
@@ -51,12 +53,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val baseUiState = combine(
         settingsRepository.settingsFlow,
+        settingsRepository.historyFlow,
         permissionsState,
         MonitoringStateStore.snapshot,
         showCameraPreviewState,
-    ) { settings, permissions, monitoring, showCameraPreview ->
+    ) { settings, history, permissions, monitoring, showCameraPreview ->
         MainUiState(
             settings = settings,
+            history = history,
             permissions = permissions,
             monitoring = monitoring,
             showCameraPreview = showCameraPreview,

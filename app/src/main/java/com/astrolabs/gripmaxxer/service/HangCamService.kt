@@ -22,6 +22,7 @@ import com.astrolabs.gripmaxxer.camera.FrontCameraManager
 import com.astrolabs.gripmaxxer.camera.PoseFrameAnalyzer
 import com.astrolabs.gripmaxxer.datastore.AppSettings
 import com.astrolabs.gripmaxxer.datastore.SettingsRepository
+import com.astrolabs.gripmaxxer.datastore.WorkoutSession
 import com.astrolabs.gripmaxxer.hang.HangDetectionConfig
 import com.astrolabs.gripmaxxer.media.MediaControlManager
 import com.astrolabs.gripmaxxer.overlay.OverlayTimerManager
@@ -351,6 +352,7 @@ class HangCamService : LifecycleService() {
                     if (hangStartRealtimeMs > 0L) {
                         currentSessionElapsedMs = SystemClock.elapsedRealtime() - hangStartRealtimeMs
                     }
+                    recordSessionIfMeaningful(nowMs)
                     hangStartRealtimeMs = 0L
                     overlayTimerManager?.onHangStateChanged(false)
                     if (mediaControlEnabled) {
@@ -373,6 +375,10 @@ class HangCamService : LifecycleService() {
     }
 
     private suspend fun handleModeChangeLocked() {
+        if (currentHangState && hangStartRealtimeMs > 0L) {
+            currentSessionElapsedMs = SystemClock.elapsedRealtime() - hangStartRealtimeMs
+        }
+        recordSessionIfMeaningful(System.currentTimeMillis())
         activityDetectors.values.forEach { it.reset() }
         repEngine.resetCurrent()
         currentHangState = false
@@ -385,6 +391,19 @@ class HangCamService : LifecycleService() {
             mediaControlManager.pause()
         }
         publishStateAndNotification()
+    }
+
+    private suspend fun recordSessionIfMeaningful(completedAtMs: Long) {
+        val hasAnySignal = currentReps > 0 || currentSessionElapsedMs >= MIN_SESSION_MS
+        if (!hasAnySignal) return
+        settingsRepository.recordWorkoutSession(
+            WorkoutSession(
+                completedAtMs = completedAtMs,
+                mode = currentMode,
+                reps = currentReps,
+                activeMs = currentSessionElapsedMs,
+            )
+        )
     }
 
     private fun startTicker() {
@@ -512,6 +531,7 @@ class HangCamService : LifecycleService() {
         const val ACTION_START = "com.astrolabs.gripmaxxer.action.START"
         const val ACTION_STOP = "com.astrolabs.gripmaxxer.action.STOP"
         private const val MIN_WRIST_SHOULDER_MARGIN = 0.08f
+        private const val MIN_SESSION_MS = 400L
 
         private const val NOTIFICATION_ID = 1001
         private const val NOTIFICATION_CHANNEL_ID = "hang_monitoring"

@@ -26,11 +26,16 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -42,8 +47,12 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.astrolabs.gripmaxxer.datastore.WorkoutHistory
+import com.astrolabs.gripmaxxer.datastore.WorkoutSession
 import com.astrolabs.gripmaxxer.reps.ExerciseMode
 import com.astrolabs.gripmaxxer.service.DebugPreviewFrame
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 @Composable
@@ -54,6 +63,7 @@ fun MainScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val view = LocalView.current
+    var selectedTab by rememberSaveable { mutableStateOf(MainTab.LIVE.name) }
 
     DisposableEffect(uiState.monitoring.serviceRunning, view) {
         view.keepScreenOn = uiState.monitoring.serviceRunning
@@ -109,7 +119,13 @@ fun MainScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        MainTabSelector(
+            selectedTab = selectedTab,
+            onTabSelected = { selectedTab = it },
+        )
+
+        if (selectedTab == MainTab.LIVE.name) {
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -274,32 +290,129 @@ fun MainScreen(
             }
         }
 
-        if (uiState.showCameraPreview) {
-            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Text(
-                        text = "Live Camera Preview",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    val frame = uiState.cameraPreviewFrame
-                    if (frame != null) {
-                        CameraPreviewWithTracking(frame = frame)
-                    } else {
+            if (uiState.showCameraPreview) {
+                ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
                         Text(
-                            text = "Waiting for camera frames. Start monitoring and keep this screen open.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = "Live Camera Preview",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
+                        val frame = uiState.cameraPreviewFrame
+                        if (frame != null) {
+                            CameraPreviewWithTracking(frame = frame)
+                        } else {
+                            Text(
+                                text = "Waiting for camera frames. Start monitoring and keep this screen open.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
+        } else {
+            HistoryTabContent(history = uiState.history)
         }
+    }
+}
+
+@Composable
+private fun MainTabSelector(
+    selectedTab: String,
+    onTabSelected: (String) -> Unit,
+) {
+    TabRow(selectedTabIndex = if (selectedTab == MainTab.LIVE.name) 0 else 1) {
+        Tab(
+            selected = selectedTab == MainTab.LIVE.name,
+            onClick = { onTabSelected(MainTab.LIVE.name) },
+            text = { Text("Live") },
+        )
+        Tab(
+            selected = selectedTab == MainTab.HISTORY.name,
+            onClick = { onTabSelected(MainTab.HISTORY.name) },
+            text = { Text("History") },
+        )
+    }
+}
+
+@Composable
+private fun HistoryTabContent(history: WorkoutHistory) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = "History",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                MetricTile(
+                    label = "Max Reps",
+                    value = history.maxReps.toString(),
+                    modifier = Modifier.weight(1f),
+                )
+                MetricTile(
+                    label = "Max Time",
+                    value = formatDuration(history.maxActiveMs),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            HorizontalDivider()
+            if (history.sessions.isEmpty()) {
+                Text(
+                    text = "No completed sessions yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                history.sessions.take(30).forEach { session ->
+                    SessionRow(session)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SessionRow(session: WorkoutSession) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = "${session.mode.label} • ${session.reps} reps",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = formatSessionTime(session.completedAtMs),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            text = formatDuration(session.activeMs),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
@@ -461,6 +574,11 @@ private fun formatDuration(elapsedMs: Long): String {
     return String.format(Locale.US, "%d:%02d", minutes, seconds)
 }
 
+private fun formatSessionTime(timestampMs: Long): String {
+    val formatter = SimpleDateFormat("MMM d, HH:mm", Locale.US)
+    return formatter.format(Date(timestampMs))
+}
+
 private fun framingHintForMode(mode: ExerciseMode): String {
     return when (mode) {
         ExerciseMode.PULL_UP -> "Front bar framing with shoulders and arms visible"
@@ -469,4 +587,9 @@ private fun framingHintForMode(mode: ExerciseMode): String {
         ExerciseMode.BENCH_PRESS -> "Side profile view focused on shoulder-elbow-wrist chain"
         ExerciseMode.DIP -> "Front upper-body framing with shoulders, elbows, wrists visible"
     }
+}
+
+private enum class MainTab {
+    LIVE,
+    HISTORY,
 }
