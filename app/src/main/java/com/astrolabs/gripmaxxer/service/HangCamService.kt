@@ -41,6 +41,8 @@ import com.astrolabs.gripmaxxer.reps.DeadHangActivityDetector
 import com.astrolabs.gripmaxxer.reps.HoldRepDetector
 import com.astrolabs.gripmaxxer.reps.HangingLegRaiseActivityDetector
 import com.astrolabs.gripmaxxer.reps.HangingLegRaiseRepDetector
+import com.astrolabs.gripmaxxer.reps.PistolSquatActivityDetector
+import com.astrolabs.gripmaxxer.reps.PistolSquatRepDetector
 import com.astrolabs.gripmaxxer.reps.PullUpActivityDetector
 import com.astrolabs.gripmaxxer.reps.PullUpRepDetector
 import com.astrolabs.gripmaxxer.reps.PushUpActivityDetector
@@ -88,11 +90,13 @@ class HangCamService : LifecycleService() {
     private val hangingLegRaiseActivityDetector = HangingLegRaiseActivityDetector()
     private val pushUpActivityDetector = PushUpActivityDetector(featureExtractor)
     private val squatActivityDetector = SquatActivityDetector(featureExtractor)
+    private val pistolSquatActivityDetector = PistolSquatActivityDetector(featureExtractor)
     private val benchPressActivityDetector = BenchPressActivityDetector(featureExtractor)
     private val dipActivityDetector = DipActivityDetector(featureExtractor)
     private val pullUpRepDetector = PullUpRepDetector(featureExtractor)
     private val pushUpRepDetector = PushUpRepDetector(featureExtractor)
     private val squatRepDetector = SquatRepDetector(featureExtractor)
+    private val pistolSquatRepDetector = PistolSquatRepDetector(featureExtractor)
     private val benchPressRepDetector = BenchPressRepDetector(featureExtractor)
     private val dipRepDetector = DipRepDetector(featureExtractor)
     private val deadHangRepDetector = HoldRepDetector()
@@ -102,11 +106,17 @@ class HangCamService : LifecycleService() {
         detectors = mapOf(
             ExerciseMode.PULL_UP to pullUpRepDetector,
             ExerciseMode.CHIN_UP to pullUpRepDetector,
+            ExerciseMode.ONE_ARM_PULL_UP to pullUpRepDetector,
+            ExerciseMode.ONE_ARM_CHIN_UP to pullUpRepDetector,
             ExerciseMode.HANGING_LEG_RAISE to hangingLegRaiseRepDetector,
             ExerciseMode.DEAD_HANG to deadHangRepDetector,
             ExerciseMode.ACTIVE_HANG to activeHangRepDetector,
+            ExerciseMode.ONE_ARM_DEAD_HANG to deadHangRepDetector,
+            ExerciseMode.ONE_ARM_ACTIVE_HANG to activeHangRepDetector,
             ExerciseMode.PUSH_UP to pushUpRepDetector,
+            ExerciseMode.ONE_ARM_PUSH_UP to pushUpRepDetector,
             ExerciseMode.SQUAT to squatRepDetector,
+            ExerciseMode.PISTOL_SQUAT to pistolSquatRepDetector,
             ExerciseMode.BENCH_PRESS to benchPressRepDetector,
             ExerciseMode.DIP to dipRepDetector,
         ),
@@ -115,11 +125,17 @@ class HangCamService : LifecycleService() {
     private val activityDetectors = mapOf(
         ExerciseMode.PULL_UP to pullUpActivityDetector,
         ExerciseMode.CHIN_UP to pullUpActivityDetector,
+        ExerciseMode.ONE_ARM_PULL_UP to pullUpActivityDetector,
+        ExerciseMode.ONE_ARM_CHIN_UP to pullUpActivityDetector,
         ExerciseMode.HANGING_LEG_RAISE to hangingLegRaiseActivityDetector,
         ExerciseMode.DEAD_HANG to deadHangActivityDetector,
         ExerciseMode.ACTIVE_HANG to activeHangActivityDetector,
+        ExerciseMode.ONE_ARM_DEAD_HANG to deadHangActivityDetector,
+        ExerciseMode.ONE_ARM_ACTIVE_HANG to activeHangActivityDetector,
         ExerciseMode.PUSH_UP to pushUpActivityDetector,
+        ExerciseMode.ONE_ARM_PUSH_UP to pushUpActivityDetector,
         ExerciseMode.SQUAT to squatActivityDetector,
+        ExerciseMode.PISTOL_SQUAT to pistolSquatActivityDetector,
         ExerciseMode.BENCH_PRESS to benchPressActivityDetector,
         ExerciseMode.DIP to dipActivityDetector,
     )

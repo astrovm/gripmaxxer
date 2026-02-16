@@ -56,11 +56,17 @@ data class CompletedWorkoutDetail(
 val CameraTrackableModes = listOf(
     ExerciseMode.DEAD_HANG,
     ExerciseMode.ACTIVE_HANG,
+    ExerciseMode.ONE_ARM_DEAD_HANG,
+    ExerciseMode.ONE_ARM_ACTIVE_HANG,
     ExerciseMode.PULL_UP,
     ExerciseMode.CHIN_UP,
+    ExerciseMode.ONE_ARM_PULL_UP,
+    ExerciseMode.ONE_ARM_CHIN_UP,
     ExerciseMode.HANGING_LEG_RAISE,
     ExerciseMode.PUSH_UP,
+    ExerciseMode.ONE_ARM_PUSH_UP,
     ExerciseMode.SQUAT,
+    ExerciseMode.PISTOL_SQUAT,
     ExerciseMode.BENCH_PRESS,
     ExerciseMode.DIP,
 )

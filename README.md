@@ -4,11 +4,17 @@ Gripmaxxer is an Android app (Kotlin + Compose) that uses the **front camera** a
 - Track exercise activity and reps for selectable modes:
   - Dead hang
   - Active hang
+  - One-arm dead hang
+  - One-arm active hang
   - Pull-up
   - Chin-up
+  - One-arm pull-up
+  - One-arm chin-up
   - Hanging leg raise
   - Push-up
+  - One-arm push-up
   - Squat
+  - Pistol squat
   - Bench press
   - Dips
 - Send **system-wide media play/pause** commands through active MediaSession controllers.
@@ -82,11 +88,17 @@ Some system screens or OEM-specific UIs may still hide overlays.
 - Mode framing tips for auto-track:
   - Dead hang: bar framing with straight elbows visible
   - Active hang: bar framing with bent elbows and upper body visible
+  - One-arm dead hang: keep support shoulder/elbow/wrist fully visible
+  - One-arm active hang: keep support shoulder/elbow/wrist fully visible
   - Pull-up: front bar framing with shoulders/arms visible
   - Chin-up: front bar framing with shoulders/arms visible
+  - One-arm pull-up: keep support-side arm and torso centered in frame
+  - One-arm chin-up: keep support-side arm and torso centered in frame
   - Hanging leg raise: front bar framing with shoulders/hips/knees visible
   - Push-up: front view with shoulders/elbows/torso visible
+  - One-arm push-up: side/front angle with support arm, shoulder, and hip visible
   - Squat: front full-body framing with hips/knees/ankles visible
+  - Pistol squat: full-body framing with support-side hip/knee/ankle visible
   - Bench press: side profile focused on shoulder-elbow-wrist
   - Dips: front upper-body framing with shoulders/elbows/wrists visible
 - FAST mode is lighter on battery/heat; ACCURATE mode is heavier but can improve robustness.
