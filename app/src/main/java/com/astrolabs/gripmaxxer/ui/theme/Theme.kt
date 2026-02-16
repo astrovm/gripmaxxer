@@ -1,63 +1,56 @@
 package com.astrolabs.gripmaxxer.ui.theme
 
 import android.app.Activity
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import com.astrolabs.gripmaxxer.datastore.ColorPalette
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Mint500,
-    secondary = Mint300,
-    tertiary = Mint500,
-    background = Iron950,
-    surface = Iron900,
-    surfaceVariant = Iron800,
-    error = Danger400,
+private fun createBlackAccentScheme(accent: Color) = darkColorScheme(
+    primary = accent,
+    onPrimary = Black,
+    secondary = accent,
+    onSecondary = Black,
+    tertiary = accent,
+    onTertiary = Black,
+    background = Black,
+    onBackground = White,
+    surface = SurfaceBlack,
+    onSurface = White,
+    surfaceVariant = SurfaceVariantBlack,
+    onSurfaceVariant = MutedWhite,
+    primaryContainer = SurfaceVariantBlack,
+    onPrimaryContainer = accent,
+    secondaryContainer = SurfaceVariantBlack,
+    onSecondaryContainer = accent,
+    error = DangerAccent,
+    onError = Black,
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = Mint500,
-    secondary = Mint300,
-    tertiary = Mint500,
-    background = Color(0xFFF4F7F9),
-    surface = Color(0xFFFFFFFF),
-    surfaceVariant = Color(0xFFE7EDF2),
-    error = Danger400,
-)
+private fun paletteScheme(palette: ColorPalette) = when (palette) {
+    ColorPalette.BLACK_WHITE -> createBlackAccentScheme(White)
+    ColorPalette.BLACK_PINK -> createBlackAccentScheme(PinkAccent)
+    ColorPalette.BLACK_BLUE -> createBlackAccentScheme(BlueAccent)
+    ColorPalette.BLACK_RED -> createBlackAccentScheme(RedAccent)
+}
 
 @Composable
 fun GripmaxxerTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = false,
+    palette: ColorPalette = ColorPalette.BLACK_WHITE,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
+    val colorScheme = paletteScheme(palette)
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.primary.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            window.statusBarColor = colorScheme.background.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
         }
     }
 

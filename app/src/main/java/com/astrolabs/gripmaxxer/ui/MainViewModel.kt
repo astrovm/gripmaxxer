@@ -7,6 +7,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.astrolabs.gripmaxxer.datastore.AppSettings
+import com.astrolabs.gripmaxxer.datastore.ColorPalette
 import com.astrolabs.gripmaxxer.datastore.GripmaxxerDatabase
 import com.astrolabs.gripmaxxer.datastore.SettingsRepository
 import com.astrolabs.gripmaxxer.media.MediaControlManager
@@ -225,6 +226,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setMediaControlEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsRepository.setMediaControlEnabled(enabled)
+        }
+    }
+
+    fun setColorPalette(palette: ColorPalette) {
+        viewModelScope.launch {
+            settingsRepository.setColorPalette(palette)
         }
     }
 

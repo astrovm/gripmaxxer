@@ -3,7 +3,6 @@ package com.astrolabs.gripmaxxer.ui
 import android.Manifest
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -65,8 +64,11 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import com.astrolabs.gripmaxxer.datastore.ColorPalette
 import com.astrolabs.gripmaxxer.reps.ExerciseMode
 import com.astrolabs.gripmaxxer.service.DebugPreviewFrame
 import com.astrolabs.gripmaxxer.workout.CameraTrackableModes
@@ -90,6 +92,7 @@ fun MainScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val view = LocalView.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val snackbarHostState = remember { SnackbarHostState() }
 
     DisposableEffect(uiState.monitoring.serviceRunning, view) {
@@ -99,16 +102,22 @@ fun MainScreen(
         }
     }
 
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshPermissionState()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { viewModel.refreshPermissionState() },
     )
-
-    val notificationsEnabled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        NotificationManagerCompat.from(context).areNotificationsEnabled()
-    } else {
-        true
-    }
 
     val openOverlaySettings: () -> Unit = {
         val intent = Intent(
@@ -195,18 +204,21 @@ fun MainScreen(
                         onSelectMode = viewModel::setSelectedExerciseMode,
                         onStart = { viewModel.startWorkout(uiState.settings.selectedExerciseMode) },
                         cameraGranted = uiState.permissions.cameraGranted,
+                        notificationAccessEnabled = uiState.permissions.notificationAccessEnabled,
+                        overlayPermissionGranted = uiState.permissions.overlayPermissionGranted,
+                        mediaControlEnabled = uiState.settings.mediaControlEnabled,
+                        overlayEnabled = uiState.settings.overlayEnabled,
                         onRequestCamera = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) },
+                        onOpenNotificationAccess = openNotificationAccessSettings,
+                        onOpenOverlaySettings = openOverlaySettings,
                     )
 
                     RootTab.PROFILE -> ProfileTab(
                         uiState = uiState,
-                        notificationsEnabled = notificationsEnabled,
                         onMediaToggle = viewModel::setMediaControlEnabled,
                         onOverlayToggle = viewModel::setOverlayEnabled,
                         onPreviewToggle = viewModel::setShowCameraPreview,
-                        onRequestCamera = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) },
-                        onOpenNotificationAccess = openNotificationAccessSettings,
-                        onOpenOverlaySettings = openOverlaySettings,
+                        onPaletteSelect = viewModel::setColorPalette,
                     )
                 }
             }
@@ -349,8 +361,18 @@ private fun WorkoutStartTab(
     onSelectMode: (ExerciseMode) -> Unit,
     onStart: () -> Unit,
     cameraGranted: Boolean,
+    notificationAccessEnabled: Boolean,
+    overlayPermissionGranted: Boolean,
+    mediaControlEnabled: Boolean,
+    overlayEnabled: Boolean,
     onRequestCamera: () -> Unit,
+    onOpenNotificationAccess: () -> Unit,
+    onOpenOverlaySettings: () -> Unit,
 ) {
+    val notificationAccessRequired = mediaControlEnabled && !notificationAccessEnabled
+    val overlayPermissionRequired = overlayEnabled && !overlayPermissionGranted
+    val canStart = cameraGranted && !notificationAccessRequired && !overlayPermissionRequired
+
     Text(
         text = "Workout",
         style = MaterialTheme.typography.headlineMedium,
@@ -404,10 +426,38 @@ private fun WorkoutStartTab(
                 }
             }
 
+            if (notificationAccessRequired || overlayPermissionRequired) {
+                Text(
+                    text = "Required for your enabled settings",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                if (notificationAccessRequired) {
+                    ChecklistLine("Notification access", false)
+                    OutlinedButton(
+                        onClick = onOpenNotificationAccess,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Open notification access")
+                    }
+                }
+
+                if (overlayPermissionRequired) {
+                    ChecklistLine("Overlay permission", false)
+                    OutlinedButton(
+                        onClick = onOpenOverlaySettings,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Open overlay settings")
+                    }
+                }
+            }
+
             Button(
                 onClick = onStart,
                 modifier = Modifier.fillMaxWidth(),
-                enabled = cameraGranted,
+                enabled = canStart,
             ) {
                 Text("Start Workout")
             }
@@ -669,13 +719,10 @@ private fun EditSetDialog(
 @Composable
 private fun ProfileTab(
     uiState: MainUiState,
-    notificationsEnabled: Boolean,
     onMediaToggle: (Boolean) -> Unit,
     onOverlayToggle: (Boolean) -> Unit,
     onPreviewToggle: (Boolean) -> Unit,
-    onRequestCamera: () -> Unit,
-    onOpenNotificationAccess: () -> Unit,
-    onOpenOverlaySettings: () -> Unit,
+    onPaletteSelect: (ColorPalette) -> Unit,
 ) {
     Text(
         text = "Profile",
@@ -710,30 +757,50 @@ private fun ProfileTab(
             SettingToggle("Enable media play/pause", uiState.settings.mediaControlEnabled, onMediaToggle)
             SettingToggle("Enable overlay", uiState.settings.overlayEnabled, onOverlayToggle)
             SettingToggle("Show camera preview", uiState.showCameraPreview, onPreviewToggle)
+            Text(
+                text = "Color palette",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            ColorPaletteSelector(
+                selectedPalette = uiState.settings.colorPalette,
+                onSelect = onPaletteSelect,
+            )
         }
     }
+}
 
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+@Composable
+private fun ColorPaletteSelector(
+    selectedPalette: ColorPalette,
+    onSelect: (ColorPalette) -> Unit,
+) {
+    ColorPalette.entries.chunked(2).forEach { rowPalettes ->
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("Permissions", style = MaterialTheme.typography.titleMedium)
-            ChecklistLine("Camera permission", uiState.permissions.cameraGranted)
-            if (!uiState.permissions.cameraGranted) {
-                OutlinedButton(onClick = onRequestCamera) { Text("Grant Camera") }
+            rowPalettes.forEach { palette ->
+                val selected = selectedPalette == palette
+                if (selected) {
+                    Button(
+                        onClick = { onSelect(palette) },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(palette.label)
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = { onSelect(palette) },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(palette.label)
+                    }
+                }
             }
-            ChecklistLine("Notification access", uiState.permissions.notificationAccessEnabled)
-            if (!uiState.permissions.notificationAccessEnabled) {
-                OutlinedButton(onClick = onOpenNotificationAccess) { Text("Open Notification Access") }
+            if (rowPalettes.size == 1) {
+                Spacer(modifier = Modifier.weight(1f))
             }
-            ChecklistLine("Overlay permission", uiState.permissions.overlayPermissionGranted)
-            if (!uiState.permissions.overlayPermissionGranted) {
-                OutlinedButton(onClick = onOpenOverlaySettings) { Text("Open Overlay Settings") }
-            }
-            ChecklistLine("Notifications enabled", notificationsEnabled)
         }
     }
 }

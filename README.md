@@ -29,7 +29,9 @@ Made by **Astro Labs** (`astrolabs`).
   - Overlay can be dragged and dropped anywhere on screen; its position is remembered.
 - While this app screen is open and monitoring is active, the display is kept awake to avoid screen timeout mid-set.
 - Workout tab includes a minimal pre-session picker:
+  - Defaults to the first trackable mode on first use, then remembers your last used mode
   - Select one camera-trackable exercise mode
+  - Prompts for any missing required permissions for enabled features
   - Tap `Start Workout`
 - Active workout runs in a fullscreen camera tracker with live HUD:
   - Exercise mode
@@ -40,7 +42,8 @@ Made by **Astro Labs** (`astrolabs`).
 - Sets are auto-created on activity end (`active -> idle`) from camera events.
 - Set correction (edit/delete) is available both during tracking and in `Log` session detail.
 - Log tab shows completed sessions feed, calendar aggregation, and editable detail.
-- Profile tab shows essential stats/settings (media control, overlay, camera preview, permissions).
+- Profile tab shows essential stats/settings (media control, overlay, camera preview).
+- App theme uses black-based palettes, defaulting to Black/White with selectable variants (Black/Pink, Black/Blue, Black/Red) in Profile settings.
 
 ## Why Notification Access Is Required
 Android does not allow unrestricted access to active media sessions without privileged permissions.
@@ -62,12 +65,12 @@ Some system screens or OEM-specific UIs may still hide overlays.
 1. Open in Android Studio (target SDK 35, min SDK 26).
 2. Let Gradle sync and install SDK components.
 3. Run on a real device (front camera + media app use case).
-4. Grant:
+4. Start playback in your target app (YouTube, TikTok, browser, etc.).
+5. Open `Workout` tab and grant required permissions when prompted:
    - Camera permission
-   - Notification access
+   - Notification access (if media control is enabled)
    - Overlay permission (if overlay is enabled)
-5. Start playback in your target app (YouTube, TikTok, browser, etc.).
-6. Open `Workout` tab, select an exercise mode, and tap **Start Workout**.
+6. Select an exercise mode and tap **Start Workout**.
 7. During tracking, use **Pause/Resume** or **End**, and open **Sets** to edit/delete finalized sets.
 
 ## Troubleshooting

@@ -21,6 +21,7 @@ class SettingsRepository(private val context: Context) {
     private object Keys {
         val overlayEnabled = booleanPreferencesKey("overlayEnabled")
         val mediaControlEnabled = booleanPreferencesKey("mediaControlEnabled")
+        val colorPalette = stringPreferencesKey("colorPalette")
         val weightUnit = stringPreferencesKey("weightUnit")
         val selectedExerciseMode = stringPreferencesKey("selectedExerciseMode")
         val poseModeAccurate = booleanPreferencesKey("poseModeAccurate")
@@ -50,6 +51,7 @@ class SettingsRepository(private val context: Context) {
         return AppSettings(
             overlayEnabled = this[Keys.overlayEnabled] ?: true,
             mediaControlEnabled = this[Keys.mediaControlEnabled] ?: true,
+            colorPalette = parseColorPalette(this[Keys.colorPalette]),
             weightUnit = parseWeightUnit(this[Keys.weightUnit]),
             selectedExerciseMode = parseExerciseMode(this[Keys.selectedExerciseMode]),
             poseModeAccurate = this[Keys.poseModeAccurate] ?: false,
@@ -74,6 +76,7 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setOverlayEnabled(value: Boolean) = editBool(Keys.overlayEnabled, value)
     suspend fun setMediaControlEnabled(value: Boolean) = editBool(Keys.mediaControlEnabled, value)
+    suspend fun setColorPalette(value: ColorPalette) = editString(Keys.colorPalette, value.name)
     suspend fun setWeightUnit(value: WeightUnit) = editString(Keys.weightUnit, value.name)
     suspend fun setSelectedExerciseMode(value: ExerciseMode) = editString(Keys.selectedExerciseMode, value.name)
     suspend fun setPoseModeAccurate(value: Boolean) = editBool(Keys.poseModeAccurate, value)
@@ -132,9 +135,15 @@ class SettingsRepository(private val context: Context) {
     }
 
     private fun parseExerciseMode(raw: String?): ExerciseMode {
-        if (raw.isNullOrBlank()) return ExerciseMode.PULL_UP
+        if (raw.isNullOrBlank()) return ExerciseMode.DEAD_HANG
         return runCatching { ExerciseMode.valueOf(raw) }
-            .getOrElse { ExerciseMode.PULL_UP }
+            .getOrElse { ExerciseMode.DEAD_HANG }
+    }
+
+    private fun parseColorPalette(raw: String?): ColorPalette {
+        if (raw.isNullOrBlank()) return ColorPalette.BLACK_WHITE
+        return runCatching { ColorPalette.valueOf(raw) }
+            .getOrElse { ColorPalette.BLACK_WHITE }
     }
 
     private fun parseWeightUnit(raw: String?): WeightUnit {
