@@ -31,7 +31,6 @@ import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.List
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button as M3Button
 import androidx.compose.material3.CardDefaults
@@ -65,6 +64,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
@@ -83,6 +83,8 @@ import com.astrolabs.gripmaxxer.reps.ExerciseMode
 import com.astrolabs.gripmaxxer.service.DebugPreviewFrame
 import com.astrolabs.gripmaxxer.ui.theme.LocalIsWindows98Theme
 import com.astrolabs.gripmaxxer.ui.theme.White
+import com.astrolabs.gripmaxxer.ui.theme.Win98TitleBlueEnd
+import com.astrolabs.gripmaxxer.ui.theme.Win98TitleBlueStart
 import com.astrolabs.gripmaxxer.ui.theme.Win98Surface
 import com.astrolabs.gripmaxxer.ui.theme.Win98SurfaceVariant
 import com.astrolabs.gripmaxxer.ui.theme.win98RaisedBorder
@@ -153,6 +155,7 @@ fun MainScreen(
         viewModel.clearWorkoutMessage()
     }
 
+    val isWindows98 = LocalIsWindows98Theme.current
     val inFullscreenTracker = uiState.selectedTab == RootTab.WORKOUT && uiState.workoutSession != null
 
     Scaffold(
@@ -164,20 +167,65 @@ fun MainScreen(
                     NavigationBarItem(
                         selected = uiState.selectedTab == RootTab.LOG,
                         onClick = { viewModel.selectTab(RootTab.LOG) },
-                        icon = { Icon(Icons.Outlined.Home, contentDescription = "Log") },
-                        label = { Text("Log") },
+                        icon = {
+                            Icon(
+                                Icons.Outlined.Home,
+                                contentDescription = "Log",
+                                modifier = Modifier.size(if (isWindows98) 20.dp else 24.dp),
+                            )
+                        },
+                        label = {
+                            Text(
+                                "Log",
+                                style = if (isWindows98) {
+                                    MaterialTheme.typography.labelMedium
+                                } else {
+                                    MaterialTheme.typography.labelMedium
+                                },
+                            )
+                        },
                     )
                     NavigationBarItem(
                         selected = uiState.selectedTab == RootTab.WORKOUT,
                         onClick = { viewModel.selectTab(RootTab.WORKOUT) },
-                        icon = { Icon(Icons.Outlined.FitnessCenter, contentDescription = "Workout") },
-                        label = { Text("Workout") },
+                        icon = {
+                            Icon(
+                                Icons.Outlined.FitnessCenter,
+                                contentDescription = "Workout",
+                                modifier = Modifier.size(if (isWindows98) 20.dp else 24.dp),
+                            )
+                        },
+                        label = {
+                            Text(
+                                "Workout",
+                                style = if (isWindows98) {
+                                    MaterialTheme.typography.labelMedium
+                                } else {
+                                    MaterialTheme.typography.labelMedium
+                                },
+                            )
+                        },
                     )
                     NavigationBarItem(
                         selected = uiState.selectedTab == RootTab.PROFILE,
                         onClick = { viewModel.selectTab(RootTab.PROFILE) },
-                        icon = { Icon(Icons.Outlined.AccountCircle, contentDescription = "Profile") },
-                        label = { Text("Profile") },
+                        icon = {
+                            Icon(
+                                Icons.Outlined.AccountCircle,
+                                contentDescription = "Profile",
+                                modifier = Modifier.size(if (isWindows98) 20.dp else 24.dp),
+                            )
+                        },
+                        label = {
+                            Text(
+                                "Profile",
+                                style = if (isWindows98) {
+                                    MaterialTheme.typography.labelMedium
+                                } else {
+                                    MaterialTheme.typography.labelMedium
+                                },
+                            )
+                        },
                     )
                 }
             }
@@ -202,8 +250,8 @@ fun MainScreen(
                     .background(MaterialTheme.colorScheme.background)
                     .padding(padding)
                     .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(if (isWindows98) 14.dp else 16.dp),
+                verticalArrangement = Arrangement.spacedBy(if (isWindows98) 10.dp else 12.dp),
             ) {
                 when (uiState.selectedTab) {
                     RootTab.LOG -> LogTab(
@@ -275,6 +323,8 @@ private fun Button(
     if (LocalIsWindows98Theme.current) {
         val interactionSource = remember { MutableInteractionSource() }
         val pressed by interactionSource.collectIsPressedAsState()
+        val horizontalPadding = 10.dp
+        val verticalPadding = 6.dp
         Surface(
             modifier = modifier
                 .then(if (pressed) Modifier.win98SunkenBorder() else Modifier.win98RaisedBorder())
@@ -292,7 +342,7 @@ private fun Button(
                         enabled = enabled,
                         onClick = onClick,
                     )
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = horizontalPadding, vertical = verticalPadding),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
                 content = content,
@@ -318,6 +368,8 @@ private fun OutlinedButton(
     if (LocalIsWindows98Theme.current) {
         val interactionSource = remember { MutableInteractionSource() }
         val pressed by interactionSource.collectIsPressedAsState()
+        val horizontalPadding = 10.dp
+        val verticalPadding = 6.dp
         Surface(
             modifier = modifier
                 .then(if (pressed) Modifier.win98SunkenBorder() else Modifier.win98RaisedBorder())
@@ -335,7 +387,7 @@ private fun OutlinedButton(
                         enabled = enabled,
                         onClick = onClick,
                     )
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = horizontalPadding, vertical = verticalPadding),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
                 content = content,
@@ -397,7 +449,7 @@ private fun RowScope.NavigationBarItem(
                     indication = null,
                     onClick = onClick,
                 )
-                .padding(vertical = 6.dp, horizontal = 4.dp),
+                .padding(vertical = 6.dp, horizontal = 5.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
@@ -478,15 +530,26 @@ private fun ScreenHeader(title: String) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.primary)
+                .background(Win98Surface)
                 .win98RaisedBorder()
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+                .padding(2.dp),
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onPrimary,
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(Win98TitleBlueStart, Win98TitleBlueEnd),
+                        )
+                    )
+                    .padding(horizontal = 8.dp, vertical = 5.dp),
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = White,
+                )
+            }
         }
     } else {
         Text(
@@ -506,6 +569,7 @@ private fun LogTab(
     onEditSet: (Long, Int, Long) -> Unit,
     onDeleteSet: (Long) -> Unit,
 ) {
+    val isWindows98 = LocalIsWindows98Theme.current
     ScreenHeader("Log")
     WeeklyActivityBar(workouts = workouts)
 
@@ -513,7 +577,7 @@ private fun LogTab(
         ElevatedCard(modifier = Modifier.fillMaxWidth()) {
             Text(
                 text = "No completed sessions yet.",
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(if (isWindows98) 14.dp else 16.dp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -523,8 +587,8 @@ private fun LogTab(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                        .padding(if (isWindows98) 12.dp else 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (isWindows98) 6.dp else 6.dp),
                 ) {
                     Text(
                         text = workout.title,
@@ -651,6 +715,7 @@ private fun WorkoutStartTab(
     onOpenNotificationAccess: () -> Unit,
     onOpenOverlaySettings: () -> Unit,
 ) {
+    val isWindows98 = LocalIsWindows98Theme.current
     val notificationAccessRequired = mediaControlEnabled && !notificationAccessEnabled
     val overlayPermissionRequired = overlayEnabled && !overlayPermissionGranted
     val canStart = cameraGranted && !notificationAccessRequired && !overlayPermissionRequired
@@ -661,15 +726,15 @@ private fun WorkoutStartTab(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(if (isWindows98) 10.dp else 12.dp),
+            verticalArrangement = Arrangement.spacedBy(if (isWindows98) 9.dp else 10.dp),
         ) {
             Text("Select exercise", style = MaterialTheme.typography.titleMedium)
 
             CameraTrackableModes.chunked(2).forEach { rowModes ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(if (isWindows98) 7.dp else 8.dp),
                 ) {
                     rowModes.forEach { mode ->
                         val selected = selectedMode == mode
@@ -731,7 +796,16 @@ private fun WorkoutStartTab(
                     }
                 }
             }
+        }
+    }
 
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(if (isWindows98) 10.dp else 12.dp),
+            verticalArrangement = Arrangement.spacedBy(if (isWindows98) 8.dp else 10.dp),
+        ) {
             Button(
                 onClick = onStart,
                 modifier = Modifier.fillMaxWidth(),
@@ -754,6 +828,8 @@ private fun WorkoutTrackerScreen(
     modifier: Modifier = Modifier,
 ) {
     val session = uiState.workoutSession ?: return
+    val isWindows98 = LocalIsWindows98Theme.current
+    val hudTextColor = if (isWindows98) MaterialTheme.colorScheme.onSurface else Color.White
     var showSetEditor by rememberSaveable(session.workoutId) { mutableStateOf(false) }
 
     Box(modifier = modifier.background(Color.Black)) {
@@ -776,74 +852,152 @@ private fun WorkoutTrackerScreen(
             }
         }
 
-        ElevatedCard(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(12.dp),
-            colors = CardDefaults.elevatedCardColors(
-                containerColor = Color(0xCC101216),
-            ),
-        ) {
-            Column(
-                modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+        if (isWindows98) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp)
+                    .background(Win98Surface)
+                    .win98RaisedBorder(),
             ) {
-                Text(session.mode.label, color = Color.White, fontWeight = FontWeight.SemiBold)
-                Text("Workout ${formatDuration(session.elapsedMs)}", color = Color.White)
-                Text("Sets ${session.completedSetCount}", color = Color.White)
-                if (session.mode.isHangMode()) {
-                    Text(
-                        text = "Current hold ${formatHoldDuration(session.liveSet.durationMs)}",
-                        color = Color.White,
-                    )
-                } else {
-                    Text(
-                        text = "Current reps ${session.liveSet.reps}",
-                        color = Color.White,
-                    )
-                    Text(
-                        text = "Current set ${formatHoldDuration(session.liveSet.durationMs)}",
-                        color = Color.White,
-                    )
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(session.mode.label, color = hudTextColor, fontWeight = FontWeight.SemiBold)
+                    Text("Workout ${formatDuration(session.elapsedMs)}", color = hudTextColor)
+                    Text("Sets ${session.completedSetCount}", color = hudTextColor)
+                    if (session.mode.isHangMode()) {
+                        Text(
+                            text = "Current hold ${formatHoldDuration(session.liveSet.durationMs)}",
+                            color = hudTextColor,
+                        )
+                    } else {
+                        Text(
+                            text = "Current reps ${session.liveSet.reps}",
+                            color = hudTextColor,
+                        )
+                        Text(
+                            text = "Current set ${formatHoldDuration(session.liveSet.durationMs)}",
+                            color = hudTextColor,
+                        )
+                    }
+                }
+            }
+        } else {
+            M3ElevatedCard(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = Color(0xCC101216),
+                ),
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(session.mode.label, color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text("Workout ${formatDuration(session.elapsedMs)}", color = Color.White)
+                    Text("Sets ${session.completedSetCount}", color = Color.White)
+                    if (session.mode.isHangMode()) {
+                        Text(
+                            text = "Current hold ${formatHoldDuration(session.liveSet.durationMs)}",
+                            color = Color.White,
+                        )
+                    } else {
+                        Text(
+                            text = "Current reps ${session.liveSet.reps}",
+                            color = Color.White,
+                        )
+                        Text(
+                            text = "Current set ${formatHoldDuration(session.liveSet.durationMs)}",
+                            color = Color.White,
+                        )
+                    }
                 }
             }
         }
 
-        ElevatedCard(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(12.dp),
-            colors = CardDefaults.elevatedCardColors(
-                containerColor = Color(0xCC101216),
-            ),
-        ) {
-            Row(
+        if (isWindows98) {
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(10.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    .align(Alignment.BottomCenter)
+                    .padding(12.dp)
+                    .background(Win98Surface)
+                    .win98RaisedBorder(),
             ) {
-                OutlinedButton(
-                    onClick = { showSetEditor = true },
-                    modifier = Modifier.weight(1f),
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Icon(Icons.Outlined.List, contentDescription = null)
-                    Spacer(modifier = Modifier.size(6.dp))
-                    Text("Sets")
-                }
+                    val controlButtonModifier = Modifier
+                        .weight(1f)
+                        .height(42.dp)
 
-                if (session.paused) {
-                    Button(onClick = onResume, modifier = Modifier.weight(1f)) {
-                        Text("Resume")
+                    OutlinedButton(
+                        onClick = { showSetEditor = true },
+                        modifier = controlButtonModifier,
+                    ) {
+                        Text("Sets")
                     }
-                } else {
-                    OutlinedButton(onClick = onPause, modifier = Modifier.weight(1f)) {
-                        Text("Pause")
+
+                    if (session.paused) {
+                        Button(onClick = onResume, modifier = controlButtonModifier) {
+                            Text("Resume")
+                        }
+                    } else {
+                        OutlinedButton(onClick = onPause, modifier = controlButtonModifier) {
+                            Text("Pause")
+                        }
+                    }
+
+                    Button(onClick = onEnd, modifier = controlButtonModifier) {
+                        Text("End")
                     }
                 }
+            }
+        } else {
+            M3ElevatedCard(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(12.dp),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = Color(0xCC101216),
+                ),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    val controlButtonModifier = Modifier
+                        .weight(1f)
+                        .height(42.dp)
 
-                Button(onClick = onEnd, modifier = Modifier.weight(1f)) {
-                    Text("End")
+                    M3OutlinedButton(
+                        onClick = { showSetEditor = true },
+                        modifier = controlButtonModifier,
+                    ) {
+                        Text("Sets")
+                    }
+
+                    if (session.paused) {
+                        M3Button(onClick = onResume, modifier = controlButtonModifier) {
+                            Text("Resume")
+                        }
+                    } else {
+                        M3OutlinedButton(onClick = onPause, modifier = controlButtonModifier) {
+                            Text("Pause")
+                        }
+                    }
+
+                    M3Button(onClick = onEnd, modifier = controlButtonModifier) {
+                        Text("End")
+                    }
                 }
             }
         }
@@ -1002,14 +1156,15 @@ private fun ProfileTab(
     onPreviewToggle: (Boolean) -> Unit,
     onPaletteSelect: (ColorPalette) -> Unit,
 ) {
+    val isWindows98 = LocalIsWindows98Theme.current
     ScreenHeader("Profile")
 
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(if (isWindows98) 10.dp else 12.dp),
+            verticalArrangement = Arrangement.spacedBy(if (isWindows98) 8.dp else 8.dp),
         ) {
             Text("Stats", style = MaterialTheme.typography.titleMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -1024,8 +1179,8 @@ private fun ProfileTab(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(if (isWindows98) 10.dp else 12.dp),
+            verticalArrangement = Arrangement.spacedBy(if (isWindows98) 8.dp else 8.dp),
         ) {
             Text("Settings", style = MaterialTheme.typography.titleMedium)
             SettingToggle("Enable media play/pause", uiState.settings.mediaControlEnabled, onMediaToggle)
@@ -1049,10 +1204,11 @@ private fun ColorPaletteSelector(
     selectedPalette: ColorPalette,
     onSelect: (ColorPalette) -> Unit,
 ) {
+    val isWindows98 = LocalIsWindows98Theme.current
     ColorPalette.entries.chunked(2).forEach { rowPalettes ->
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (isWindows98) 7.dp else 8.dp),
         ) {
             rowPalettes.forEach { palette ->
                 val selected = selectedPalette == palette
