@@ -439,5 +439,6 @@ private fun ExerciseMode.isHangMode(): Boolean {
         this == ExerciseMode.ONE_ARM_DEAD_HANG ||
         this == ExerciseMode.ONE_ARM_ACTIVE_HANG ||
         this == ExerciseMode.HANDSTAND_HOLD ||
-        this == ExerciseMode.PLANK_HOLD
+        this == ExerciseMode.PLANK_HOLD ||
+        this == ExerciseMode.MIDDLE_SPLIT_HOLD
 }

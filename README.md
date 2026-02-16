@@ -8,6 +8,7 @@ Gripmaxxer is an Android app (Kotlin + Compose) that uses the **front camera** a
   - One-arm active hang
   - Handstand hold
   - Plank hold
+  - Middle split hold
   - Pull-up
   - Chin-up
   - Muscle-up
@@ -18,6 +19,7 @@ Gripmaxxer is an Android app (Kotlin + Compose) that uses the **front camera** a
   - Pike push-up
   - One-arm push-up
   - Squat
+  - Archer squat
   - Pistol squat
   - Lunge
   - Bulgarian split squat
@@ -99,6 +101,7 @@ Some system screens or OEM-specific UIs may still hide overlays.
   - One-arm active hang: keep support shoulder/elbow/wrist fully visible
   - Handstand hold: works for wall-assisted and freestanding; keep hands/shoulders/hips/legs in frame
   - Plank hold: side angle works best; keep shoulders/hips/legs visible
+  - Middle split hold: keep hips, knees, and ankles fully visible in a wide straddle
   - Pull-up: front bar framing with shoulders/arms visible
   - Chin-up: front bar framing with shoulders/arms visible
   - Muscle-up: include bar + full upper body with both wrists visible through transition
@@ -109,6 +112,7 @@ Some system screens or OEM-specific UIs may still hide overlays.
   - Pike push-up: keep hips and shoulders fully in frame from a side/front angle
   - One-arm push-up: side/front angle with support arm, shoulder, and hip visible
   - Squat: front full-body framing with hips/knees/ankles visible
+  - Archer squat: keep a wide stance in frame so both knees and ankles remain visible
   - Pistol squat: full-body framing with support-side hip/knee/ankle visible
   - Lunge: full-body framing with both knees and ankles visible
   - Bulgarian split squat: keep both ankles and knees visible in split stance
