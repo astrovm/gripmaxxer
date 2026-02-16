@@ -56,6 +56,7 @@ val CameraTrackableModes = listOf(
     ExerciseMode.DEAD_HANG,
     ExerciseMode.ACTIVE_HANG,
     ExerciseMode.PULL_UP,
+    ExerciseMode.HANGING_LEG_RAISE,
     ExerciseMode.PUSH_UP,
     ExerciseMode.SQUAT,
     ExerciseMode.BENCH_PRESS,
