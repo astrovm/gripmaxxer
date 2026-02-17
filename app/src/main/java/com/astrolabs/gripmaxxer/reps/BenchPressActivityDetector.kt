@@ -43,27 +43,39 @@ class BenchPressActivityDetector(
     }
 
     private fun hasBenchPressPosture(frame: PoseFrame): Boolean {
-        val leftShoulder = frame.landmark(PoseLandmark.LEFT_SHOULDER) ?: return false
-        val rightShoulder = frame.landmark(PoseLandmark.RIGHT_SHOULDER) ?: return false
-        val leftElbow = frame.landmark(PoseLandmark.LEFT_ELBOW) ?: return false
-        val rightElbow = frame.landmark(PoseLandmark.RIGHT_ELBOW) ?: return false
-        val leftWrist = frame.landmark(PoseLandmark.LEFT_WRIST) ?: return false
-        val rightWrist = frame.landmark(PoseLandmark.RIGHT_WRIST) ?: return false
+        val leftShoulder = frame.landmark(PoseLandmark.LEFT_SHOULDER)
+        val rightShoulder = frame.landmark(PoseLandmark.RIGHT_SHOULDER)
 
-        val shoulderWidth = abs(leftShoulder.x - rightShoulder.x)
-        if (shoulderWidth < MIN_SHOULDER_WIDTH) return false
+        if (leftShoulder != null && rightShoulder != null) {
+            val shoulderWidth = abs(leftShoulder.x - rightShoulder.x)
+            if (shoulderWidth < MIN_SHOULDER_WIDTH) return false
+        }
 
-        val shoulderY = (leftShoulder.y + rightShoulder.y) / 2f
-        val elbowY = (leftElbow.y + rightElbow.y) / 2f
-        val wristY = (leftWrist.y + rightWrist.y) / 2f
+        val leftValid = isBenchSideValid(
+            shoulder = leftShoulder,
+            elbow = frame.landmark(PoseLandmark.LEFT_ELBOW),
+            wrist = frame.landmark(PoseLandmark.LEFT_WRIST),
+        )
+        val rightValid = isBenchSideValid(
+            shoulder = rightShoulder,
+            elbow = frame.landmark(PoseLandmark.RIGHT_ELBOW),
+            wrist = frame.landmark(PoseLandmark.RIGHT_WRIST),
+        )
+        return leftValid || rightValid
+    }
 
-        val wristNearShoulderHeight = abs(wristY - shoulderY) <= MAX_WRIST_TO_SHOULDER_Y_DELTA
-        val elbowNearShoulderHeight = abs(elbowY - shoulderY) <= MAX_ELBOW_TO_SHOULDER_Y_DELTA
-        val wristsNearShouldersX = abs(leftWrist.x - leftShoulder.x) < MAX_WRIST_TO_SHOULDER_X_DELTA &&
-            abs(rightWrist.x - rightShoulder.x) < MAX_WRIST_TO_SHOULDER_X_DELTA
-        val wristsNearElbowsX = abs(leftWrist.x - leftElbow.x) < MAX_WRIST_TO_ELBOW_X_DELTA &&
-            abs(rightWrist.x - rightElbow.x) < MAX_WRIST_TO_ELBOW_X_DELTA
-        return wristNearShoulderHeight && elbowNearShoulderHeight && wristsNearShouldersX && wristsNearElbowsX
+    private fun isBenchSideValid(
+        shoulder: com.astrolabs.gripmaxxer.pose.NormalizedLandmark?,
+        elbow: com.astrolabs.gripmaxxer.pose.NormalizedLandmark?,
+        wrist: com.astrolabs.gripmaxxer.pose.NormalizedLandmark?,
+    ): Boolean {
+        if (shoulder == null || elbow == null || wrist == null) return false
+
+        val wristNearShoulderHeight = abs(wrist.y - shoulder.y) <= MAX_WRIST_TO_SHOULDER_Y_DELTA
+        val elbowNearShoulderHeight = abs(elbow.y - shoulder.y) <= MAX_ELBOW_TO_SHOULDER_Y_DELTA
+        val wristNearShoulderX = abs(wrist.x - shoulder.x) <= MAX_WRIST_TO_SHOULDER_X_DELTA
+        val wristNearElbowX = abs(wrist.x - elbow.x) <= MAX_WRIST_TO_ELBOW_X_DELTA
+        return wristNearShoulderHeight && elbowNearShoulderHeight && wristNearShoulderX && wristNearElbowX
     }
 
     private fun decayActive(nowMs: Long): Boolean {
@@ -74,12 +86,12 @@ class BenchPressActivityDetector(
     }
 
     companion object {
-        private const val IDLE_TIMEOUT_MS = 1300L
+        private const val IDLE_TIMEOUT_MS = 1500L
         private const val MIN_SHOULDER_WIDTH = 0.075f
-        private const val ACTIVE_ELBOW_MAX = 164f
-        private const val MAX_WRIST_TO_SHOULDER_Y_DELTA = 0.22f
-        private const val MAX_ELBOW_TO_SHOULDER_Y_DELTA = 0.20f
-        private const val MAX_WRIST_TO_SHOULDER_X_DELTA = 0.32f
-        private const val MAX_WRIST_TO_ELBOW_X_DELTA = 0.22f
+        private const val ACTIVE_ELBOW_MAX = 168f
+        private const val MAX_WRIST_TO_SHOULDER_Y_DELTA = 0.30f
+        private const val MAX_ELBOW_TO_SHOULDER_Y_DELTA = 0.26f
+        private const val MAX_WRIST_TO_SHOULDER_X_DELTA = 0.42f
+        private const val MAX_WRIST_TO_ELBOW_X_DELTA = 0.30f
     }
 }

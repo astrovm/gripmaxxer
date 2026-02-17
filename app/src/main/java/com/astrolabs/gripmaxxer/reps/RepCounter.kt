@@ -121,10 +121,10 @@ class RepCounter(
                 shoulderToWristDelta < (config.marginUp + SHOULDER_UP_EXTRA_DELTA)
             Triple(down, up, config.stableMs)
         } else {
-            // If wrists/head are occluded, rely on elbow angle only so reps still count.
+            // If wrists/head are occluded, only trust down-state by elbow.
+            // Blind "up" counting from elbow-only often creates ghost reps on release.
             val down = smoothElbow > (config.elbowDownAngle - ELBOW_ONLY_DOWN_RELAX_DEG)
-            val up = smoothElbow < (config.elbowUpAngle + ELBOW_ONLY_UP_RELAX_DEG)
-            Triple(down, up, (config.stableMs / 2L).coerceAtLeast(MIN_OCCLUDED_STABLE_MS))
+            Triple(down, false, (config.stableMs / 2L).coerceAtLeast(MIN_OCCLUDED_STABLE_MS))
         }
 
         if (state == State.DOWN) {
@@ -135,8 +135,9 @@ class RepCounter(
             upAnchorElbow = if (anchor == null) smoothElbow else minOf(anchor, smoothElbow)
         }
 
+        val hasGripPosture = hasGripLikePosture(frame)
         val isUpByElbowTravel = downAnchorElbow?.let { anchor ->
-            (anchor - smoothElbow) >= ELBOW_UP_TRAVEL_DEG
+            hasGripPosture && (anchor - smoothElbow) >= ELBOW_UP_TRAVEL_DEG
         } ?: false
         val isDownByElbowTravel = upAnchorElbow?.let { anchor ->
             (smoothElbow - anchor) >= ELBOW_DOWN_TRAVEL_DEG
@@ -155,7 +156,7 @@ class RepCounter(
 
         return when (state) {
             State.DOWN -> handleDownState(
-                isUp = isUp || isUpByElbowTravel,
+                isUp = (isUp || isUpByElbowTravel) && hasGripPosture,
                 nowMs = nowMs,
                 requiredStableMs = upStableMs,
                 smoothElbow = smoothElbow,
@@ -232,6 +233,21 @@ class RepCounter(
         upAnchorElbow = null
     }
 
+    private fun hasGripLikePosture(frame: PoseFrame): Boolean {
+        val leftShoulder = frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.LEFT_SHOULDER)
+        val rightShoulder = frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.RIGHT_SHOULDER)
+        val leftWrist = frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.LEFT_WRIST)
+        val rightWrist = frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.RIGHT_WRIST)
+
+        val leftGrip = leftShoulder != null &&
+            leftWrist != null &&
+            leftWrist.y < leftShoulder.y + WRIST_ABOVE_SHOULDER_GRIP_DELTA
+        val rightGrip = rightShoulder != null &&
+            rightWrist != null &&
+            rightWrist.y < rightShoulder.y + WRIST_ABOVE_SHOULDER_GRIP_DELTA
+        return leftGrip || rightGrip
+    }
+
     private fun isLikelyReleased(
         frame: PoseFrame,
         shoulderY: Float?,
@@ -269,6 +285,7 @@ class RepCounter(
         private const val ELBOW_DOWN_TRAVEL_DEG = 22f
         private const val ELBOW_TRAVEL_STABLE_MS = 120L
         private const val WRIST_BELOW_SHOULDER_RELEASE_DELTA = 0.03f
+        private const val WRIST_ABOVE_SHOULDER_GRIP_DELTA = 0.04f
         private const val RELEASE_LOCK_MS = 1200L
     }
 }
