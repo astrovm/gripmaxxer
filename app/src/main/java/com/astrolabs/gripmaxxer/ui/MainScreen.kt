@@ -880,6 +880,7 @@ private fun WorkoutTrackerScreen(
         if (uiState.showCameraPreview && uiState.cameraPreviewFrame != null) {
             CameraPreviewWithTracking(
                 frame = uiState.cameraPreviewFrame,
+                isCounterActive = session.liveSet.active,
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
@@ -1365,6 +1366,7 @@ private fun MetricTile(
 @Composable
 private fun CameraPreviewWithTracking(
     frame: DebugPreviewFrame,
+    isCounterActive: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -1378,9 +1380,10 @@ private fun CameraPreviewWithTracking(
         )
         Canvas(modifier = Modifier.fillMaxSize()) {
             val radius = 5.dp.toPx()
+            val dotColor = if (isCounterActive) ActiveTrackingDotColor else InactiveTrackingDotColor
             frame.landmarks.values.forEach { landmark ->
                 drawCircle(
-                    color = Color.Red,
+                    color = dotColor,
                     radius = radius,
                     center = Offset(
                         x = (1f - landmark.x).coerceIn(0f, 1f) * size.width,
@@ -1391,6 +1394,9 @@ private fun CameraPreviewWithTracking(
         }
     }
 }
+
+private val ActiveTrackingDotColor = Color(0xFF00E676)
+private val InactiveTrackingDotColor = Color.Red
 
 private fun formatDuration(elapsedMs: Long): String {
     val totalSeconds = (elapsedMs / 1000L).coerceAtLeast(0L)
