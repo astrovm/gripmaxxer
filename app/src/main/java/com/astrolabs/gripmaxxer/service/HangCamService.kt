@@ -283,6 +283,7 @@ class HangCamService : LifecycleService() {
             settingsRepository.settingsFlow.collect { settings ->
                 currentSettings = settings
                 poseDetectorWrapper?.setAccurateMode(settings.poseModeAccurate)
+                frameAnalyzer?.updateMinFrameIntervalMs(analyzerIntervalForSettings(settings))
                 frameMutex.withLock {
                     val previousMode = currentMode
                     currentMode = settings.selectedExerciseMode
@@ -327,7 +328,7 @@ class HangCamService : LifecycleService() {
             val analyzer = PoseFrameAnalyzer(
                 detectorWrapper = poseDetectorWrapper ?: return@launch,
                 featureExtractor = featureExtractor,
-                minFrameIntervalMs = 66L,
+                minFrameIntervalMs = analyzerIntervalForSettings(currentSettings),
                 onFrameTick = {
                     rawFramesSinceTick.incrementAndGet()
                     lastFrameRealtimeMs.set(SystemClock.elapsedRealtime())
@@ -650,6 +651,14 @@ class HangCamService : LifecycleService() {
         }
     }
 
+    private fun analyzerIntervalForSettings(settings: AppSettings): Long {
+        return if (settings.poseModeAccurate) {
+            ACCURATE_ANALYZER_FRAME_INTERVAL_MS
+        } else {
+            FAST_ANALYZER_FRAME_INTERVAL_MS
+        }
+    }
+
     private fun publishStateAndNotification() {
         val elapsedMs = if (currentHangState && hangStartRealtimeMs > 0L) {
             currentSessionElapsedMs = SystemClock.elapsedRealtime() - hangStartRealtimeMs
@@ -763,6 +772,8 @@ class HangCamService : LifecycleService() {
         private const val TAG = "HangCamService"
         const val ACTION_START = "com.astrolabs.gripmaxxer.action.START"
         const val ACTION_STOP = "com.astrolabs.gripmaxxer.action.STOP"
+        private const val FAST_ANALYZER_FRAME_INTERVAL_MS = 33L
+        private const val ACCURATE_ANALYZER_FRAME_INTERVAL_MS = 45L
         private const val MIN_WRIST_SHOULDER_MARGIN = 0.08f
         private const val MIN_ONE_ARM_WRIST_SHOULDER_MARGIN = 0.06f
         private const val MIN_HLR_WRIST_SHOULDER_MARGIN = 0.065f

@@ -18,7 +18,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 class PoseFrameAnalyzer(
     private val detectorWrapper: PoseDetectorWrapper,
     private val featureExtractor: PoseFeatureExtractor,
-    private val minFrameIntervalMs: Long = 66L,
+    minFrameIntervalMs: Long = 66L,
     private val onFrameTick: (() -> Unit)? = null,
     private val shouldEmitDebugFrame: (() -> Boolean)? = null,
     private val onDebugFrame: ((android.graphics.Bitmap, PoseFrame) -> Unit)? = null,
@@ -27,6 +27,8 @@ class PoseFrameAnalyzer(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val isProcessing = AtomicBoolean(false)
+    @Volatile
+    private var minFrameIntervalMs: Long = minFrameIntervalMs.coerceAtLeast(0L)
     private var lastAnalyzedMs: Long = 0L
     private var lastDebugFrameMs: Long = 0L
 
@@ -94,6 +96,10 @@ class PoseFrameAnalyzer(
 
     fun stop() {
         scope.cancel()
+    }
+
+    fun updateMinFrameIntervalMs(value: Long) {
+        minFrameIntervalMs = value.coerceAtLeast(0L)
     }
 
     companion object {

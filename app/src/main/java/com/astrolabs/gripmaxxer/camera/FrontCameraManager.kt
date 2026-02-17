@@ -3,8 +3,11 @@ package com.astrolabs.gripmaxxer.camera
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.util.Size
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.lifecycle.LifecycleOwner
 import java.util.concurrent.ExecutorService
@@ -31,6 +34,16 @@ class FrontCameraManager(
 
         val executor = Executors.newSingleThreadExecutor().also { cameraExecutor = it }
         val imageAnalysis = ImageAnalysis.Builder()
+            .setResolutionSelector(
+                ResolutionSelector.Builder()
+                    .setResolutionStrategy(
+                        ResolutionStrategy(
+                            ANALYSIS_TARGET_RESOLUTION,
+                            ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER,
+                        )
+                    )
+                    .build(),
+            )
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .build()
             .also {
@@ -64,6 +77,10 @@ class FrontCameraManager(
         }
         cameraExecutor?.shutdownNow()
         cameraExecutor = null
+    }
+
+    companion object {
+        private val ANALYSIS_TARGET_RESOLUTION = Size(640, 480)
     }
 }
 

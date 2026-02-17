@@ -121,4 +121,5 @@ Some system screens or OEM-specific UIs may still hide overlays.
   - Bench press: side profile focused on shoulder-elbow-wrist
   - Dip: front upper-body framing with shoulders/elbows/wrists visible
 - FAST mode is lighter on battery/heat; ACCURATE mode is heavier but can improve robustness.
+- Camera analysis throughput is higher in FAST pose mode than ACCURATE mode.
 - Long continuous camera processing can increase battery usage and device temperature.
