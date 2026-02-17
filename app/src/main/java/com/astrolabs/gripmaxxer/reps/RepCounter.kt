@@ -10,6 +10,7 @@ data class RepCounterConfig(
     val marginDown: Float = 0.03f,
     val stableMs: Long = 250L,
     val minRepIntervalMs: Long = 600L,
+    val requireBothWristsForGripUp: Boolean = false,
 )
 
 data class RepCounterResult(
@@ -245,6 +246,12 @@ class RepCounter(
         val rightGrip = rightShoulder != null &&
             rightWrist != null &&
             rightWrist.y < rightShoulder.y + WRIST_ABOVE_SHOULDER_GRIP_DELTA
+
+        val hasBothSides = leftShoulder != null && rightShoulder != null &&
+            leftWrist != null && rightWrist != null
+        if (config.requireBothWristsForGripUp && hasBothSides) {
+            return leftGrip && rightGrip
+        }
         return leftGrip || rightGrip
     }
 
@@ -254,13 +261,18 @@ class RepCounter(
         wristY: Float?,
     ): Boolean {
         if (shoulderY == null || wristY == null) return false
-        val bothShouldersPresent =
-            frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.LEFT_SHOULDER) != null &&
-                frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.RIGHT_SHOULDER) != null
-        val bothWristsPresent =
-            frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.LEFT_WRIST) != null &&
-                frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.RIGHT_WRIST) != null
-        if (!bothShouldersPresent || !bothWristsPresent) return false
+        val leftShoulder = frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.LEFT_SHOULDER)
+        val rightShoulder = frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.RIGHT_SHOULDER)
+        val leftWrist = frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.LEFT_WRIST)
+        val rightWrist = frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.RIGHT_WRIST)
+        val hasBothSides = leftShoulder != null && rightShoulder != null && leftWrist != null && rightWrist != null
+        if (!hasBothSides) return false
+
+        val leftReleased = (leftWrist?.y ?: 0f) > (leftShoulder?.y ?: 0f) + WRIST_BELOW_SHOULDER_RELEASE_DELTA
+        val rightReleased = (rightWrist?.y ?: 0f) > (rightShoulder?.y ?: 0f) + WRIST_BELOW_SHOULDER_RELEASE_DELTA
+        if (config.requireBothWristsForGripUp && (leftReleased || rightReleased)) {
+            return true
+        }
 
         return wristY > shoulderY + WRIST_BELOW_SHOULDER_RELEASE_DELTA
     }

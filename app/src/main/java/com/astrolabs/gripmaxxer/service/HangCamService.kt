@@ -589,6 +589,7 @@ class HangCamService : LifecycleService() {
             ExerciseMode.PULL_UP -> base.copy(
                 stableMs = maxOf(base.stableMs, 220L),
                 minRepIntervalMs = maxOf(base.minRepIntervalMs, 560L),
+                requireBothWristsForGripUp = true,
             )
 
             ExerciseMode.CHIN_UP -> base.copy(
@@ -597,6 +598,7 @@ class HangCamService : LifecycleService() {
                 marginUp = (base.marginUp - 0.004f).coerceIn(0.015f, 0.10f),
                 stableMs = maxOf(base.stableMs, 210L),
                 minRepIntervalMs = maxOf(base.minRepIntervalMs, 540L),
+                requireBothWristsForGripUp = true,
             )
 
             ExerciseMode.ONE_ARM_PULL_UP -> base.copy(
@@ -606,6 +608,7 @@ class HangCamService : LifecycleService() {
                 marginDown = (base.marginDown - 0.006f).coerceIn(0.008f, 0.08f),
                 stableMs = maxOf(base.stableMs, 260L),
                 minRepIntervalMs = maxOf(base.minRepIntervalMs, 760L),
+                requireBothWristsForGripUp = false,
             )
 
             ExerciseMode.ONE_ARM_CHIN_UP -> base.copy(
@@ -615,6 +618,7 @@ class HangCamService : LifecycleService() {
                 marginDown = (base.marginDown - 0.007f).coerceIn(0.008f, 0.08f),
                 stableMs = maxOf(base.stableMs, 270L),
                 minRepIntervalMs = maxOf(base.minRepIntervalMs, 780L),
+                requireBothWristsForGripUp = false,
             )
 
             else -> base
