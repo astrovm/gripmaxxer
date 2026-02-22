@@ -38,6 +38,38 @@ class HangingLegRaiseRepDetectorTest {
         assertEquals(1, rep.reps)
     }
 
+    @Test
+    fun `counts fast consecutive reps`() {
+        val detector = HangingLegRaiseRepDetector()
+
+        val downFrame = buildFrame(
+            shoulderY = 0.35f,
+            hipY = 0.70f,
+            kneeY = 0.88f,
+            ankleY = 0.95f,
+        )
+        val upFrame = buildFrame(
+            shoulderY = 0.35f,
+            hipY = 0.70f,
+            kneeY = 0.64f,
+            ankleY = 0.72f,
+        )
+
+        detector.process(frame = downFrame, active = true, nowMs = 0L)
+        detector.process(frame = downFrame, active = true, nowMs = 130L)
+        detector.process(frame = upFrame, active = true, nowMs = 500L)
+        val firstRep = detector.process(frame = upFrame, active = true, nowMs = 640L)
+        assertTrue(firstRep.repEvent)
+        assertEquals(1, firstRep.reps)
+
+        detector.process(frame = downFrame, active = true, nowMs = 780L)
+        detector.process(frame = downFrame, active = true, nowMs = 920L)
+        detector.process(frame = upFrame, active = true, nowMs = 1040L)
+        val secondRep = detector.process(frame = upFrame, active = true, nowMs = 1160L)
+        assertTrue(secondRep.repEvent)
+        assertEquals(2, secondRep.reps)
+    }
+
     private fun buildFrame(
         shoulderY: Float,
         hipY: Float,

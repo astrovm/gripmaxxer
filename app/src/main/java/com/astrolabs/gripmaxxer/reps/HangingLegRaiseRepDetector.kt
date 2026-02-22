@@ -6,8 +6,8 @@ import com.google.mlkit.vision.pose.PoseLandmark
 class HangingLegRaiseRepDetector : ModeRepDetector {
 
     private val cycleCounter = CycleRepCounter(
-        stableMs = 180L,
-        minRepIntervalMs = 550L,
+        stableMs = 120L,
+        minRepIntervalMs = 320L,
     )
 
     override fun reset() {

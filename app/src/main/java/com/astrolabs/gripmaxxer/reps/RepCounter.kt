@@ -239,6 +239,7 @@ class RepCounter(
         val rightShoulder = frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.RIGHT_SHOULDER)
         val leftWrist = frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.LEFT_WRIST)
         val rightWrist = frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.RIGHT_WRIST)
+        val faceY = frame.noseOrMouthY()
 
         val leftGrip = leftShoulder != null &&
             leftWrist != null &&
@@ -251,7 +252,10 @@ class RepCounter(
             leftWrist != null && rightWrist != null
         if (config.requireBothWristsForGripUp) {
             if (!hasBothSides) return false
-            return leftGrip && rightGrip
+            if (!(leftGrip && rightGrip)) return false
+            if (faceY == null) return true
+            return leftWrist.y < faceY + WRIST_ABOVE_FACE_GRIP_DELTA &&
+                rightWrist.y < faceY + WRIST_ABOVE_FACE_GRIP_DELTA
         }
         return leftGrip || rightGrip
     }
@@ -301,6 +305,7 @@ class RepCounter(
         private const val ELBOW_TRAVEL_STABLE_MS = 120L
         private const val WRIST_BELOW_SHOULDER_RELEASE_DELTA = 0.03f
         private const val WRIST_ABOVE_SHOULDER_GRIP_DELTA = 0.04f
+        private const val WRIST_ABOVE_FACE_GRIP_DELTA = 0.02f
         private const val RELEASE_LOCK_MS = 1200L
     }
 }

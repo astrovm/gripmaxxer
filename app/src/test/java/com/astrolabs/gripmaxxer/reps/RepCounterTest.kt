@@ -48,6 +48,45 @@ class RepCounterTest {
         assertEquals(0, result.reps)
     }
 
+    @Test
+    fun `pull-up mode does not count release motion with wrists below face`() {
+        val counter = RepCounter(
+            featureExtractor = PoseFeatureExtractor(),
+            config = RepCounterConfig(
+                stableMs = 40L,
+                minRepIntervalMs = 0L,
+                requireBothWristsForGripUp = true,
+            ),
+        )
+
+        val downFrame = buildFrame(
+            noseY = 0.35f,
+            leftShoulderY = 0.50f,
+            rightShoulderY = 0.50f,
+            leftElbow = NormalizedLandmark(0.45f, 0.60f),
+            rightElbow = NormalizedLandmark(0.55f, 0.60f),
+            leftWrist = NormalizedLandmark(0.45f, 0.24f),
+            rightWrist = NormalizedLandmark(0.55f, 0.24f),
+        )
+        val releaseLikeFrame = buildFrame(
+            noseY = 0.35f,
+            leftShoulderY = 0.50f,
+            rightShoulderY = 0.50f,
+            leftElbow = NormalizedLandmark(0.45f, 0.60f),
+            rightElbow = NormalizedLandmark(0.55f, 0.60f),
+            leftWrist = NormalizedLandmark(0.53f, 0.42f),
+            rightWrist = NormalizedLandmark(0.47f, 0.42f),
+        )
+
+        counter.process(frame = downFrame, hanging = true, nowMs = 0L)
+        counter.process(frame = downFrame, hanging = true, nowMs = 60L)
+        counter.process(frame = releaseLikeFrame, hanging = true, nowMs = 140L)
+        val result = counter.process(frame = releaseLikeFrame, hanging = true, nowMs = 220L)
+
+        assertFalse(result.repEvent)
+        assertEquals(0, result.reps)
+    }
+
     private fun buildFrame(
         noseY: Float,
         leftShoulderY: Float,
