@@ -249,7 +249,8 @@ class RepCounter(
 
         val hasBothSides = leftShoulder != null && rightShoulder != null &&
             leftWrist != null && rightWrist != null
-        if (config.requireBothWristsForGripUp && hasBothSides) {
+        if (config.requireBothWristsForGripUp) {
+            if (!hasBothSides) return false
             return leftGrip && rightGrip
         }
         return leftGrip || rightGrip
@@ -266,7 +267,9 @@ class RepCounter(
         val leftWrist = frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.LEFT_WRIST)
         val rightWrist = frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.RIGHT_WRIST)
         val hasBothSides = leftShoulder != null && rightShoulder != null && leftWrist != null && rightWrist != null
-        if (!hasBothSides) return false
+        if (!hasBothSides) {
+            return wristY > shoulderY + WRIST_BELOW_SHOULDER_RELEASE_DELTA
+        }
 
         val leftReleased = (leftWrist?.y ?: 0f) > (leftShoulder?.y ?: 0f) + WRIST_BELOW_SHOULDER_RELEASE_DELTA
         val rightReleased = (rightWrist?.y ?: 0f) > (rightShoulder?.y ?: 0f) + WRIST_BELOW_SHOULDER_RELEASE_DELTA

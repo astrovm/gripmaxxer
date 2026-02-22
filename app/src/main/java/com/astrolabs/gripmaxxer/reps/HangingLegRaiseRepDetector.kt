@@ -34,8 +34,9 @@ class HangingLegRaiseRepDetector : ModeRepDetector {
 
         val isUp = kneeLift >= KNEE_UP_LIFT_THRESHOLD ||
             (ankleLift != null && ankleLift >= ANKLE_UP_LIFT_THRESHOLD)
-        val isDown = kneeLift <= KNEE_DOWN_LIFT_THRESHOLD &&
-            (ankleLift == null || ankleLift <= ANKLE_DOWN_LIFT_THRESHOLD)
+        val kneeDown = kneeLift <= KNEE_DOWN_LIFT_THRESHOLD
+        val ankleDown = ankleLift?.let { it <= ANKLE_DOWN_LIFT_THRESHOLD } == true
+        val isDown = kneeDown || ankleDown
 
         return cycleCounter.process(
             isDown = isDown,
