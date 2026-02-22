@@ -46,8 +46,6 @@ import com.astrolabs.gripmaxxer.reps.HangingLegRaiseActivityDetector
 import com.astrolabs.gripmaxxer.reps.HangingLegRaiseRepDetector
 import com.astrolabs.gripmaxxer.reps.HipThrustActivityDetector
 import com.astrolabs.gripmaxxer.reps.HipThrustRepDetector
-import com.astrolabs.gripmaxxer.reps.LungeActivityDetector
-import com.astrolabs.gripmaxxer.reps.LungeRepDetector
 import com.astrolabs.gripmaxxer.reps.BulgarianSplitSquatActivityDetector
 import com.astrolabs.gripmaxxer.reps.BulgarianSplitSquatRepDetector
 import com.astrolabs.gripmaxxer.reps.MuscleUpActivityDetector
@@ -55,8 +53,6 @@ import com.astrolabs.gripmaxxer.reps.MuscleUpRepDetector
 import com.astrolabs.gripmaxxer.reps.MiddleSplitHoldActivityDetector
 import com.astrolabs.gripmaxxer.reps.PistolSquatActivityDetector
 import com.astrolabs.gripmaxxer.reps.PistolSquatRepDetector
-import com.astrolabs.gripmaxxer.reps.PikePushUpActivityDetector
-import com.astrolabs.gripmaxxer.reps.PikePushUpRepDetector
 import com.astrolabs.gripmaxxer.reps.PlankHoldActivityDetector
 import com.astrolabs.gripmaxxer.reps.PullUpActivityDetector
 import com.astrolabs.gripmaxxer.reps.PullUpRepDetector
@@ -108,11 +104,9 @@ class HangCamService : LifecycleService() {
     private val hangingLegRaiseActivityDetector = HangingLegRaiseActivityDetector()
     private val muscleUpActivityDetector = MuscleUpActivityDetector(featureExtractor)
     private val pushUpActivityDetector = PushUpActivityDetector(featureExtractor)
-    private val pikePushUpActivityDetector = PikePushUpActivityDetector(featureExtractor)
     private val squatActivityDetector = SquatActivityDetector(featureExtractor)
     private val archerSquatActivityDetector = ArcherSquatActivityDetector(featureExtractor)
     private val pistolSquatActivityDetector = PistolSquatActivityDetector(featureExtractor)
-    private val lungeActivityDetector = LungeActivityDetector(featureExtractor)
     private val bulgarianSplitSquatActivityDetector = BulgarianSplitSquatActivityDetector(featureExtractor)
     private val hipThrustActivityDetector = HipThrustActivityDetector(featureExtractor)
     private val benchPressActivityDetector = BenchPressActivityDetector(featureExtractor)
@@ -120,11 +114,9 @@ class HangCamService : LifecycleService() {
     private val pullUpRepDetector = PullUpRepDetector(featureExtractor)
     private val muscleUpRepDetector = MuscleUpRepDetector(featureExtractor)
     private val pushUpRepDetector = PushUpRepDetector(featureExtractor)
-    private val pikePushUpRepDetector = PikePushUpRepDetector(featureExtractor)
     private val squatRepDetector = SquatRepDetector(featureExtractor)
     private val archerSquatRepDetector = ArcherSquatRepDetector(featureExtractor)
     private val pistolSquatRepDetector = PistolSquatRepDetector(featureExtractor)
-    private val lungeRepDetector = LungeRepDetector(featureExtractor)
     private val bulgarianSplitSquatRepDetector = BulgarianSplitSquatRepDetector(featureExtractor)
     private val hipThrustRepDetector = HipThrustRepDetector(featureExtractor)
     private val benchPressRepDetector = BenchPressRepDetector(featureExtractor)
@@ -151,12 +143,10 @@ class HangCamService : LifecycleService() {
             ExerciseMode.PLANK_HOLD to plankHoldRepDetector,
             ExerciseMode.MIDDLE_SPLIT_HOLD to middleSplitHoldRepDetector,
             ExerciseMode.PUSH_UP to pushUpRepDetector,
-            ExerciseMode.PIKE_PUSH_UP to pikePushUpRepDetector,
             ExerciseMode.ONE_ARM_PUSH_UP to pushUpRepDetector,
             ExerciseMode.SQUAT to squatRepDetector,
             ExerciseMode.ARCHER_SQUAT to archerSquatRepDetector,
             ExerciseMode.PISTOL_SQUAT to pistolSquatRepDetector,
-            ExerciseMode.LUNGE to lungeRepDetector,
             ExerciseMode.BULGARIAN_SPLIT_SQUAT to bulgarianSplitSquatRepDetector,
             ExerciseMode.HIP_THRUST to hipThrustRepDetector,
             ExerciseMode.BENCH_PRESS to benchPressRepDetector,
@@ -179,12 +169,10 @@ class HangCamService : LifecycleService() {
         ExerciseMode.PLANK_HOLD to plankHoldActivityDetector,
         ExerciseMode.MIDDLE_SPLIT_HOLD to middleSplitHoldActivityDetector,
         ExerciseMode.PUSH_UP to pushUpActivityDetector,
-        ExerciseMode.PIKE_PUSH_UP to pikePushUpActivityDetector,
         ExerciseMode.ONE_ARM_PUSH_UP to pushUpActivityDetector,
         ExerciseMode.SQUAT to squatActivityDetector,
         ExerciseMode.ARCHER_SQUAT to archerSquatActivityDetector,
         ExerciseMode.PISTOL_SQUAT to pistolSquatActivityDetector,
-        ExerciseMode.LUNGE to lungeActivityDetector,
         ExerciseMode.BULGARIAN_SPLIT_SQUAT to bulgarianSplitSquatActivityDetector,
         ExerciseMode.HIP_THRUST to hipThrustActivityDetector,
         ExerciseMode.BENCH_PRESS to benchPressActivityDetector,
