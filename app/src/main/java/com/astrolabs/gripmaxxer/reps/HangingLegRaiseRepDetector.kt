@@ -7,7 +7,7 @@ class HangingLegRaiseRepDetector : ModeRepDetector {
 
     private val cycleCounter = CycleRepCounter(
         stableMs = 120L,
-        minRepIntervalMs = 320L,
+        minRepIntervalMs = 430L,
     )
 
     override fun reset() {
@@ -34,9 +34,9 @@ class HangingLegRaiseRepDetector : ModeRepDetector {
 
         val isUp = kneeLift >= KNEE_UP_LIFT_THRESHOLD ||
             (ankleLift != null && ankleLift >= ANKLE_UP_LIFT_THRESHOLD)
-        val kneeDown = kneeLift <= KNEE_DOWN_LIFT_THRESHOLD
-        val ankleDown = ankleLift?.let { it <= ANKLE_DOWN_LIFT_THRESHOLD } == true
-        val isDown = kneeDown || ankleDown
+        // Use knee-driven reset to avoid ankle jitter causing false "down" transitions
+        // (which can lead to ghost/double reps on fast movement).
+        val isDown = kneeLift <= KNEE_DOWN_LIFT_THRESHOLD
 
         return cycleCounter.process(
             isDown = isDown,

@@ -70,6 +70,44 @@ class HangingLegRaiseRepDetectorTest {
         assertEquals(2, secondRep.reps)
     }
 
+    @Test
+    fun `does not double count from brief ankle drop while knees stay raised`() {
+        val detector = HangingLegRaiseRepDetector()
+
+        val downFrame = buildFrame(
+            shoulderY = 0.35f,
+            hipY = 0.70f,
+            kneeY = 0.88f,
+            ankleY = 0.95f,
+        )
+        val upFrame = buildFrame(
+            shoulderY = 0.35f,
+            hipY = 0.70f,
+            kneeY = 0.64f,
+            ankleY = 0.72f,
+        )
+        // Ankles momentarily look lower, but knees are still clearly up.
+        val ankleJitterFrame = buildFrame(
+            shoulderY = 0.35f,
+            hipY = 0.70f,
+            kneeY = 0.64f,
+            ankleY = 0.75f,
+        )
+
+        detector.process(frame = downFrame, active = true, nowMs = 0L)
+        detector.process(frame = downFrame, active = true, nowMs = 130L)
+        detector.process(frame = upFrame, active = true, nowMs = 600L)
+        val firstRep = detector.process(frame = upFrame, active = true, nowMs = 760L)
+        assertTrue(firstRep.repEvent)
+        assertEquals(1, firstRep.reps)
+
+        detector.process(frame = ankleJitterFrame, active = true, nowMs = 980L)
+        detector.process(frame = upFrame, active = true, nowMs = 1120L)
+        val noSecondRep = detector.process(frame = upFrame, active = true, nowMs = 1260L)
+        assertFalse(noSecondRep.repEvent)
+        assertEquals(1, noSecondRep.reps)
+    }
+
     private fun buildFrame(
         shoulderY: Float,
         hipY: Float,
