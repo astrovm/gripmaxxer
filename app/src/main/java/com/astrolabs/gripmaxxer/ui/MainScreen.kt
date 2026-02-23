@@ -282,6 +282,7 @@ fun MainScreen(
                         uiState = uiState,
                         onMediaToggle = viewModel::setMediaControlEnabled,
                         onRepSoundToggle = viewModel::setRepSoundEnabled,
+                        onVoiceCueToggle = viewModel::setVoiceCueEnabled,
                         onOverlayToggle = viewModel::setOverlayEnabled,
                         onPreviewToggle = viewModel::setShowCameraPreview,
                         onPaletteSelect = viewModel::setColorPalette,
@@ -1198,6 +1199,7 @@ private fun ProfileTab(
     uiState: MainUiState,
     onMediaToggle: (Boolean) -> Unit,
     onRepSoundToggle: (Boolean) -> Unit,
+    onVoiceCueToggle: (Boolean) -> Unit,
     onOverlayToggle: (Boolean) -> Unit,
     onPreviewToggle: (Boolean) -> Unit,
     onPaletteSelect: (ColorPalette) -> Unit,
@@ -1245,6 +1247,7 @@ private fun ProfileTab(
             Text("Settings", style = MaterialTheme.typography.titleMedium)
             SettingToggle("Enable media play/pause", uiState.settings.mediaControlEnabled, onMediaToggle)
             SettingToggle("Enable rep sound", uiState.settings.repSoundEnabled, onRepSoundToggle)
+            SettingToggle("Voice cue every 10s (hold modes)", uiState.settings.voiceCueEnabled, onVoiceCueToggle)
             SettingToggle("Enable overlay", uiState.settings.overlayEnabled, onOverlayToggle)
             SettingToggle("Show camera preview", uiState.showCameraPreview, onPreviewToggle)
             Text(

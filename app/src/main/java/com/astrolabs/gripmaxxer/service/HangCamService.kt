@@ -13,6 +13,7 @@ import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.Build
 import android.os.SystemClock
+import android.speech.tts.TextToSpeech
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -74,6 +75,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
@@ -189,11 +191,15 @@ class HangCamService : LifecycleService() {
     private var currentReps = 0
     private var currentSessionElapsedMs = 0L
     private var hangStartRealtimeMs = 0L
+    private var lastVoiceCueSecond = 0L
     private var latestFps = 0
     private val rawFramesSinceTick = AtomicInteger(0)
     private val lastFrameRealtimeMs = AtomicLong(0L)
     private var lastPosePresent = false
     private var repToneGenerator: ToneGenerator? = null
+    private var voiceCueTts: TextToSpeech? = null
+    @Volatile
+    private var voiceCueTtsReady = false
 
     override fun onCreate() {
         super.onCreate()
@@ -203,6 +209,19 @@ class HangCamService : LifecycleService() {
         repToneGenerator = runCatching {
             ToneGenerator(AudioManager.STREAM_MUSIC, REP_TONE_VOLUME)
         }.getOrNull()
+        voiceCueTts = TextToSpeech(applicationContext) { status ->
+            if (status != TextToSpeech.SUCCESS) {
+                voiceCueTtsReady = false
+                Log.w(TAG, "TextToSpeech init failed: $status")
+                return@TextToSpeech
+            }
+            val tts = voiceCueTts ?: return@TextToSpeech
+            voiceCueTtsReady = true
+            val localeResult = tts.setLanguage(Locale.getDefault())
+            if (localeResult == TextToSpeech.LANG_MISSING_DATA || localeResult == TextToSpeech.LANG_NOT_SUPPORTED) {
+                tts.setLanguage(Locale.US)
+            }
+        }
         createNotificationChannel()
     }
 
@@ -229,6 +248,10 @@ class HangCamService : LifecycleService() {
 
     override fun onDestroy() {
         stopMonitoring()
+        stopVoiceCueAnnouncements()
+        voiceCueTts?.shutdown()
+        voiceCueTts = null
+        voiceCueTtsReady = false
         repToneGenerator?.release()
         repToneGenerator = null
         serviceScope.cancel()
@@ -244,6 +267,7 @@ class HangCamService : LifecycleService() {
         repSoundEnabled = currentSettings.repSoundEnabled
         hangStartRealtimeMs = 0L
         currentSessionElapsedMs = 0L
+        lastVoiceCueSecond = 0L
         latestFps = 0
         rawFramesSinceTick.set(0)
         lastFrameRealtimeMs.set(0L)
@@ -277,6 +301,9 @@ class HangCamService : LifecycleService() {
                     currentMode = settings.selectedExerciseMode
                     mediaControlEnabled = settings.mediaControlEnabled
                     repSoundEnabled = settings.repSoundEnabled
+                    if (!settings.voiceCueEnabled) {
+                        voiceCueTts?.stop()
+                    }
                     applyModeCalibratedThresholds(settings = settings, mode = currentMode)
                     repEngine.setMode(currentMode, resetCurrent = previousMode != currentMode)
                     if (previousMode != currentMode) {
@@ -363,6 +390,7 @@ class HangCamService : LifecycleService() {
         currentMode = currentSettings.selectedExerciseMode
         hangStartRealtimeMs = 0L
         currentSessionElapsedMs = 0L
+        stopVoiceCueAnnouncements()
         latestFps = 0
         rawFramesSinceTick.set(0)
         lastFrameRealtimeMs.set(0L)
@@ -413,6 +441,7 @@ class HangCamService : LifecycleService() {
                     currentHangState = true
                     currentReps = 0
                     currentSessionElapsedMs = 0L
+                    lastVoiceCueSecond = 0L
                     repEngine.resetCurrent()
                     hangStartRealtimeMs = SystemClock.elapsedRealtime()
                     overlayTimerManager?.onHangStateChanged(true)
@@ -426,6 +455,7 @@ class HangCamService : LifecycleService() {
                     }
                     recordSessionIfMeaningful(nowMs)
                     hangStartRealtimeMs = 0L
+                    stopVoiceCueAnnouncements()
                     overlayTimerManager?.onHangStateChanged(false)
                     if (mediaControlEnabled) {
                         mediaControlManager.pause()
@@ -460,6 +490,7 @@ class HangCamService : LifecycleService() {
         currentReps = 0
         currentSessionElapsedMs = 0L
         hangStartRealtimeMs = 0L
+        stopVoiceCueAnnouncements()
         overlayTimerManager?.onHangStateChanged(false)
         overlayTimerManager?.onRepCountChanged(0)
         if (mediaControlEnabled) {
@@ -658,6 +689,7 @@ class HangCamService : LifecycleService() {
         } else {
             currentSessionElapsedMs
         }
+        maybeSpeakVoiceCue(elapsedMs)
         val lastFrameMs = lastFrameRealtimeMs.get()
         val frameAgeMs = if (lastFrameMs > 0L) {
             SystemClock.elapsedRealtime() - lastFrameMs
@@ -684,6 +716,48 @@ class HangCamService : LifecycleService() {
                 text = "${if (currentHangState) "ACTIVE" else "IDLE"} | Reps: $currentReps | ${formatSeconds(elapsedMs)}s | Cam:${latestFps}fps ${if (lastPosePresent) "pose" else "no-pose"} | ${currentMode.label}"
             )
         )
+    }
+
+    private fun maybeSpeakVoiceCue(elapsedMs: Long) {
+        if (!currentHangState || !currentSettings.voiceCueEnabled || !currentMode.isTimedHoldMode()) return
+        if (!voiceCueTtsReady) return
+        val elapsedSeconds = (elapsedMs / 1000L).coerceAtLeast(0L)
+        if (elapsedSeconds < VOICE_CUE_INTERVAL_SECONDS) return
+        if (elapsedSeconds % VOICE_CUE_INTERVAL_SECONDS != 0L) return
+        if (elapsedSeconds == lastVoiceCueSecond) return
+        lastVoiceCueSecond = elapsedSeconds
+        voiceCueTts?.speak(
+            buildVoiceCueText(elapsedSeconds),
+            TextToSpeech.QUEUE_FLUSH,
+            null,
+            "voice-cue-$elapsedSeconds",
+        )
+    }
+
+    private fun stopVoiceCueAnnouncements() {
+        lastVoiceCueSecond = 0L
+        voiceCueTts?.stop()
+    }
+
+    private fun buildVoiceCueText(elapsedSeconds: Long): String {
+        val minuteCount = elapsedSeconds / 60L
+        val secondCount = elapsedSeconds % 60L
+        return when {
+            minuteCount <= 0L -> "$elapsedSeconds seconds"
+            secondCount <= 0L -> {
+                if (minuteCount == 1L) {
+                    "1 minute"
+                } else {
+                    "$minuteCount minutes"
+                }
+            }
+
+            else -> {
+                val minuteSuffix = if (minuteCount == 1L) "" else "s"
+                val secondSuffix = if (secondCount == 1L) "" else "s"
+                "$minuteCount minute$minuteSuffix $secondCount second$secondSuffix"
+            }
+        }
     }
 
     private fun updateOverlayVisibility() {
@@ -756,6 +830,16 @@ class HangCamService : LifecycleService() {
             PackageManager.PERMISSION_GRANTED
     }
 
+    private fun ExerciseMode.isTimedHoldMode(): Boolean {
+        return this == ExerciseMode.DEAD_HANG ||
+            this == ExerciseMode.ACTIVE_HANG ||
+            this == ExerciseMode.ONE_ARM_DEAD_HANG ||
+            this == ExerciseMode.ONE_ARM_ACTIVE_HANG ||
+            this == ExerciseMode.HANDSTAND_HOLD ||
+            this == ExerciseMode.PLANK_HOLD ||
+            this == ExerciseMode.MIDDLE_SPLIT_HOLD
+    }
+
     private fun formatSeconds(ms: Long): String {
         return String.format(java.util.Locale.US, "%.1f", ms / 1000f)
     }
@@ -778,6 +862,7 @@ class HangCamService : LifecycleService() {
         private const val MIN_SESSION_MS = 400L
         private const val REP_TONE_DURATION_MS = 100
         private const val REP_TONE_VOLUME = 80
+        private const val VOICE_CUE_INTERVAL_SECONDS = 10L
 
         private const val NOTIFICATION_ID = 1001
         private const val NOTIFICATION_CHANNEL_ID = "hang_monitoring"

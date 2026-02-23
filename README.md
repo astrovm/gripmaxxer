@@ -27,6 +27,7 @@ Gripmaxxer is an Android app (Kotlin + Compose) that uses the **front camera** a
 - Send **system-wide media play/pause** commands through active MediaSession controllers.
 - Show an always-on-top numeric overlay stopwatch while exercise is active.
 - Count reps in the selected exercise mode.
+- Optional voice cues in hold modes: when enabled, announces elapsed hold time every 10 seconds.
 - Exercise detectors are tuned per mode (timing, angle, posture, and side-stability thresholds are not shared globally).
 - Provide a simple workout shell with bottom tabs: `Log`, `Workout`, `Profile`.
 
@@ -59,7 +60,7 @@ Made by **Astro Labs** (`astrolabs`).
 - Log entries can be deleted directly from the `Log` feed.
 - Log tab shows completed sessions feed, calendar aggregation, and editable detail.
 - Profile stats are separated by exercise mode (not global across all exercises).
-- Profile tab shows essential stats/settings (media control, rep sound, overlay, camera preview).
+- Profile tab shows essential stats/settings (media control, rep sound, voice cues, overlay, camera preview).
 - App theme defaults to Black/White and supports additional palettes in Profile settings (Black/Pink, Black/Blue, Black/Red, Black/Green, Black/Purple, Black/Orange, Windows 98 with classic beveled controls).
 
 ## Why Notification Access Is Required

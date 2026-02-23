@@ -22,6 +22,7 @@ class SettingsRepository(private val context: Context) {
         val overlayEnabled = booleanPreferencesKey("overlayEnabled")
         val mediaControlEnabled = booleanPreferencesKey("mediaControlEnabled")
         val repSoundEnabled = booleanPreferencesKey("repSoundEnabled")
+        val voiceCueEnabled = booleanPreferencesKey("voiceCueEnabled")
         val colorPalette = stringPreferencesKey("colorPalette")
         val weightUnit = stringPreferencesKey("weightUnit")
         val selectedExerciseMode = stringPreferencesKey("selectedExerciseMode")
@@ -53,6 +54,7 @@ class SettingsRepository(private val context: Context) {
             overlayEnabled = this[Keys.overlayEnabled] ?: true,
             mediaControlEnabled = this[Keys.mediaControlEnabled] ?: true,
             repSoundEnabled = this[Keys.repSoundEnabled] ?: true,
+            voiceCueEnabled = this[Keys.voiceCueEnabled] ?: false,
             colorPalette = parseColorPalette(this[Keys.colorPalette]),
             weightUnit = parseWeightUnit(this[Keys.weightUnit]),
             selectedExerciseMode = parseExerciseMode(this[Keys.selectedExerciseMode]),
@@ -79,6 +81,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setOverlayEnabled(value: Boolean) = editBool(Keys.overlayEnabled, value)
     suspend fun setMediaControlEnabled(value: Boolean) = editBool(Keys.mediaControlEnabled, value)
     suspend fun setRepSoundEnabled(value: Boolean) = editBool(Keys.repSoundEnabled, value)
+    suspend fun setVoiceCueEnabled(value: Boolean) = editBool(Keys.voiceCueEnabled, value)
     suspend fun setColorPalette(value: ColorPalette) = editString(Keys.colorPalette, value.name)
     suspend fun setWeightUnit(value: WeightUnit) = editString(Keys.weightUnit, value.name)
     suspend fun setSelectedExerciseMode(value: ExerciseMode) = editString(Keys.selectedExerciseMode, value.name)

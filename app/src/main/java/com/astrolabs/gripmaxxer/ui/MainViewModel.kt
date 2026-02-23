@@ -227,6 +227,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun setVoiceCueEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setVoiceCueEnabled(enabled)
+        }
+    }
+
     fun setColorPalette(palette: ColorPalette) {
         viewModelScope.launch {
             settingsRepository.setColorPalette(palette)
