@@ -31,8 +31,6 @@ Gripmaxxer is an Android app (Kotlin + Compose) that uses the **front camera** a
 - Exercise detectors are tuned per mode (timing, angle, posture, and side-stability thresholds are not shared globally).
 - Provide a simple workout shell with bottom tabs: `Log`, `Workout`, `Profile`.
 
-Made by **astrovm** (`astrovm`).
-
 ## What It Does
 - **Exercise active** -> sends `play()` to the active media session (if media control is enabled).
 - **Exercise idle** -> sends `pause()` (if media control is enabled).
