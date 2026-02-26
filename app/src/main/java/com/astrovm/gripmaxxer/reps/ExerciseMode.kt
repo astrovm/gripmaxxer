@@ -1,0 +1,26 @@
+package com.astrovm.gripmaxxer.reps
+
+enum class ExerciseMode(val label: String) {
+    PULL_UP("Pull-up"),
+    CHIN_UP("Chin-up"),
+    MUSCLE_UP("Muscle-up"),
+    ONE_ARM_PULL_UP("One-arm pull-up"),
+    ONE_ARM_CHIN_UP("One-arm chin-up"),
+    HANGING_LEG_RAISE("Hanging leg raise"),
+    DEAD_HANG("Dead hang"),
+    ACTIVE_HANG("Active hang"),
+    ONE_ARM_DEAD_HANG("One-arm dead hang"),
+    ONE_ARM_ACTIVE_HANG("One-arm active hang"),
+    HANDSTAND_HOLD("Handstand hold"),
+    PLANK_HOLD("Plank hold"),
+    MIDDLE_SPLIT_HOLD("Middle split hold"),
+    PUSH_UP("Push-up"),
+    ONE_ARM_PUSH_UP("One-arm push-up"),
+    SQUAT("Squat"),
+    ARCHER_SQUAT("Archer squat"),
+    PISTOL_SQUAT("Pistol squat"),
+    BULGARIAN_SPLIT_SQUAT("Bulgarian split squat"),
+    HIP_THRUST("Hip thrust"),
+    BENCH_PRESS("Bench press"),
+    DIP("Dip"),
+}

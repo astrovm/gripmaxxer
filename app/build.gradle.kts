@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.astrolabs.gripmaxxer"
+    namespace = "com.astrovm.gripmaxxer"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.astrolabs.gripmaxxer"
+        applicationId = "com.astrovm.gripmaxxer"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

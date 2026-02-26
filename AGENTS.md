@@ -7,7 +7,7 @@ Guidance for coding agents working in this repository.
 - App name: `Gripmaxxer`
 - Platform: Android (Kotlin)
 - Module layout: single module `:app`
-- Package name: `com.astrolabs.gripmaxxer` (do not rename unless explicitly requested)
+- Package name: `com.astrovm.gripmaxxer` (do not rename unless explicitly requested)
 - UI: Jetpack Compose
 - Camera/ML: CameraX + ML Kit Pose Detection
 - Persistence: DataStore Preferences
@@ -25,9 +25,9 @@ Guidance for coding agents working in this repository.
 
 ## Important Files
 - Manifest: `app/src/main/AndroidManifest.xml`
-- Service: `app/src/main/java/com/astrolabs/gripmaxxer/service/HangCamService.kt`
-- Main UI: `app/src/main/java/com/astrolabs/gripmaxxer/ui/MainScreen.kt`
-- Settings: `app/src/main/java/com/astrolabs/gripmaxxer/datastore/SettingsRepository.kt`
+- Service: `app/src/main/java/com/astrovm/gripmaxxer/service/HangCamService.kt`
+- Main UI: `app/src/main/java/com/astrovm/gripmaxxer/ui/MainScreen.kt`
+- Settings: `app/src/main/java/com/astrovm/gripmaxxer/datastore/SettingsRepository.kt`
 - README: `README.md`
 
 ## Coding Guidelines

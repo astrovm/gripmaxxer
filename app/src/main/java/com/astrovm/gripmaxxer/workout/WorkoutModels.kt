@@ -1,0 +1,79 @@
+package com.astrovm.gripmaxxer.workout
+
+import com.astrovm.gripmaxxer.reps.ExerciseMode
+
+data class WorkoutSetState(
+    val id: Long,
+    val setNumber: Int,
+    val reps: Int,
+    val durationMs: Long,
+    val completedAtMs: Long,
+    val autoTracked: Boolean,
+)
+
+data class ActiveWorkoutState(
+    val id: Long,
+    val title: String,
+    val mode: ExerciseMode,
+    val startedAtMs: Long,
+    val elapsedMs: Long,
+    val elapsedComputedAtMs: Long,
+    val paused: Boolean,
+    val sets: List<WorkoutSetState>,
+)
+
+data class WorkoutFeedItem(
+    val workoutId: Long,
+    val title: String,
+    val mode: ExerciseMode,
+    val completedAtMs: Long,
+    val durationMs: Long,
+    val setCount: Int,
+)
+
+data class CalendarDaySummary(
+    val dayEpochMs: Long,
+    val workoutCount: Int,
+)
+
+data class ExerciseProfileStats(
+    val mode: ExerciseMode,
+    val totalWorkouts: Int,
+    val maxReps: Int,
+    val maxHoldMs: Long,
+)
+
+data class CompletedWorkoutDetail(
+    val workoutId: Long,
+    val title: String,
+    val mode: ExerciseMode,
+    val startedAtMs: Long,
+    val completedAtMs: Long,
+    val durationMs: Long,
+    val sets: List<WorkoutSetState>,
+)
+
+val CameraTrackableModes = listOf(
+    ExerciseMode.DEAD_HANG,
+    ExerciseMode.ACTIVE_HANG,
+    ExerciseMode.ONE_ARM_DEAD_HANG,
+    ExerciseMode.ONE_ARM_ACTIVE_HANG,
+    ExerciseMode.HANDSTAND_HOLD,
+    ExerciseMode.PLANK_HOLD,
+    ExerciseMode.MIDDLE_SPLIT_HOLD,
+    ExerciseMode.PULL_UP,
+    ExerciseMode.CHIN_UP,
+    ExerciseMode.MUSCLE_UP,
+    ExerciseMode.ONE_ARM_PULL_UP,
+    ExerciseMode.ONE_ARM_CHIN_UP,
+    ExerciseMode.HANGING_LEG_RAISE,
+    ExerciseMode.PUSH_UP,
+    ExerciseMode.ONE_ARM_PUSH_UP,
+    ExerciseMode.SQUAT,
+    ExerciseMode.ARCHER_SQUAT,
+    ExerciseMode.PISTOL_SQUAT,
+    ExerciseMode.BULGARIAN_SPLIT_SQUAT,
+    ExerciseMode.HIP_THRUST,
+    ExerciseMode.BENCH_PRESS,
+    ExerciseMode.DIP,
+)
