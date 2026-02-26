@@ -14,8 +14,8 @@ Guidance for coding agents working in this repository.
 
 ## Build and Verify
 - Preferred command:
-  - `JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ANDROID_HOME=/home/astro/Android/Sdk ./gradlew :app:assembleDebug -x lint`
-- If Android SDK path differs locally, set `ANDROID_HOME` accordingly.
+  - `JAVA_HOME="${JAVA_HOME:-$HOME/android-studio/jbr}" ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}" ./gradlew :app:assembleDebug -x lint`
+- If Android Studio/JDK or Android SDK are installed elsewhere, set `JAVA_HOME` and `ANDROID_HOME` to local paths before running.
 
 ## Key Runtime Constraints
 - Camera monitoring runs only in foreground service (`HangCamService`) with persistent notification.
