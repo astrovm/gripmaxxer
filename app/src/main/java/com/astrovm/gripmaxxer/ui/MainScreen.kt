@@ -70,6 +70,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -1205,6 +1206,7 @@ private fun ProfileTab(
     onPaletteSelect: (ColorPalette) -> Unit,
 ) {
     val isWindows98 = LocalIsWindows98Theme.current
+    val uriHandler = LocalUriHandler.current
     ScreenHeader("Profile")
 
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
@@ -1258,6 +1260,16 @@ private fun ProfileTab(
             ColorPaletteSelector(
                 selectedPalette = uiState.settings.colorPalette,
                 onSelect = onPaletteSelect,
+            )
+            HorizontalDivider()
+            Text(
+                text = "Made by @astrovm",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { uriHandler.openUri("https://github.com/astrovm/gripmaxxer") }
+                    .padding(top = 4.dp),
             )
         }
     }
