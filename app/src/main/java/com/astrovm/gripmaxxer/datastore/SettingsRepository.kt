@@ -54,7 +54,7 @@ class SettingsRepository(private val context: Context) {
             overlayEnabled = this[Keys.overlayEnabled] ?: true,
             mediaControlEnabled = this[Keys.mediaControlEnabled] ?: true,
             repSoundEnabled = this[Keys.repSoundEnabled] ?: true,
-            voiceCueEnabled = this[Keys.voiceCueEnabled] ?: false,
+            voiceCueEnabled = this[Keys.voiceCueEnabled] ?: true,
             colorPalette = parseColorPalette(this[Keys.colorPalette]),
             weightUnit = parseWeightUnit(this[Keys.weightUnit]),
             selectedExerciseMode = parseExerciseMode(this[Keys.selectedExerciseMode]),

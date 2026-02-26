@@ -6,7 +6,7 @@ data class AppSettings(
     val overlayEnabled: Boolean = true,
     val mediaControlEnabled: Boolean = true,
     val repSoundEnabled: Boolean = true,
-    val voiceCueEnabled: Boolean = false,
+    val voiceCueEnabled: Boolean = true,
     val colorPalette: ColorPalette = ColorPalette.BLACK_WHITE,
     val weightUnit: WeightUnit = WeightUnit.KG,
     val selectedExerciseMode: ExerciseMode = ExerciseMode.DEAD_HANG,

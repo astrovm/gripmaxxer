@@ -762,9 +762,11 @@ private fun WorkoutStartTab(
     onOpenOverlaySettings: () -> Unit,
 ) {
     val isWindows98 = LocalIsWindows98Theme.current
+    val cameraPermissionRequired = !cameraGranted
     val notificationAccessRequired = mediaControlEnabled && !notificationAccessEnabled
     val overlayPermissionRequired = overlayEnabled && !overlayPermissionGranted
-    val canStart = cameraGranted && !notificationAccessRequired && !overlayPermissionRequired
+    val hasMissingPermissions = cameraPermissionRequired || notificationAccessRequired || overlayPermissionRequired
+    val canStart = !hasMissingPermissions
 
     ScreenHeader("Workout")
 
@@ -806,40 +808,43 @@ private fun WorkoutStartTab(
                 }
             }
 
-            if (!cameraGranted) {
-                OutlinedButton(
-                    onClick = onRequestCamera,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Grant camera permission")
-                }
-            }
-
-            if (notificationAccessRequired || overlayPermissionRequired) {
+            if (hasMissingPermissions) {
+                HorizontalDivider()
                 Text(
-                    text = "Required for your enabled settings",
+                    text = "Missing permissions",
                     style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Grant the permissions below to start your workout.",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
+                if (cameraPermissionRequired) {
+                    PermissionRequestItem(
+                        title = "Camera permission",
+                        description = "Required for exercise tracking.",
+                        actionLabel = "Grant camera permission",
+                        onClick = onRequestCamera,
+                    )
+                }
                 if (notificationAccessRequired) {
-                    ChecklistLine("Notification access", false)
-                    OutlinedButton(
+                    PermissionRequestItem(
+                        title = "Notification access",
+                        description = "Required when media play/pause is enabled.",
+                        actionLabel = "Open notification access",
                         onClick = onOpenNotificationAccess,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Open notification access")
-                    }
+                    )
                 }
 
                 if (overlayPermissionRequired) {
-                    ChecklistLine("Overlay permission", false)
-                    OutlinedButton(
+                    PermissionRequestItem(
+                        title = "Overlay permission",
+                        description = "Required when overlay is enabled.",
+                        actionLabel = "Open overlay settings",
                         onClick = onOpenOverlaySettings,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Open overlay settings")
-                    }
+                    )
                 }
             }
         }
@@ -1312,17 +1317,32 @@ private fun ColorPaletteSelector(
 }
 
 @Composable
-private fun ChecklistLine(label: String, ready: Boolean) {
-    Row(
+private fun PermissionRequestItem(
+    title: String,
+    description: String,
+    actionLabel: String,
+    onClick: () -> Unit,
+) {
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text(text = label, color = MaterialTheme.colorScheme.onSurface)
         Text(
-            text = if (ready) "Ready" else "Required",
-            color = if (ready) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
         )
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedButton(
+            onClick = onClick,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(actionLabel)
+        }
     }
 }
 
