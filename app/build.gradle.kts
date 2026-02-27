@@ -69,9 +69,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
 
     implementation("androidx.datastore:datastore-preferences:1.2.0")
-    implementation("androidx.room:room-runtime:2.7.2")
-    implementation("androidx.room:room-ktx:2.7.2")
-    ksp("androidx.room:room-compiler:2.7.2")
+    implementation("androidx.room:room-runtime:2.8.4")
+    implementation("androidx.room:room-ktx:2.8.4")
+    ksp("androidx.room:room-compiler:2.8.4")
 
     implementation("androidx.camera:camera-core:1.5.3")
     implementation("androidx.camera:camera-camera2:1.5.3")
