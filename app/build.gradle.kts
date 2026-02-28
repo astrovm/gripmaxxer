@@ -1,4 +1,4 @@
-import java.io.ByteArrayOutputStream
+import org.gradle.api.Project
 
 plugins {
     id("com.android.application")
@@ -6,26 +6,29 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
-fun readGitValue(vararg args: String): String? {
+fun Project.gitOutput(vararg args: String): String? {
     return try {
-        val output = ByteArrayOutputStream()
-        val command = mutableListOf("git").apply { addAll(args) }
-        val process = ProcessBuilder(command)
-            .directory(project.rootDir)
+        val process = ProcessBuilder(listOf("git", *args))
+            .directory(rootDir)
             .redirectErrorStream(true)
             .start()
-        process.inputStream.copyTo(output)
-        val result = output.toString().trim()
-        if (process.waitFor() == 0 && result.isNotEmpty()) result else null
+        val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
+        if (process.waitFor() == 0) output.ifEmpty { null } else null
     } catch (_: Exception) {
         null
     }
 }
 
-val gitVersionCode = readGitValue("rev-list", "--count", "HEAD")?.toIntOrNull() ?: 1
-val gitVersionName = readGitValue("describe", "--tags", "--dirty", "--always")
-    ?.removePrefix("v")
-    ?: "0.0.0-local"
+val latestTagRef = project.gitOutput("describe", "--tags", "--abbrev=0")
+val latestTagName = latestTagRef?.removePrefix("v")
+val commitCount = project.gitOutput("rev-list", "--count", "HEAD")?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+val commitsSinceTag = latestTagRef?.let { project.gitOutput("rev-list", "--count", "$it..HEAD")?.toIntOrNull() }
+
+val derivedVersionName = when {
+    latestTagName == null -> "0.0.0-dev"
+    commitsSinceTag == null || commitsSinceTag == 0 -> latestTagName
+    else -> "$latestTagName-dev.$commitsSinceTag"
+}
 
 android {
     namespace = "com.astrovm.gripmaxxer"
@@ -35,8 +38,8 @@ android {
         applicationId = "com.astrovm.gripmaxxer"
         minSdk = 26
         targetSdk = 36
-        versionCode = gitVersionCode
-        versionName = gitVersionName
+        versionCode = commitCount
+        versionName = derivedVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
