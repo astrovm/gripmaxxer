@@ -135,6 +135,82 @@ class HangingLegRaiseRepDetectorTest {
         assertEquals(1, final.reps)
     }
 
+    @Test
+    fun `counts next rep after controlled partial descent`() {
+        val detector = HangingLegRaiseRepDetector()
+
+        val fullDownFrame = buildFrame(
+            shoulderY = 0.35f,
+            hipY = 0.70f,
+            kneeY = 0.88f,
+            ankleY = 0.95f,
+        )
+        val partialDownFrame = buildFrame(
+            shoulderY = 0.35f,
+            hipY = 0.70f,
+            kneeY = 0.678f,
+            ankleY = 0.76f,
+        )
+        val upFrame = buildFrame(
+            shoulderY = 0.35f,
+            hipY = 0.70f,
+            kneeY = 0.64f,
+            ankleY = 0.72f,
+        )
+
+        detector.process(frame = fullDownFrame, active = true, nowMs = 0L)
+        detector.process(frame = fullDownFrame, active = true, nowMs = 140L)
+        detector.process(frame = upFrame, active = true, nowMs = 600L)
+        val firstRep = detector.process(frame = upFrame, active = true, nowMs = 760L)
+        assertTrue(firstRep.repEvent)
+        assertEquals(1, firstRep.reps)
+
+        detector.process(frame = partialDownFrame, active = true, nowMs = 920L)
+        detector.process(frame = partialDownFrame, active = true, nowMs = 1080L)
+        detector.process(frame = upFrame, active = true, nowMs = 1240L)
+        val secondRep = detector.process(frame = upFrame, active = true, nowMs = 1400L)
+        assertTrue(secondRep.repEvent)
+        assertEquals(2, secondRep.reps)
+    }
+
+    @Test
+    fun `counts rep when ankles are clearly lowered with slight knee bend`() {
+        val detector = HangingLegRaiseRepDetector()
+
+        val fullDownFrame = buildFrame(
+            shoulderY = 0.35f,
+            hipY = 0.70f,
+            kneeY = 0.88f,
+            ankleY = 0.95f,
+        )
+        val bentKneeBottomFrame = buildFrame(
+            shoulderY = 0.35f,
+            hipY = 0.70f,
+            kneeY = 0.67f,
+            ankleY = 0.70f,
+        )
+        val upFrame = buildFrame(
+            shoulderY = 0.35f,
+            hipY = 0.70f,
+            kneeY = 0.64f,
+            ankleY = 0.72f,
+        )
+
+        detector.process(frame = fullDownFrame, active = true, nowMs = 0L)
+        detector.process(frame = fullDownFrame, active = true, nowMs = 140L)
+        detector.process(frame = upFrame, active = true, nowMs = 520L)
+        val firstRep = detector.process(frame = upFrame, active = true, nowMs = 680L)
+        assertTrue(firstRep.repEvent)
+        assertEquals(1, firstRep.reps)
+
+        detector.process(frame = bentKneeBottomFrame, active = true, nowMs = 900L)
+        detector.process(frame = bentKneeBottomFrame, active = true, nowMs = 1060L)
+        detector.process(frame = upFrame, active = true, nowMs = 1220L)
+        val secondRep = detector.process(frame = upFrame, active = true, nowMs = 1380L)
+        assertTrue(secondRep.repEvent)
+        assertEquals(2, secondRep.reps)
+    }
+
     private fun buildFrame(
         shoulderY: Float,
         hipY: Float,

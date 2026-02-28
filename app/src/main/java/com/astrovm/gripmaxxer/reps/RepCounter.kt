@@ -161,6 +161,7 @@ class RepCounter(
             State.DOWN -> handleDownState(
                 isDown = isDown || isDownByElbowTravel,
                 isUp = (isUp || isUpByElbowTravel) && hasGripPosture,
+                hasGripPosture = hasGripPosture,
                 nowMs = nowMs,
                 requiredStableMs = upStableMs,
                 smoothElbow = smoothElbow,
@@ -178,11 +179,13 @@ class RepCounter(
     private fun handleDownState(
         isDown: Boolean,
         isUp: Boolean,
+        hasGripPosture: Boolean,
         nowMs: Long,
         requiredStableMs: Long,
         smoothElbow: Float,
     ): RepCounterResult {
-        if (!armedForUp && isDown) {
+        // Only arm from a real bottom hang posture; this blocks ghost reps while releasing the bar.
+        if (!armedForUp && isDown && hasGripPosture) {
             armedForUp = true
         }
 
@@ -255,13 +258,18 @@ class RepCounter(
         val leftWrist = frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.LEFT_WRIST)
         val rightWrist = frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.RIGHT_WRIST)
         val faceY = frame.noseOrMouthY()
+        val gripShoulderDelta = if (config.requireBothWristsForGripUp) {
+            WRIST_ABOVE_SHOULDER_STRICT_GRIP_DELTA
+        } else {
+            WRIST_ABOVE_SHOULDER_GRIP_DELTA
+        }
 
         val leftGrip = leftShoulder != null &&
             leftWrist != null &&
-            leftWrist.y < leftShoulder.y + WRIST_ABOVE_SHOULDER_GRIP_DELTA
+            leftWrist.y < leftShoulder.y + gripShoulderDelta
         val rightGrip = rightShoulder != null &&
             rightWrist != null &&
-            rightWrist.y < rightShoulder.y + WRIST_ABOVE_SHOULDER_GRIP_DELTA
+            rightWrist.y < rightShoulder.y + gripShoulderDelta
 
         val hasBothSides = leftShoulder != null && rightShoulder != null &&
             leftWrist != null && rightWrist != null
@@ -319,6 +327,7 @@ class RepCounter(
         private const val ELBOW_DOWN_TRAVEL_DEG = 22f
         private const val ELBOW_TRAVEL_STABLE_MS = 120L
         private const val WRIST_BELOW_SHOULDER_RELEASE_DELTA = 0.03f
+        private const val WRIST_ABOVE_SHOULDER_STRICT_GRIP_DELTA = 0.015f
         private const val WRIST_ABOVE_SHOULDER_GRIP_DELTA = 0.04f
         private const val WRIST_BELOW_FACE_MAX_GRIP_DELTA = 0.14f
         private const val RELEASE_LOCK_MS = 1200L

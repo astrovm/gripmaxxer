@@ -42,7 +42,9 @@ class HangingLegRaiseRepDetector : ModeRepDetector {
             (ankleLift != null && ankleLift >= ANKLE_UP_LIFT_THRESHOLD)
         // Use knee-driven reset to avoid ankle jitter causing false "down" transitions
         // (which can lead to ghost/double reps on fast movement).
-        val isDown = kneeLift <= KNEE_DOWN_LIFT_THRESHOLD
+        // Also accept clearly lowered ankles for users who keep a slight knee bend at the bottom.
+        val isDown = kneeLift <= KNEE_DOWN_LIFT_THRESHOLD ||
+            (ankleLift != null && ankleLift <= ANKLE_DOWN_LIFT_THRESHOLD)
 
         return cycleCounter.process(
             isDown = isDown,
@@ -54,7 +56,9 @@ class HangingLegRaiseRepDetector : ModeRepDetector {
     companion object {
         private const val ACTIVE_GRACE_MS = 450L
         private const val KNEE_UP_LIFT_THRESHOLD = 0.030f
-        private const val KNEE_DOWN_LIFT_THRESHOLD = 0.018f
+        // Tolerate slight knee bend at the bottom so controlled partial descents still reset the cycle.
+        private const val KNEE_DOWN_LIFT_THRESHOLD = 0.028f
         private const val ANKLE_UP_LIFT_THRESHOLD = 0.020f
+        private const val ANKLE_DOWN_LIFT_THRESHOLD = 0.010f
     }
 }
