@@ -288,6 +288,61 @@ class RepCounterTest {
         assertEquals(1, noGhostRep.reps)
     }
 
+    @Test
+    fun `pull-up mode disarms when grip is lost after returning to down`() {
+        val counter = RepCounter(
+            featureExtractor = PoseFeatureExtractor(),
+            config = RepCounterConfig(
+                stableMs = 40L,
+                minRepIntervalMs = 0L,
+                requireBothWristsForGripUp = true,
+            ),
+        )
+
+        val downFrame = buildFrame(
+            noseY = 0.35f,
+            leftShoulderY = 0.50f,
+            rightShoulderY = 0.50f,
+            leftElbow = NormalizedLandmark(0.45f, 0.40f),
+            rightElbow = NormalizedLandmark(0.55f, 0.40f),
+            leftWrist = NormalizedLandmark(0.45f, 0.24f),
+            rightWrist = NormalizedLandmark(0.55f, 0.24f),
+        )
+        val upFrame = buildFrame(
+            noseY = 0.12f,
+            leftShoulderY = 0.50f,
+            rightShoulderY = 0.50f,
+            leftElbow = NormalizedLandmark(0.45f, 0.28f),
+            rightElbow = NormalizedLandmark(0.55f, 0.28f),
+            leftWrist = NormalizedLandmark(0.34f, 0.26f),
+            rightWrist = NormalizedLandmark(0.66f, 0.26f),
+        )
+        val noGripDownLikeFrame = buildFrame(
+            noseY = 0.38f,
+            leftShoulderY = 0.50f,
+            rightShoulderY = 0.50f,
+            leftElbow = NormalizedLandmark(0.45f, 0.43f),
+            rightElbow = NormalizedLandmark(0.55f, 0.43f),
+            leftWrist = NormalizedLandmark(0.53f, 0.52f),
+            rightWrist = NormalizedLandmark(0.47f, 0.52f),
+        )
+
+        counter.process(frame = downFrame, hanging = true, nowMs = 0L)
+        counter.process(frame = downFrame, hanging = true, nowMs = 80L)
+        counter.process(frame = upFrame, hanging = true, nowMs = 160L)
+        val firstRep = counter.process(frame = upFrame, hanging = true, nowMs = 240L)
+        assertEquals(1, firstRep.reps)
+
+        counter.process(frame = downFrame, hanging = true, nowMs = 360L)
+        counter.process(frame = downFrame, hanging = true, nowMs = 440L)
+        counter.process(frame = noGripDownLikeFrame, hanging = true, nowMs = 520L)
+        counter.process(frame = upFrame, hanging = true, nowMs = 620L)
+        val noGhostRep = counter.process(frame = upFrame, hanging = true, nowMs = 700L)
+
+        assertFalse(noGhostRep.repEvent)
+        assertEquals(1, noGhostRep.reps)
+    }
+
     private fun buildFrame(
         noseY: Float,
         leftShoulderY: Float,
