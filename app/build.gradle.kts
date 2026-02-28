@@ -1,8 +1,31 @@
+import java.io.ByteArrayOutputStream
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
 }
+
+fun readGitValue(vararg args: String): String? {
+    return try {
+        val output = ByteArrayOutputStream()
+        val command = mutableListOf("git").apply { addAll(args) }
+        val process = ProcessBuilder(command)
+            .directory(project.rootDir)
+            .redirectErrorStream(true)
+            .start()
+        process.inputStream.copyTo(output)
+        val result = output.toString().trim()
+        if (process.waitFor() == 0 && result.isNotEmpty()) result else null
+    } catch (_: Exception) {
+        null
+    }
+}
+
+val gitVersionCode = readGitValue("rev-list", "--count", "HEAD")?.toIntOrNull() ?: 1
+val gitVersionName = readGitValue("describe", "--tags", "--dirty", "--always")
+    ?.removePrefix("v")
+    ?: "0.0.0-local"
 
 android {
     namespace = "com.astrovm.gripmaxxer"
@@ -12,8 +35,8 @@ android {
         applicationId = "com.astrovm.gripmaxxer"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = gitVersionCode
+        versionName = gitVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
