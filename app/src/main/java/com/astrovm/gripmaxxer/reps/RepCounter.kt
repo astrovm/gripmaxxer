@@ -184,8 +184,14 @@ class RepCounter(
         requiredStableMs: Long,
         smoothElbow: Float,
     ): RepCounterResult {
+        if (config.requireBothWristsForGripUp && !hasGripPosture) {
+            armedForUp = false
+            upCandidateSince = null
+            return RepCounterResult(reps = reps, repEvent = false)
+        }
+
         // Only arm from a real bottom hang posture; this blocks ghost reps while releasing the bar.
-        if (!armedForUp && isDown && hasGripPosture) {
+        if (!armedForUp && isDown && hasGripPosture && !isUp) {
             armedForUp = true
         }
 
@@ -250,6 +256,10 @@ class RepCounter(
         armedForUp = false
         downAnchorElbow = null
         upAnchorElbow = null
+        wristWindow.clear()
+        noseWindow.clear()
+        shoulderWindow.clear()
+        elbowWindow.clear()
     }
 
     private fun hasGripLikePosture(frame: PoseFrame): Boolean {
@@ -289,22 +299,27 @@ class RepCounter(
         wristY: Float?,
     ): Boolean {
         if (shoulderY == null || wristY == null) return false
+        val releaseDelta = if (config.requireBothWristsForGripUp) {
+            WRIST_BELOW_SHOULDER_STRICT_RELEASE_DELTA
+        } else {
+            WRIST_BELOW_SHOULDER_RELEASE_DELTA
+        }
         val leftShoulder = frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.LEFT_SHOULDER)
         val rightShoulder = frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.RIGHT_SHOULDER)
         val leftWrist = frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.LEFT_WRIST)
         val rightWrist = frame.landmark(com.google.mlkit.vision.pose.PoseLandmark.RIGHT_WRIST)
         val hasBothSides = leftShoulder != null && rightShoulder != null && leftWrist != null && rightWrist != null
         if (!hasBothSides) {
-            return wristY > shoulderY + WRIST_BELOW_SHOULDER_RELEASE_DELTA
+            return wristY > shoulderY + releaseDelta
         }
 
-        val leftReleased = (leftWrist?.y ?: 0f) > (leftShoulder?.y ?: 0f) + WRIST_BELOW_SHOULDER_RELEASE_DELTA
-        val rightReleased = (rightWrist?.y ?: 0f) > (rightShoulder?.y ?: 0f) + WRIST_BELOW_SHOULDER_RELEASE_DELTA
+        val leftReleased = (leftWrist?.y ?: 0f) > (leftShoulder?.y ?: 0f) + releaseDelta
+        val rightReleased = (rightWrist?.y ?: 0f) > (rightShoulder?.y ?: 0f) + releaseDelta
         if (config.requireBothWristsForGripUp && (leftReleased || rightReleased)) {
             return true
         }
 
-        return wristY > shoulderY + WRIST_BELOW_SHOULDER_RELEASE_DELTA
+        return wristY > shoulderY + releaseDelta
     }
 
     private fun pushAndAverage(window: ArrayDeque<Float>, value: Float): Float {
@@ -326,6 +341,7 @@ class RepCounter(
         private const val ELBOW_UP_TRAVEL_DEG = 24f
         private const val ELBOW_DOWN_TRAVEL_DEG = 22f
         private const val ELBOW_TRAVEL_STABLE_MS = 120L
+        private const val WRIST_BELOW_SHOULDER_STRICT_RELEASE_DELTA = 0f
         private const val WRIST_BELOW_SHOULDER_RELEASE_DELTA = 0.03f
         private const val WRIST_ABOVE_SHOULDER_STRICT_GRIP_DELTA = 0.015f
         private const val WRIST_ABOVE_SHOULDER_GRIP_DELTA = 0.04f
