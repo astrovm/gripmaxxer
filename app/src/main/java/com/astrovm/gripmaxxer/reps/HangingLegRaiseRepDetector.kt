@@ -6,12 +6,14 @@ import com.google.mlkit.vision.pose.PoseLandmark
 class HangingLegRaiseRepDetector : ModeRepDetector {
 
     private val cycleCounter = CycleRepCounter(
-        stableMs = 120L,
-        minRepIntervalMs = 430L,
+        stableMs = 110L,
+        minRepIntervalMs = 320L,
     )
+    private var lastActiveAtMs = Long.MIN_VALUE
 
     override fun reset() {
         cycleCounter.reset()
+        lastActiveAtMs = Long.MIN_VALUE
     }
 
     override fun process(
@@ -19,7 +21,11 @@ class HangingLegRaiseRepDetector : ModeRepDetector {
         active: Boolean,
         nowMs: Long,
     ): RepCounterResult {
-        if (!active) {
+        if (active) {
+            lastActiveAtMs = nowMs
+        }
+        val activeWithGrace = active || (nowMs - lastActiveAtMs) <= ACTIVE_GRACE_MS
+        if (!activeWithGrace) {
             return RepCounterResult(reps = cycleCounter.currentReps(), repEvent = false)
         }
 
@@ -46,9 +52,9 @@ class HangingLegRaiseRepDetector : ModeRepDetector {
     }
 
     companion object {
-        private const val KNEE_UP_LIFT_THRESHOLD = 0.035f
-        private const val KNEE_DOWN_LIFT_THRESHOLD = 0.012f
+        private const val ACTIVE_GRACE_MS = 450L
+        private const val KNEE_UP_LIFT_THRESHOLD = 0.030f
+        private const val KNEE_DOWN_LIFT_THRESHOLD = 0.018f
         private const val ANKLE_UP_LIFT_THRESHOLD = 0.020f
-        private const val ANKLE_DOWN_LIFT_THRESHOLD = 0.005f
     }
 }

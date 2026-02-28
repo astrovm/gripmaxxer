@@ -40,6 +40,7 @@ class RepCounter(
     private var lastRepTimeMs = 0L
     private var upCandidateSince: Long? = null
     private var downCandidateSince: Long? = null
+    private var armedForUp: Boolean = false
     private var downAnchorElbow: Float? = null
     private var upAnchorElbow: Float? = null
     private var releaseLockUntilMs = 0L
@@ -58,6 +59,7 @@ class RepCounter(
         lastRepTimeMs = 0L
         upCandidateSince = null
         downCandidateSince = null
+        armedForUp = false
         downAnchorElbow = null
         upAnchorElbow = null
         releaseLockUntilMs = 0L
@@ -157,6 +159,7 @@ class RepCounter(
 
         return when (state) {
             State.DOWN -> handleDownState(
+                isDown = isDown || isDownByElbowTravel,
                 isUp = (isUp || isUpByElbowTravel) && hasGripPosture,
                 nowMs = nowMs,
                 requiredStableMs = upStableMs,
@@ -173,11 +176,21 @@ class RepCounter(
     }
 
     private fun handleDownState(
+        isDown: Boolean,
         isUp: Boolean,
         nowMs: Long,
         requiredStableMs: Long,
         smoothElbow: Float,
     ): RepCounterResult {
+        if (!armedForUp && isDown) {
+            armedForUp = true
+        }
+
+        if (!armedForUp) {
+            upCandidateSince = null
+            return RepCounterResult(reps = reps, repEvent = false)
+        }
+
         if (isUp) {
             if (upCandidateSince == null) {
                 upCandidateSince = nowMs
@@ -190,6 +203,7 @@ class RepCounter(
                 state = State.IN_UP
                 upCandidateSince = null
                 downCandidateSince = null
+                armedForUp = false
                 upAnchorElbow = smoothElbow
                 downAnchorElbow = null
                 return RepCounterResult(reps = reps, repEvent = true)
@@ -230,6 +244,7 @@ class RepCounter(
         state = State.DOWN
         upCandidateSince = null
         downCandidateSince = null
+        armedForUp = false
         downAnchorElbow = null
         upAnchorElbow = null
     }
@@ -254,8 +269,8 @@ class RepCounter(
             if (!hasBothSides) return false
             if (!(leftGrip && rightGrip)) return false
             if (faceY == null) return true
-            return leftWrist.y < faceY + WRIST_ABOVE_FACE_GRIP_DELTA &&
-                rightWrist.y < faceY + WRIST_ABOVE_FACE_GRIP_DELTA
+            return leftWrist.y <= faceY + WRIST_BELOW_FACE_MAX_GRIP_DELTA &&
+                rightWrist.y <= faceY + WRIST_BELOW_FACE_MAX_GRIP_DELTA
         }
         return leftGrip || rightGrip
     }
@@ -305,7 +320,7 @@ class RepCounter(
         private const val ELBOW_TRAVEL_STABLE_MS = 120L
         private const val WRIST_BELOW_SHOULDER_RELEASE_DELTA = 0.03f
         private const val WRIST_ABOVE_SHOULDER_GRIP_DELTA = 0.04f
-        private const val WRIST_ABOVE_FACE_GRIP_DELTA = 0.02f
+        private const val WRIST_BELOW_FACE_MAX_GRIP_DELTA = 0.14f
         private const val RELEASE_LOCK_MS = 1200L
     }
 }

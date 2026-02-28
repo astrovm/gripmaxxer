@@ -108,6 +108,33 @@ class HangingLegRaiseRepDetectorTest {
         assertEquals(1, noSecondRep.reps)
     }
 
+    @Test
+    fun `keeps counting when activity briefly flickers inactive`() {
+        val detector = HangingLegRaiseRepDetector()
+
+        val downFrame = buildFrame(
+            shoulderY = 0.35f,
+            hipY = 0.70f,
+            kneeY = 0.88f,
+            ankleY = 0.95f,
+        )
+        val upFrame = buildFrame(
+            shoulderY = 0.35f,
+            hipY = 0.70f,
+            kneeY = 0.64f,
+            ankleY = 0.72f,
+        )
+
+        detector.process(frame = downFrame, active = true, nowMs = 0L)
+        detector.process(frame = downFrame, active = true, nowMs = 140L)
+        detector.process(frame = upFrame, active = true, nowMs = 520L)
+        // Hang detector can flicker false for a frame during fast motion.
+        val maybeRep = detector.process(frame = upFrame, active = false, nowMs = 640L)
+        val final = detector.process(frame = upFrame, active = false, nowMs = 760L)
+        assertTrue(maybeRep.reps == 1 || final.reps == 1)
+        assertEquals(1, final.reps)
+    }
+
     private fun buildFrame(
         shoulderY: Float,
         hipY: Float,
