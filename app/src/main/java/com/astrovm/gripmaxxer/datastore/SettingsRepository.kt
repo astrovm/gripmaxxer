@@ -124,6 +124,26 @@ class SettingsRepository(private val context: Context) {
         }.first()
     }
 
+    suspend fun purgeLegacyExerciseData() {
+        context.gripDataStore.edit { prefs ->
+            val normalizedSelectedMode = parseExerciseModeOrNull(prefs[Keys.selectedExerciseMode]) ?: ExerciseMode.DEAD_HANG
+            prefs[Keys.selectedExerciseMode] = normalizedSelectedMode.name
+
+            val sanitizedSessions = parseSessions(prefs[Keys.historySessions])
+                .sortedByDescending { it.completedAtMs }
+                .take(MAX_HISTORY_SESSIONS)
+
+            if (sanitizedSessions.isEmpty()) {
+                prefs.remove(Keys.historySessions)
+            } else {
+                prefs[Keys.historySessions] = serializeSessions(sanitizedSessions)
+            }
+
+            prefs[Keys.historyMaxReps] = sanitizedSessions.maxOfOrNull { it.reps } ?: 0
+            prefs[Keys.historyMaxActiveMs] = sanitizedSessions.maxOfOrNull { it.activeMs } ?: 0L
+        }
+    }
+
     private suspend fun editBool(key: Preferences.Key<Boolean>, value: Boolean) {
         context.gripDataStore.edit { it[key] = value }
     }
@@ -141,9 +161,12 @@ class SettingsRepository(private val context: Context) {
     }
 
     private fun parseExerciseMode(raw: String?): ExerciseMode {
-        if (raw.isNullOrBlank()) return ExerciseMode.DEAD_HANG
-        return runCatching { ExerciseMode.valueOf(raw) }
-            .getOrElse { ExerciseMode.DEAD_HANG }
+        return parseExerciseModeOrNull(raw) ?: ExerciseMode.DEAD_HANG
+    }
+
+    private fun parseExerciseModeOrNull(raw: String?): ExerciseMode? {
+        if (raw.isNullOrBlank()) return null
+        return runCatching { ExerciseMode.valueOf(raw) }.getOrNull()
     }
 
     private fun parseColorPalette(raw: String?): ColorPalette {
@@ -169,7 +192,7 @@ class SettingsRepository(private val context: Context) {
         val parts = raw.split(FIELD_SEPARATOR)
         if (parts.size != 4) return null
         val completedAtMs = parts[0].toLongOrNull() ?: return null
-        val mode = parseExerciseMode(parts[1])
+        val mode = parseExerciseModeOrNull(parts[1]) ?: return null
         val reps = parts[2].toIntOrNull() ?: return null
         val activeMs = parts[3].toLongOrNull() ?: return null
         return WorkoutSession(

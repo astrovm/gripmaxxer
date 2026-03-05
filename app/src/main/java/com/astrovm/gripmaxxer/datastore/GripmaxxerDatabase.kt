@@ -186,6 +186,9 @@ interface WorkoutDao {
 
     @Query("SELECT COUNT(*) FROM workouts WHERE completedAtMs IS NOT NULL")
     suspend fun getCompletedWorkoutCount(): Int
+
+    @Query("DELETE FROM workouts WHERE exerciseModeName NOT IN (:supportedModes)")
+    suspend fun deleteWorkoutsOutsideModes(supportedModes: List<String>): Int
 }
 
 @Database(

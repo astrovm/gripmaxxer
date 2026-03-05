@@ -131,6 +131,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         DebugPreviewStore.enabled.value = true
 
         viewModelScope.launch {
+            settingsRepository.purgeLegacyExerciseData()
+            workoutRepository.purgeLegacyWorkouts()
+        }
+
+        viewModelScope.launch {
             AutoSetEventStore.events.collect { event ->
                 handleAutoSetEvent(event)
             }
@@ -442,9 +447,5 @@ private fun ActiveWorkoutState.toWorkoutSessionUiState(
 private fun ExerciseMode.isHangMode(): Boolean {
     return this == ExerciseMode.DEAD_HANG ||
         this == ExerciseMode.ACTIVE_HANG ||
-        this == ExerciseMode.ONE_ARM_DEAD_HANG ||
-        this == ExerciseMode.ONE_ARM_ACTIVE_HANG ||
-        this == ExerciseMode.HANDSTAND_HOLD ||
-        this == ExerciseMode.PLANK_HOLD ||
-        this == ExerciseMode.MIDDLE_SPLIT_HOLD
+        this == ExerciseMode.PLANK_HOLD
 }

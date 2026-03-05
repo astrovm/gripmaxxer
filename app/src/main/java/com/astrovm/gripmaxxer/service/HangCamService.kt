@@ -32,28 +32,14 @@ import com.astrovm.gripmaxxer.overlay.OverlayTimerManager
 import com.astrovm.gripmaxxer.pose.PoseDetectorWrapper
 import com.astrovm.gripmaxxer.pose.PoseFeatureExtractor
 import com.astrovm.gripmaxxer.pose.PoseFrame
-import com.astrovm.gripmaxxer.reps.BenchPressActivityDetector
-import com.astrovm.gripmaxxer.reps.BenchPressRepDetector
-import com.astrovm.gripmaxxer.reps.ArcherSquatActivityDetector
-import com.astrovm.gripmaxxer.reps.ArcherSquatRepDetector
+import com.astrovm.gripmaxxer.reps.ActiveHangActivityDetector
+import com.astrovm.gripmaxxer.reps.DeadHangActivityDetector
 import com.astrovm.gripmaxxer.reps.DipActivityDetector
 import com.astrovm.gripmaxxer.reps.DipRepDetector
 import com.astrovm.gripmaxxer.reps.ExerciseMode
-import com.astrovm.gripmaxxer.reps.ActiveHangActivityDetector
-import com.astrovm.gripmaxxer.reps.DeadHangActivityDetector
 import com.astrovm.gripmaxxer.reps.HoldRepDetector
-import com.astrovm.gripmaxxer.reps.HandstandHoldActivityDetector
 import com.astrovm.gripmaxxer.reps.HangingLegRaiseActivityDetector
 import com.astrovm.gripmaxxer.reps.HangingLegRaiseRepDetector
-import com.astrovm.gripmaxxer.reps.HipThrustActivityDetector
-import com.astrovm.gripmaxxer.reps.HipThrustRepDetector
-import com.astrovm.gripmaxxer.reps.BulgarianSplitSquatActivityDetector
-import com.astrovm.gripmaxxer.reps.BulgarianSplitSquatRepDetector
-import com.astrovm.gripmaxxer.reps.MuscleUpActivityDetector
-import com.astrovm.gripmaxxer.reps.MuscleUpRepDetector
-import com.astrovm.gripmaxxer.reps.MiddleSplitHoldActivityDetector
-import com.astrovm.gripmaxxer.reps.PistolSquatActivityDetector
-import com.astrovm.gripmaxxer.reps.PistolSquatRepDetector
 import com.astrovm.gripmaxxer.reps.PlankHoldActivityDetector
 import com.astrovm.gripmaxxer.reps.PullUpActivityDetector
 import com.astrovm.gripmaxxer.reps.PullUpRepDetector
@@ -100,85 +86,43 @@ class HangCamService : LifecycleService() {
     private val pullUpActivityDetector = PullUpActivityDetector()
     private val deadHangActivityDetector = DeadHangActivityDetector(featureExtractor)
     private val activeHangActivityDetector = ActiveHangActivityDetector(featureExtractor)
-    private val handstandHoldActivityDetector = HandstandHoldActivityDetector(featureExtractor)
     private val plankHoldActivityDetector = PlankHoldActivityDetector(featureExtractor)
-    private val middleSplitHoldActivityDetector = MiddleSplitHoldActivityDetector(featureExtractor)
     private val hangingLegRaiseActivityDetector = HangingLegRaiseActivityDetector()
-    private val muscleUpActivityDetector = MuscleUpActivityDetector(featureExtractor)
     private val pushUpActivityDetector = PushUpActivityDetector(featureExtractor)
     private val squatActivityDetector = SquatActivityDetector(featureExtractor)
-    private val archerSquatActivityDetector = ArcherSquatActivityDetector(featureExtractor)
-    private val pistolSquatActivityDetector = PistolSquatActivityDetector(featureExtractor)
-    private val bulgarianSplitSquatActivityDetector = BulgarianSplitSquatActivityDetector(featureExtractor)
-    private val hipThrustActivityDetector = HipThrustActivityDetector(featureExtractor)
-    private val benchPressActivityDetector = BenchPressActivityDetector(featureExtractor)
     private val dipActivityDetector = DipActivityDetector(featureExtractor)
     private val pullUpRepDetector = PullUpRepDetector(featureExtractor)
-    private val muscleUpRepDetector = MuscleUpRepDetector(featureExtractor)
     private val pushUpRepDetector = PushUpRepDetector(featureExtractor)
     private val squatRepDetector = SquatRepDetector(featureExtractor)
-    private val archerSquatRepDetector = ArcherSquatRepDetector(featureExtractor)
-    private val pistolSquatRepDetector = PistolSquatRepDetector(featureExtractor)
-    private val bulgarianSplitSquatRepDetector = BulgarianSplitSquatRepDetector(featureExtractor)
-    private val hipThrustRepDetector = HipThrustRepDetector(featureExtractor)
-    private val benchPressRepDetector = BenchPressRepDetector(featureExtractor)
     private val dipRepDetector = DipRepDetector(featureExtractor)
     private val deadHangRepDetector = HoldRepDetector()
     private val activeHangRepDetector = HoldRepDetector()
-    private val handstandHoldRepDetector = HoldRepDetector()
     private val plankHoldRepDetector = HoldRepDetector()
-    private val middleSplitHoldRepDetector = HoldRepDetector()
     private val hangingLegRaiseRepDetector = HangingLegRaiseRepDetector()
     private val repEngine = RepEngine(
         detectors = mapOf(
-            ExerciseMode.PULL_UP to pullUpRepDetector,
-            ExerciseMode.CHIN_UP to pullUpRepDetector,
-            ExerciseMode.MUSCLE_UP to muscleUpRepDetector,
-            ExerciseMode.ONE_ARM_PULL_UP to pullUpRepDetector,
-            ExerciseMode.ONE_ARM_CHIN_UP to pullUpRepDetector,
-            ExerciseMode.HANGING_LEG_RAISE to hangingLegRaiseRepDetector,
             ExerciseMode.DEAD_HANG to deadHangRepDetector,
             ExerciseMode.ACTIVE_HANG to activeHangRepDetector,
-            ExerciseMode.ONE_ARM_DEAD_HANG to deadHangRepDetector,
-            ExerciseMode.ONE_ARM_ACTIVE_HANG to activeHangRepDetector,
-            ExerciseMode.HANDSTAND_HOLD to handstandHoldRepDetector,
-            ExerciseMode.PLANK_HOLD to plankHoldRepDetector,
-            ExerciseMode.MIDDLE_SPLIT_HOLD to middleSplitHoldRepDetector,
+            ExerciseMode.PULL_UP to pullUpRepDetector,
+            ExerciseMode.CHIN_UP to pullUpRepDetector,
+            ExerciseMode.HANGING_LEG_RAISE to hangingLegRaiseRepDetector,
             ExerciseMode.PUSH_UP to pushUpRepDetector,
-            ExerciseMode.ONE_ARM_PUSH_UP to pushUpRepDetector,
             ExerciseMode.SQUAT to squatRepDetector,
-            ExerciseMode.ARCHER_SQUAT to archerSquatRepDetector,
-            ExerciseMode.PISTOL_SQUAT to pistolSquatRepDetector,
-            ExerciseMode.BULGARIAN_SPLIT_SQUAT to bulgarianSplitSquatRepDetector,
-            ExerciseMode.HIP_THRUST to hipThrustRepDetector,
-            ExerciseMode.BENCH_PRESS to benchPressRepDetector,
             ExerciseMode.DIP to dipRepDetector,
+            ExerciseMode.PLANK_HOLD to plankHoldRepDetector,
         ),
         initialMode = ExerciseMode.PULL_UP,
     )
     private val activityDetectors = mapOf(
-        ExerciseMode.PULL_UP to pullUpActivityDetector,
-        ExerciseMode.CHIN_UP to pullUpActivityDetector,
-        ExerciseMode.MUSCLE_UP to muscleUpActivityDetector,
-        ExerciseMode.ONE_ARM_PULL_UP to pullUpActivityDetector,
-        ExerciseMode.ONE_ARM_CHIN_UP to pullUpActivityDetector,
-        ExerciseMode.HANGING_LEG_RAISE to hangingLegRaiseActivityDetector,
         ExerciseMode.DEAD_HANG to deadHangActivityDetector,
         ExerciseMode.ACTIVE_HANG to activeHangActivityDetector,
-        ExerciseMode.ONE_ARM_DEAD_HANG to deadHangActivityDetector,
-        ExerciseMode.ONE_ARM_ACTIVE_HANG to activeHangActivityDetector,
-        ExerciseMode.HANDSTAND_HOLD to handstandHoldActivityDetector,
-        ExerciseMode.PLANK_HOLD to plankHoldActivityDetector,
-        ExerciseMode.MIDDLE_SPLIT_HOLD to middleSplitHoldActivityDetector,
+        ExerciseMode.PULL_UP to pullUpActivityDetector,
+        ExerciseMode.CHIN_UP to pullUpActivityDetector,
+        ExerciseMode.HANGING_LEG_RAISE to hangingLegRaiseActivityDetector,
         ExerciseMode.PUSH_UP to pushUpActivityDetector,
-        ExerciseMode.ONE_ARM_PUSH_UP to pushUpActivityDetector,
         ExerciseMode.SQUAT to squatActivityDetector,
-        ExerciseMode.ARCHER_SQUAT to archerSquatActivityDetector,
-        ExerciseMode.PISTOL_SQUAT to pistolSquatActivityDetector,
-        ExerciseMode.BULGARIAN_SPLIT_SQUAT to bulgarianSplitSquatActivityDetector,
-        ExerciseMode.HIP_THRUST to hipThrustActivityDetector,
-        ExerciseMode.BENCH_PRESS to benchPressActivityDetector,
         ExerciseMode.DIP to dipActivityDetector,
+        ExerciseMode.PLANK_HOLD to plankHoldActivityDetector,
     )
 
     @Volatile
@@ -504,61 +448,40 @@ class HangCamService : LifecycleService() {
         mode: ExerciseMode,
     ) {
         val baseMargin = settings.wristShoulderMargin.coerceAtLeast(MIN_WRIST_SHOULDER_MARGIN)
-        val oneArmPullMode = mode == ExerciseMode.ONE_ARM_PULL_UP || mode == ExerciseMode.ONE_ARM_CHIN_UP
-        val oneArmDeadHangMode = mode == ExerciseMode.ONE_ARM_DEAD_HANG
-        val oneArmActiveHangMode = mode == ExerciseMode.ONE_ARM_ACTIVE_HANG
-
-        val pullMargin = if (oneArmPullMode) {
-            (baseMargin - ONE_ARM_HANG_MARGIN_RELAX).coerceAtLeast(MIN_ONE_ARM_WRIST_SHOULDER_MARGIN)
-        } else {
-            baseMargin
-        }
         pullUpActivityDetector.updateConfig(
             HangDetectionConfig(
-                wristShoulderMargin = pullMargin,
-                wristShoulderReleaseMargin = (pullMargin - WRIST_RELEASE_GAP).coerceAtLeast(MIN_WRIST_RELEASE_MARGIN),
+                wristShoulderMargin = baseMargin,
+                wristShoulderReleaseMargin = (baseMargin - WRIST_RELEASE_GAP).coerceAtLeast(MIN_WRIST_RELEASE_MARGIN),
                 missingPoseTimeoutMs = settings.missingPoseTimeoutMs,
-                partialPoseHoldMs = if (oneArmPullMode) 3600L else 3000L,
-                shoulderOnlyHoldMs = if (oneArmPullMode) 3900L else 3500L,
-                occlusionHoldMs = if (oneArmPullMode) 3900L else 3500L,
-                stableSwitchMs = if (oneArmPullMode) 600L else 500L,
-                minToggleIntervalMs = if (oneArmPullMode) 1700L else 1500L,
+                partialPoseHoldMs = 3000L,
+                shoulderOnlyHoldMs = 3500L,
+                occlusionHoldMs = 3500L,
+                stableSwitchMs = 500L,
+                minToggleIntervalMs = 1500L,
             )
         )
-
-        val deadHangMargin = if (oneArmDeadHangMode) {
-            (baseMargin - ONE_ARM_HANG_MARGIN_RELAX).coerceAtLeast(MIN_ONE_ARM_WRIST_SHOULDER_MARGIN)
-        } else {
-            baseMargin
-        }
         deadHangActivityDetector.updateConfig(
             HangDetectionConfig(
-                wristShoulderMargin = deadHangMargin,
-                wristShoulderReleaseMargin = (deadHangMargin - WRIST_RELEASE_GAP).coerceAtLeast(MIN_WRIST_RELEASE_MARGIN),
+                wristShoulderMargin = baseMargin,
+                wristShoulderReleaseMargin = (baseMargin - WRIST_RELEASE_GAP).coerceAtLeast(MIN_WRIST_RELEASE_MARGIN),
                 missingPoseTimeoutMs = settings.missingPoseTimeoutMs,
-                partialPoseHoldMs = if (oneArmDeadHangMode) 3600L else 3000L,
-                shoulderOnlyHoldMs = if (oneArmDeadHangMode) 3900L else 3500L,
-                occlusionHoldMs = if (oneArmDeadHangMode) 3900L else 3500L,
-                stableSwitchMs = if (oneArmDeadHangMode) 600L else 500L,
-                minToggleIntervalMs = if (oneArmDeadHangMode) 1700L else 1500L,
+                partialPoseHoldMs = 3000L,
+                shoulderOnlyHoldMs = 3500L,
+                occlusionHoldMs = 3500L,
+                stableSwitchMs = 500L,
+                minToggleIntervalMs = 1500L,
             )
         )
-
-        val activeHangMargin = if (oneArmActiveHangMode) {
-            (baseMargin - ONE_ARM_HANG_MARGIN_RELAX).coerceAtLeast(MIN_ONE_ARM_WRIST_SHOULDER_MARGIN)
-        } else {
-            baseMargin
-        }
         activeHangActivityDetector.updateConfig(
             HangDetectionConfig(
-                wristShoulderMargin = activeHangMargin,
-                wristShoulderReleaseMargin = (activeHangMargin - WRIST_RELEASE_GAP).coerceAtLeast(MIN_WRIST_RELEASE_MARGIN),
+                wristShoulderMargin = baseMargin,
+                wristShoulderReleaseMargin = (baseMargin - WRIST_RELEASE_GAP).coerceAtLeast(MIN_WRIST_RELEASE_MARGIN),
                 missingPoseTimeoutMs = settings.missingPoseTimeoutMs,
-                partialPoseHoldMs = if (oneArmActiveHangMode) 3600L else 3000L,
-                shoulderOnlyHoldMs = if (oneArmActiveHangMode) 3900L else 3500L,
-                occlusionHoldMs = if (oneArmActiveHangMode) 3900L else 3500L,
-                stableSwitchMs = if (oneArmActiveHangMode) 600L else 500L,
-                minToggleIntervalMs = if (oneArmActiveHangMode) 1700L else 1500L,
+                partialPoseHoldMs = 3000L,
+                shoulderOnlyHoldMs = 3500L,
+                occlusionHoldMs = 3500L,
+                stableSwitchMs = 500L,
+                minToggleIntervalMs = 1500L,
             )
         )
 
@@ -571,20 +494,6 @@ class HangCamService : LifecycleService() {
                 partialPoseHoldMs = 3200L,
                 shoulderOnlyHoldMs = 3600L,
                 occlusionHoldMs = 3600L,
-            )
-        )
-
-        muscleUpActivityDetector.updateConfig(
-            HangDetectionConfig(
-                wristShoulderMargin = (baseMargin - MUSCLE_UP_MARGIN_RELAX).coerceAtLeast(MIN_MUSCLE_UP_WRIST_SHOULDER_MARGIN),
-                wristShoulderReleaseMargin = (baseMargin - MUSCLE_UP_MARGIN_RELAX - WRIST_RELEASE_GAP)
-                    .coerceAtLeast(MIN_WRIST_RELEASE_MARGIN),
-                missingPoseTimeoutMs = settings.missingPoseTimeoutMs,
-                partialPoseHoldMs = 3200L,
-                shoulderOnlyHoldMs = 3600L,
-                occlusionHoldMs = 3600L,
-                stableSwitchMs = 520L,
-                minToggleIntervalMs = 1600L,
             )
         )
 
@@ -618,26 +527,6 @@ class HangCamService : LifecycleService() {
                 stableMs = maxOf(base.stableMs, 210L),
                 minRepIntervalMs = maxOf(base.minRepIntervalMs, 540L),
                 requireBothWristsForGripUp = true,
-            )
-
-            ExerciseMode.ONE_ARM_PULL_UP -> base.copy(
-                elbowUpAngle = (base.elbowUpAngle + 10f).coerceIn(95f, 150f),
-                elbowDownAngle = (base.elbowDownAngle - 8f).coerceIn(125f, 175f),
-                marginUp = (base.marginUp - 0.012f).coerceIn(0.012f, 0.10f),
-                marginDown = (base.marginDown - 0.006f).coerceIn(0.008f, 0.08f),
-                stableMs = maxOf(base.stableMs, 260L),
-                minRepIntervalMs = maxOf(base.minRepIntervalMs, 760L),
-                requireBothWristsForGripUp = false,
-            )
-
-            ExerciseMode.ONE_ARM_CHIN_UP -> base.copy(
-                elbowUpAngle = (base.elbowUpAngle + 12f).coerceIn(95f, 150f),
-                elbowDownAngle = (base.elbowDownAngle - 8f).coerceIn(125f, 175f),
-                marginUp = (base.marginUp - 0.013f).coerceIn(0.012f, 0.10f),
-                marginDown = (base.marginDown - 0.007f).coerceIn(0.008f, 0.08f),
-                stableMs = maxOf(base.stableMs, 270L),
-                minRepIntervalMs = maxOf(base.minRepIntervalMs, 780L),
-                requireBothWristsForGripUp = false,
             )
 
             else -> base
@@ -833,11 +722,7 @@ class HangCamService : LifecycleService() {
     private fun ExerciseMode.isTimedHoldMode(): Boolean {
         return this == ExerciseMode.DEAD_HANG ||
             this == ExerciseMode.ACTIVE_HANG ||
-            this == ExerciseMode.ONE_ARM_DEAD_HANG ||
-            this == ExerciseMode.ONE_ARM_ACTIVE_HANG ||
-            this == ExerciseMode.HANDSTAND_HOLD ||
-            this == ExerciseMode.PLANK_HOLD ||
-            this == ExerciseMode.MIDDLE_SPLIT_HOLD
+            this == ExerciseMode.PLANK_HOLD
     }
 
     private fun formatSeconds(ms: Long): String {
@@ -851,12 +736,8 @@ class HangCamService : LifecycleService() {
         private const val FAST_ANALYZER_FRAME_INTERVAL_MS = 33L
         private const val ACCURATE_ANALYZER_FRAME_INTERVAL_MS = 45L
         private const val MIN_WRIST_SHOULDER_MARGIN = 0.08f
-        private const val MIN_ONE_ARM_WRIST_SHOULDER_MARGIN = 0.06f
         private const val MIN_HLR_WRIST_SHOULDER_MARGIN = 0.065f
-        private const val MIN_MUSCLE_UP_WRIST_SHOULDER_MARGIN = 0.06f
-        private const val ONE_ARM_HANG_MARGIN_RELAX = 0.012f
         private const val HLR_MARGIN_RELAX = 0.008f
-        private const val MUSCLE_UP_MARGIN_RELAX = 0.015f
         private const val WRIST_RELEASE_GAP = 0.015f
         private const val MIN_WRIST_RELEASE_MARGIN = 0.035f
         private const val MIN_SESSION_MS = 400L

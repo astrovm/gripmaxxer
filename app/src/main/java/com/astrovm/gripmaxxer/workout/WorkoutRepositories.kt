@@ -27,6 +27,7 @@ interface WorkoutRepository {
     suspend fun deleteWorkout(workoutId: Long): Boolean
     suspend fun getCompletedWorkoutDetail(workoutId: Long): CompletedWorkoutDetail?
     suspend fun getSetById(setId: Long): WorkoutSetState?
+    suspend fun purgeLegacyWorkouts()
 }
 
 class RoomWorkoutRepository(
@@ -208,6 +209,11 @@ class RoomWorkoutRepository(
 
     override suspend fun getSetById(setId: Long): WorkoutSetState? {
         return workoutDao.getSetById(setId)?.toDomain()
+    }
+
+    override suspend fun purgeLegacyWorkouts() {
+        val supportedModes = ExerciseMode.entries.map { it.name }
+        workoutDao.deleteWorkoutsOutsideModes(supportedModes)
     }
 
     private fun WorkoutWithSetsEntity.toActiveDomain(): ActiveWorkoutState {
