@@ -9,5 +9,4 @@ enum class ExerciseMode(val label: String) {
     PUSH_UP("Push-up"),
     SQUAT("Squat"),
     DIP("Dip"),
-    PLANK_HOLD("Plank hold"),
 }

@@ -446,6 +446,5 @@ private fun ActiveWorkoutState.toWorkoutSessionUiState(
 
 private fun ExerciseMode.isHangMode(): Boolean {
     return this == ExerciseMode.DEAD_HANG ||
-        this == ExerciseMode.ACTIVE_HANG ||
-        this == ExerciseMode.PLANK_HOLD
+        this == ExerciseMode.ACTIVE_HANG
 }

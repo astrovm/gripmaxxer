@@ -40,7 +40,6 @@ import com.astrovm.gripmaxxer.reps.ExerciseMode
 import com.astrovm.gripmaxxer.reps.HoldRepDetector
 import com.astrovm.gripmaxxer.reps.HangingLegRaiseActivityDetector
 import com.astrovm.gripmaxxer.reps.HangingLegRaiseRepDetector
-import com.astrovm.gripmaxxer.reps.PlankHoldActivityDetector
 import com.astrovm.gripmaxxer.reps.PullUpActivityDetector
 import com.astrovm.gripmaxxer.reps.PullUpRepDetector
 import com.astrovm.gripmaxxer.reps.PushUpActivityDetector
@@ -86,7 +85,6 @@ class HangCamService : LifecycleService() {
     private val pullUpActivityDetector = PullUpActivityDetector()
     private val deadHangActivityDetector = DeadHangActivityDetector(featureExtractor)
     private val activeHangActivityDetector = ActiveHangActivityDetector(featureExtractor)
-    private val plankHoldActivityDetector = PlankHoldActivityDetector(featureExtractor)
     private val hangingLegRaiseActivityDetector = HangingLegRaiseActivityDetector()
     private val pushUpActivityDetector = PushUpActivityDetector(featureExtractor)
     private val squatActivityDetector = SquatActivityDetector(featureExtractor)
@@ -97,7 +95,6 @@ class HangCamService : LifecycleService() {
     private val dipRepDetector = DipRepDetector(featureExtractor)
     private val deadHangRepDetector = HoldRepDetector()
     private val activeHangRepDetector = HoldRepDetector()
-    private val plankHoldRepDetector = HoldRepDetector()
     private val hangingLegRaiseRepDetector = HangingLegRaiseRepDetector()
     private val repEngine = RepEngine(
         detectors = mapOf(
@@ -109,7 +106,6 @@ class HangCamService : LifecycleService() {
             ExerciseMode.PUSH_UP to pushUpRepDetector,
             ExerciseMode.SQUAT to squatRepDetector,
             ExerciseMode.DIP to dipRepDetector,
-            ExerciseMode.PLANK_HOLD to plankHoldRepDetector,
         ),
         initialMode = ExerciseMode.PULL_UP,
     )
@@ -122,7 +118,6 @@ class HangCamService : LifecycleService() {
         ExerciseMode.PUSH_UP to pushUpActivityDetector,
         ExerciseMode.SQUAT to squatActivityDetector,
         ExerciseMode.DIP to dipActivityDetector,
-        ExerciseMode.PLANK_HOLD to plankHoldActivityDetector,
     )
 
     @Volatile
@@ -721,8 +716,7 @@ class HangCamService : LifecycleService() {
 
     private fun ExerciseMode.isTimedHoldMode(): Boolean {
         return this == ExerciseMode.DEAD_HANG ||
-            this == ExerciseMode.ACTIVE_HANG ||
-            this == ExerciseMode.PLANK_HOLD
+            this == ExerciseMode.ACTIVE_HANG
     }
 
     private fun formatSeconds(ms: Long): String {

@@ -4,7 +4,7 @@ Gripmaxxer is an Android workout tracker that uses your front camera to detect a
 
 ## What You Can Do
 - Pick an exercise mode and start a workout quickly.
-- Track these camera-supported modes: dead hang, active hang, pull-up, chin-up, hanging leg raise, push-up, squat, dip, and plank hold.
+- Track these camera-supported modes: dead hang, active hang, pull-up, chin-up, hanging leg raise, push-up, squat, and dip.
 - Auto-count reps and timed holds.
 - Use optional media control (play/pause) based on your activity.
 - Show an optional floating stopwatch overlay.
