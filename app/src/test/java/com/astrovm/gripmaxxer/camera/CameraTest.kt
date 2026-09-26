@@ -34,6 +34,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.nio.ByteBuffer
 import java.util.concurrent.CopyOnWriteArrayList
@@ -42,6 +43,7 @@ import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(shadows = [TestYuvImageShadow::class])
 class CameraTest {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
@@ -80,7 +82,7 @@ class CameraTest {
         val planes = arrayOf(
             plane(width * height, width, 100),
             plane(width * height / 4, width / 2, 90),
-            plane(width * height / 4, width / 2, 160),
+            plane(width * height / 4, width / 2, 160.toByte()),
         )
         val info = mockk<ImageInfo> { every { rotationDegrees } returns rotation }
         return mockk(relaxed = true) {

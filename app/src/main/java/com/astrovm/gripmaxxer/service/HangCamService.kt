@@ -369,7 +369,7 @@ class HangCamService : LifecycleService() {
         DebugPreviewStore.clear()
     }
 
-    private suspend fun processPoseFrame(frame: PoseFrame) {
+    internal suspend fun processPoseFrame(frame: PoseFrame) {
         frameMutex.withLock {
             if (!running) return
             val nowMs = System.currentTimeMillis()
