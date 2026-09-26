@@ -15,9 +15,11 @@ import android.os.Build
 import android.os.SystemClock
 import android.speech.tts.TextToSpeech
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleService
 import com.astrovm.gripmaxxer.MainActivity
 import com.astrovm.gripmaxxer.R
@@ -277,7 +279,7 @@ class HangCamService : LifecycleService() {
 
             currentSettings = settingsRepository.settingsFlow.first()
             updateOverlayVisibility()
-            poseDetectorWrapper = PoseDetectorWrapper(currentSettings.poseModeAccurate)
+            poseDetectorWrapper = poseDetectorFactory(currentSettings.poseModeAccurate)
 
             val analyzer = PoseFrameAnalyzer(
                 detectorWrapper = poseDetectorWrapper ?: return@launch,
@@ -304,7 +306,7 @@ class HangCamService : LifecycleService() {
             }
             frameAnalyzer = analyzer
 
-            val cameraManager = FrontCameraManager(applicationContext, this@HangCamService)
+            val cameraManager = cameraManagerFactory(applicationContext, this@HangCamService)
             frontCameraManager = cameraManager
             try {
                 cameraManager.start(analyzer)
@@ -367,7 +369,7 @@ class HangCamService : LifecycleService() {
         DebugPreviewStore.clear()
     }
 
-    private suspend fun processPoseFrame(frame: PoseFrame) {
+    internal suspend fun processPoseFrame(frame: PoseFrame) {
         frameMutex.withLock {
             if (!running) return
             val nowMs = System.currentTimeMillis()
@@ -741,6 +743,14 @@ class HangCamService : LifecycleService() {
 
         private const val NOTIFICATION_ID = 1001
         private const val NOTIFICATION_CHANNEL_ID = "hang_monitoring"
+
+        @VisibleForTesting
+        internal var poseDetectorFactory: (Boolean) -> PoseDetectorWrapper = { accurate -> PoseDetectorWrapper(accurate) }
+
+        @VisibleForTesting
+        internal var cameraManagerFactory: (Context, LifecycleOwner) -> FrontCameraManager = { context, owner ->
+            FrontCameraManager(context, owner)
+        }
 
         fun start(context: Context) {
             val intent = Intent(context, HangCamService::class.java).apply {
