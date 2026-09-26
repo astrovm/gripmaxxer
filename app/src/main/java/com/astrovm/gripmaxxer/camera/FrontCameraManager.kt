@@ -10,6 +10,7 @@ import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.lifecycle.LifecycleOwner
+import com.google.common.util.concurrent.ListenableFuture
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlinx.coroutines.Dispatchers
@@ -21,6 +22,7 @@ import kotlin.coroutines.resumeWithException
 class FrontCameraManager(
     private val context: Context,
     private val lifecycleOwner: LifecycleOwner,
+    private val providerFuture: (Context) -> ListenableFuture<ProcessCameraProvider> = { ProcessCameraProvider.getInstance(it) },
 ) {
 
     private var cameraProvider: ProcessCameraProvider? = null
@@ -28,7 +30,7 @@ class FrontCameraManager(
     private var analysisUseCase: ImageAnalysis? = null
 
     suspend fun start(analyzer: PoseFrameAnalyzer) {
-        val provider = cameraProvider ?: ProcessCameraProvider.getInstance(context).await().also {
+        val provider = cameraProvider ?: providerFuture(context).await().also {
             cameraProvider = it
         }
 
@@ -84,7 +86,7 @@ class FrontCameraManager(
     }
 }
 
-private suspend fun <T> com.google.common.util.concurrent.ListenableFuture<T>.await(): T {
+private suspend fun <T> ListenableFuture<T>.await(): T {
     return suspendCancellableCoroutine { cont ->
         addListener(
             {
