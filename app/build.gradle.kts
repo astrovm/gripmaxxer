@@ -33,7 +33,7 @@ val derivedVersionName = when {
 
 android {
     namespace = "com.astrovm.gripmaxxer"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.astrovm.gripmaxxer"
