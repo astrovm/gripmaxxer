@@ -254,8 +254,8 @@ fun MainScreen(
                     .padding(if (isWindows98) 14.dp else 16.dp),
                 verticalArrangement = Arrangement.spacedBy(if (isWindows98) 10.dp else 12.dp),
             ) {
-                when (uiState.selectedTab) {
-                    RootTab.LOG -> LogTab(
+                when {
+                    uiState.selectedTab == RootTab.LOG -> LogTab(
                         workouts = uiState.completedWorkouts,
                         selectedDetail = uiState.selectedWorkoutDetail,
                         onOpenDetail = viewModel::openWorkoutDetail,
@@ -265,7 +265,7 @@ fun MainScreen(
                         onDeleteSet = viewModel::deleteDetailSet,
                     )
 
-                    RootTab.WORKOUT -> WorkoutStartTab(
+                    uiState.selectedTab == RootTab.WORKOUT -> WorkoutStartTab(
                         selectedMode = uiState.settings.selectedExerciseMode,
                         onSelectMode = viewModel::setSelectedExerciseMode,
                         onStart = { viewModel.startWorkout(uiState.settings.selectedExerciseMode) },
@@ -279,7 +279,7 @@ fun MainScreen(
                         onOpenOverlaySettings = openOverlaySettings,
                     )
 
-                    RootTab.PROFILE -> ProfileTab(
+                    else -> ProfileTab(
                         uiState = uiState,
                         onMediaToggle = viewModel::setMediaControlEnabled,
                         onRepSoundToggle = viewModel::setRepSoundEnabled,
@@ -802,9 +802,6 @@ private fun WorkoutStartTab(
                             }
                         }
                     }
-                    if (rowModes.size == 1) {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
                 }
             }
 
@@ -1308,9 +1305,6 @@ private fun ColorPaletteSelector(
                         Text(palette.label)
                     }
                 }
-            }
-            if (rowPalettes.size == 1) {
-                Spacer(modifier = Modifier.weight(1f))
             }
         }
     }

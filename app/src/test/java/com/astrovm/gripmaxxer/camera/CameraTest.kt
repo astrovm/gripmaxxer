@@ -22,6 +22,7 @@ import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import io.mockk.verify
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -92,6 +93,26 @@ class CameraTest {
             every { imageInfo } returns info
             every { image } returns if (withMedia) bareMediaImage() else null
         }
+    }
+
+    @Test fun cancellingCameraStartupCancelsThePendingProviderFuture() = runBlocking {
+        val future = com.google.common.util.concurrent.SettableFuture.create<ProcessCameraProvider>()
+        val manager = FrontCameraManager(context, mockk(relaxed = true)) { future }
+        val pending = launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            manager.start(mockk(relaxed = true))
+        }
+        pending.cancel()
+        pending.join()
+        assertTrue(future.isCancelled)
+        manager.stop()
+    }
+
+    @Test fun defaultAnalyzerIntervalAcceptsTheFirstFrame() {
+        val analyzer = PoseFrameAnalyzer(mockk(relaxed = true), PoseFeatureExtractor(), onPoseFrame = {})
+        val image = yuvImage(4, 4, withMedia = false)
+        analyzer.analyze(image)
+        verify { image.close() }
+        analyzer.stop()
     }
 
     @Test

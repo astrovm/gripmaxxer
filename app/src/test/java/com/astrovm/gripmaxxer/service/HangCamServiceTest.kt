@@ -145,4 +145,86 @@ class HangCamServiceTest {
         HangCamService.stop(app)
         assertEquals(HangCamService.ACTION_STOP, shadowOf(app).nextStartedService.action)
     }
+
+    private fun field(name: String): java.lang.reflect.Field = HangCamService::class.java.getDeclaredField(name).apply { isAccessible = true }
+    private fun invoke(name: String, value: Long): Any? = HangCamService::class.java.getDeclaredMethod(name, Long::class.javaPrimitiveType).apply { isAccessible = true }.invoke(service, value)
+
+    @Test fun speechInitializationReportsFailuresAndFallsBackToEnglish() {
+        val tts = field("voiceCueTts").get(service) as android.speech.tts.TextToSpeech
+        val listener = shadowOf(tts).onInitListener
+        listener.onInit(android.speech.tts.TextToSpeech.ERROR)
+        assertFalse(field("voiceCueTtsReady").getBoolean(service))
+        listener.onInit(android.speech.tts.TextToSpeech.SUCCESS)
+        assertTrue(field("voiceCueTtsReady").getBoolean(service))
+        assertEquals(java.util.Locale.US, shadowOf(tts).currentLanguage)
+        org.robolectric.shadows.ShadowTextToSpeech.addLanguageAvailability(java.util.Locale.getDefault())
+        listener.onInit(android.speech.tts.TextToSpeech.SUCCESS)
+        assertEquals(java.util.Locale.getDefault(), shadowOf(tts).currentLanguage)
+        field("voiceCueTts").set(service, null)
+        listener.onInit(android.speech.tts.TextToSpeech.SUCCESS)
+        field("voiceCueTts").set(service, tts)
+    }
+
+    @Test fun timedVoiceCuesUseIntervalsDeduplicateAndPluralize() {
+        val tts = field("voiceCueTts").get(service) as android.speech.tts.TextToSpeech
+        val shadow = shadowOf(tts)
+        field("currentSettings").set(service, com.astrovm.gripmaxxer.datastore.AppSettings(voiceCueEnabled = true))
+        field("currentMode").set(service, ExerciseMode.DEAD_HANG)
+        field("currentHangState").setBoolean(service, true)
+        invoke("maybeSpeakVoiceCue", 10000)
+        assertNull(shadow.lastSpokenText)
+        shadow.onInitListener.onInit(android.speech.tts.TextToSpeech.SUCCESS)
+        for (seconds in listOf(0L, 9L, 11L)) invoke("maybeSpeakVoiceCue", seconds * 1000)
+        assertNull(shadow.lastSpokenText)
+        val cases = mapOf(10L to "10 seconds", 60L to "1 minute", 120L to "2 minutes", 70L to "1 minute 10 seconds", 130L to "2 minutes 10 seconds")
+        for ((seconds, text) in cases) {
+            invoke("maybeSpeakVoiceCue", seconds * 1000)
+            assertEquals(text, shadow.lastSpokenText)
+            val count = shadow.spokenTextList.size
+            invoke("maybeSpeakVoiceCue", seconds * 1000)
+            assertEquals(count, shadow.spokenTextList.size)
+        }
+        assertEquals("1 minute 1 second", invoke("buildVoiceCueText", 61))
+        assertEquals("2 minutes 1 second", invoke("buildVoiceCueText", 121))
+    }
+
+    @Test fun cameraCallbacksPublishDebugFramesAndFrameFreshness() {
+        start()
+        DebugPreviewStore.enabled.value = true
+        val captured = analyzer.captured
+        fun callback(name: String): Any = PoseFrameAnalyzer::class.java.getDeclaredField(name).apply { isAccessible = true }.get(captured)
+        @Suppress("UNCHECKED_CAST")
+        val tick = callback("onFrameTick") as () -> Unit
+        tick()
+        val bitmap = android.graphics.Bitmap.createBitmap(10, 10, android.graphics.Bitmap.Config.ARGB_8888)
+        val pose = PoseFrame(emptyMap(), 1234, true)
+        @Suppress("UNCHECKED_CAST")
+        val debug = callback("onDebugFrame") as (android.graphics.Bitmap, PoseFrame) -> Unit
+        debug(bitmap, pose)
+        assertEquals(1234L, DebugPreviewStore.frame.value!!.timestampMs)
+        @Suppress("UNCHECKED_CAST")
+        val detected = callback("onPoseFrame") as (PoseFrame) -> Unit
+        detected(pose)
+        await { MonitoringStateStore.snapshot.value.posePresent }
+        assertTrue(MonitoringStateStore.snapshot.value.lastFrameAgeMs < Long.MAX_VALUE)
+        DebugPreviewStore.enabled.value = false
+    }
+
+    @Test fun switchingModesDuringAnActiveSetStopsTheCounter() = runBlocking {
+        start()
+        active = true
+        frame()
+        assertTrue(MonitoringStateStore.snapshot.value.hanging)
+        SettingsRepository(app).setSelectedExerciseMode(ExerciseMode.SQUAT)
+        await { MonitoringStateStore.snapshot.value.mode == ExerciseMode.SQUAT }
+        assertFalse(MonitoringStateStore.snapshot.value.hanging)
+        assertEquals(0L, MonitoringStateStore.snapshot.value.elapsedHangMs)
+        originalCameraFactory(app, service).stop()
+    }
+
+    @Test @org.robolectric.annotation.Config(sdk = [28])
+    fun supportedOlderAndroidStartsForegroundMonitoring() {
+        start()
+        assertTrue(MonitoringStateStore.snapshot.value.serviceRunning)
+    }
 }

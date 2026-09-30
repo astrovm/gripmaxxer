@@ -19,8 +19,10 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.GraphicsMode
 import org.robolectric.annotation.Config
 
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w600dp-h2000dp")
 class MainScreenTest {
@@ -151,4 +153,46 @@ class MainScreenTest {
             verify { model.deleteCompletedWorkout(10) }
         }
     }
+    @Test fun permissionSettingsOpenTheCorrectAndroidScreens() {
+        val app = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>()
+        render()
+        show(MainUiState(settings = AppSettings(overlayEnabled = true, mediaControlEnabled = true)))
+        click("Open overlay settings")
+        val overlay = org.robolectric.Shadows.shadowOf(app).nextStartedActivity
+        org.junit.Assert.assertEquals(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, overlay.action)
+        org.junit.Assert.assertEquals("package:${app.packageName}", overlay.data.toString())
+        click("Open notification access")
+        org.junit.Assert.assertEquals(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS,
+            org.robolectric.Shadows.shadowOf(app).nextStartedActivity.action)
+        for (camera in listOf(false, true)) for (notifications in listOf(false, true)) for (overlay in listOf(false, true)) {
+            show(state.value.copy(permissions = PermissionSnapshot(camera, notifications, overlay)))
+            if (camera && notifications && overlay) compose.onNodeWithText("Missing permissions").assertDoesNotExist()
+            else compose.onNodeWithText("Missing permissions").assertExists()
+        }
+    }
+
+    @Test fun snackbarAcknowledgesTheWorkoutMessageAfterItsDisplayTime() {
+        render()
+        show(MainUiState(workoutMessage = "Set recorded"))
+        compose.onNodeWithText("Set recorded").assertExists()
+        compose.mainClock.advanceTimeBy(6000)
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(6))
+        compose.waitForIdle()
+        verify { model.clearWorkoutMessage() }
+    }
+
+    @Test fun previewDrawsTheTrackedLandmarksForActiveAndInactiveCounters() {
+        render()
+        val bitmap = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888)
+        val landmarks = mapOf(0 to NormalizedLandmark(0.5f, 0.5f), 1 to NormalizedLandmark(-0.5f, 1.5f))
+        for (active in listOf(false, true)) {
+            show(MainUiState(showCameraPreview = true,
+                workoutSession = WorkoutSessionUiState(1, ExerciseMode.DEAD_HANG, 1000, false, 1, LiveSetUiState(active, 0, 1000), SessionEditorUiState()),
+                cameraPreviewFrame = DebugPreviewFrame(bitmap, landmarks, 1000),
+                monitoring = com.astrovm.gripmaxxer.service.MonitoringSnapshot(hanging = active)))
+            val image = compose.onNodeWithContentDescription("Camera preview with tracking").captureToImage()
+            org.junit.Assert.assertTrue(image.width > 0 && image.height > 0)
+        }
+    }
+
 }

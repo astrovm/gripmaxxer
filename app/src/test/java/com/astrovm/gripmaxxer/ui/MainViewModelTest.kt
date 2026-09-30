@@ -142,4 +142,13 @@ class MainViewModelTest {
         model.endWorkout()
         await { model.uiState.value.workoutSession == null }
     }
+    @Test fun setMessagesExpireAfterTheirDisplayWindow() {
+        model.startWorkout(ExerciseMode.PULL_UP)
+        await { model.uiState.value.workoutSession != null }
+        emit(ExerciseMode.PULL_UP)
+        await { model.uiState.value.workoutMessage != null }
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(2))
+        await { model.uiState.value.workoutMessage == null }
+    }
+
 }
