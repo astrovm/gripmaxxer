@@ -82,10 +82,17 @@ android {
 
 kover {
     reports {
+        filters {
+            excludes {
+                // Room generates these implementations; measure our entities,
+                // DAOs and repository code, not compiler-generated adapters.
+                classes("com.astrovm.gripmaxxer.datastore.WorkoutDao_Impl*", "com.astrovm.gripmaxxer.datastore.GripmaxxerDatabase_Impl*")
+            }
+        }
         variant("debug") {
             verify {
                 rule {
-                    minBound(95)
+                    minBound(100)
                 }
             }
         }

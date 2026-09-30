@@ -211,4 +211,8 @@ class HangDetectorTest {
         assertFalse(detector.feed(Poses.deadHang, 30_000L).isHanging)
         assertFalse(detector.feed(Poses.deadHang, 31_000L).isHanging)
     }
+    @Test fun defaultClockStartsWithAnInactiveCandidate() {
+        assertFalse(HangDetector().process(Poses.deadHang.frame(0)).isHanging)
+    }
+
 }

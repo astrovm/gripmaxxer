@@ -223,11 +223,8 @@ class OverlayTimerManager(context: Context) {
         private const val DEFAULT_OVERLAY_Y = 180
 
         fun isOverlayPermissionGranted(context: Context): Boolean {
-            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                Settings.canDrawOverlays(context)
-            } else {
-                true
-            }
+            // All supported devices (minSdk 26) use the runtime overlay permission.
+            return Settings.canDrawOverlays(context)
         }
     }
 }

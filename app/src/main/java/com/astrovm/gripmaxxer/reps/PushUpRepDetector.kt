@@ -26,13 +26,13 @@ class PushUpRepDetector(
         active: Boolean,
         nowMs: Long,
     ): RepCounterResult {
-        if (!active || !hasRequiredTorso(frame) || !isLikelyStandardPushUp(frame)) {
+        if (!active || !isLikelyStandardPushUp(frame)) {
             return RepCounterResult(reps = cycleCounter.currentReps(), repEvent = false)
         }
 
-        val elbowAngle = featureExtractor.elbowAngleDegrees(frame)
+        val shoulderY = requiredTorsoShoulderY(frame)
             ?: return RepCounterResult(reps = cycleCounter.currentReps(), repEvent = false)
-        val shoulderY = frame.averageY(PoseLandmark.LEFT_SHOULDER, PoseLandmark.RIGHT_SHOULDER)
+        val elbowAngle = featureExtractor.elbowAngleDegrees(frame)
             ?: return RepCounterResult(reps = cycleCounter.currentReps(), repEvent = false)
 
         if (baselineShoulderY == null) {
@@ -53,16 +53,16 @@ class PushUpRepDetector(
         return cycleCounter.process(isDown = isDown, isUp = isUp, nowMs = nowMs)
     }
 
-    private fun hasRequiredTorso(frame: PoseFrame): Boolean {
-        val leftShoulder = frame.landmark(PoseLandmark.LEFT_SHOULDER) ?: return false
-        val rightShoulder = frame.landmark(PoseLandmark.RIGHT_SHOULDER) ?: return false
+    private fun requiredTorsoShoulderY(frame: PoseFrame): Float? {
+        val leftShoulder = frame.landmark(PoseLandmark.LEFT_SHOULDER) ?: return null
+        val rightShoulder = frame.landmark(PoseLandmark.RIGHT_SHOULDER) ?: return null
         val shoulderY = frame.averageY(PoseLandmark.LEFT_SHOULDER, PoseLandmark.RIGHT_SHOULDER)
         val hipY = frame.averageY(PoseLandmark.LEFT_HIP, PoseLandmark.RIGHT_HIP)
-        if (shoulderY == null || hipY == null) return false
+        if (shoulderY == null || hipY == null) return null
 
         val shoulderWidth = abs(leftShoulder.x - rightShoulder.x)
-        if (shoulderWidth < MIN_SHOULDER_WIDTH) return false
-        return abs(shoulderY - hipY) <= BODY_FLAT_MAX_DELTA
+        if (shoulderWidth < MIN_SHOULDER_WIDTH) return null
+        return if (abs(shoulderY - hipY) <= BODY_FLAT_MAX_DELTA) shoulderY else null
     }
 
     private fun isLikelyStandardPushUp(frame: PoseFrame): Boolean {
