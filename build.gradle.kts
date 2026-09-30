@@ -2,8 +2,8 @@ buildscript {
     dependencies {
         // Pin patched versions of transitive build-tool dependencies pulled in by the Android Gradle Plugin.
         constraints {
-            classpath("org.bouncycastle:bcprov-jdk18on:1.85")
-            classpath("org.bouncycastle:bcpkix-jdk18on:1.85")
+            classpath("org.bouncycastle:bcprov-jdk18on:1.86")
+            classpath("org.bouncycastle:bcpkix-jdk18on:1.86")
             classpath("org.freemarker:freemarker:2.3.35")
             classpath("org.bitbucket.b_c:jose4j:0.9.6")
             classpath("org.jdom:jdom2:2.0.6.1")
