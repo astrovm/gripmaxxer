@@ -1,10 +1,12 @@
 <resources>
     <string name="app_name">Gripmaxxer</string>
-    <string name="notification_channel_name">Grip Monitoring</string>
-    <string name="notification_channel_description">Foreground camera service for hang and rep detection</string>
-    <string name="notification_title">Gripmaxxer monitoring</string>
-    <string name="notification_listener_label">Gripmaxxer Notification Access</string>
-    <string name="notification_stop">Stop monitoring</string>
-    <string name="developer_name">astrovm</string>
-    <string name="developer_id">astrovm</string>
+    <string name="notification_channel">Workout tracking</string>
+    <string name="notification_title">Workout in progress</string>
+    <string name="notification_listener_label">Gripmaxxer media control</string>
+    <string name="tracking_starting">Starting camera</string>
+    <string name="status_step_in">step into frame</string>
+    <string name="status_ready">ready</string>
+    <string name="finish_workout">Finish</string>
+    <string name="error_camera_permission">Camera permission is off</string>
+    <string name="error_camera_unavailable">Camera unavailable</string>
 </resources>

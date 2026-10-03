@@ -1,44 +1,63 @@
 # Gripmaxxer
 
-Gripmaxxer is an Android workout tracker that uses your front camera to detect activity and count reps/hold time in real time.
+Android workout tracker that watches you through the front camera and counts for you.
 
-## What You Can Do
-- Pick an exercise mode and start a workout quickly.
-- Track these camera-supported modes: dead hang, active hang, pull-up, chin-up, hanging leg raise, push-up, squat, and dip.
-- Auto-count reps and timed holds.
-- Use optional media control (play/pause) based on your activity.
-- Show an optional floating stopwatch overlay.
-- Review sessions in `Log` and stats/settings in `Profile`.
+Hang from a bar and it times the hang. Do pull-ups and it counts them. Every set is saved on its own.
 
-## Quick Start (User)
-1. Install and open the app on a real Android device.
-2. Go to `Workout`.
-3. Select your exercise mode.
-4. Grant any missing permissions shown on screen.
-5. Tap `Start Workout`.
-6. Use `Pause/Resume`, `Sets`, and `End` during the session.
-7. Check completed workouts in `Log`.
+## 🏋️ What it does
 
-## Permissions (Why They Are Requested)
-- `Camera`: required for exercise detection and rep counting.
-- `Notification access`: only required if media play/pause control is enabled.
-- `Overlay`: only required if floating stopwatch overlay is enabled.
+- Tracks dead hangs, active hangs, pull-ups, chin-ups, hanging leg raises, push-ups, squats and dips.
+- Saves a set when you let go of the bar, or after a few seconds of rest on the floor.
+- Mixes exercises in one workout. Switch any time from the live screen.
+- Plays your music or video while you're in a set and pauses it when you stop.
+- Shows a floating timer over other apps, so you can watch something while you hang.
+- Beeps on each rep and reads hold times out loud every 10 seconds.
+- Lets you add, fix or delete sets by hand.
+- Keeps your history and personal bests.
 
-## Notes
-- Camera monitoring runs in a foreground service, so a persistent notification is expected.
-- Android camera privacy indicator will be visible while tracking is active.
-- Overlay visibility can vary on some OEM/system screens.
-- Voice cue (hold modes) is enabled by default and can be toggled in `Profile`.
+No account. Your workouts stay on the phone.
 
-## Tracking Tips
-- Keep your full movement in frame.
-- Use good lighting and stable phone placement.
-- If tracking feels noisy, try adjusting angle/distance.
-- Start your media app first if you use media control.
+## 📱 Using it
 
-## Build From Source
-1. Open the project in Android Studio.
-2. Use SDK settings from your environment.
-3. Build debug APK:
-   - `JAVA_HOME="${JAVA_HOME:-$HOME/android-studio/jbr}" ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}" ./gradlew :app:assembleDebug -x lint`
-4. Install/run on device (min SDK 26, target SDK 36).
+1. Prop the phone up so your whole body is in frame, hands included.
+2. Pick an exercise in **Workout** and tap **Start**.
+3. Train. Switch exercises with the chips under the camera.
+4. Tap **Finish**. The workout shows up in **History**.
+
+The camera keeps running with the app in the background, so you can open YouTube or anything else while you train.
+
+## 🔐 Permissions
+
+- **Camera**: needed to count.
+- **Notifications**: shows the running workout, with a **Finish** button.
+- **Notification access** (optional): lets Gripmaxxer play and pause other apps' media.
+- **Display over other apps** (optional): for the floating timer.
+
+Turn the optional ones on from **Profile**.
+
+## 🛠️ Building
+
+Needs JDK 21 and the Android SDK.
+
+```sh
+./gradlew :app:assembleDebug
+```
+
+Checks CI runs on every pull request, 100% line coverage included:
+
+```sh
+./gradlew :app:testDebugUnitTest :app:koverVerifyDebug :app:assembleDebug
+```
+
+## 🧭 How the code is laid out
+
+- `tracking/`: plain Kotlin, no Android. Turns body poses into reps and sets. Start here to tune detection.
+- `camera/`: front camera and ML Kit pose detection.
+- `service/`: keeps the camera on while a workout is open.
+- `data/`: Room database for workouts and DataStore for settings.
+- `media/`, `feedback/`: media control, sounds, voice and the floating timer.
+- `ui/`: Compose screens.
+
+## License
+
+MIT
