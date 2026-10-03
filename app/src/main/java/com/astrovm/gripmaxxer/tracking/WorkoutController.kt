@@ -22,12 +22,14 @@ data class LiveState(
     val exercise: Exercise? = null,
     /** When the open workout started, for the notification clock. */
     val workoutStartedAtMs: Long? = null,
-    /** A person is in frame. */
+    /** A person is in frame. Always true in the pocket. */
     val personVisible: Boolean = false,
+    /** The phone is in a pocket: the motion sensors count instead of the camera. */
+    val inPocket: Boolean = false,
     val inSet: Boolean = false,
     val reps: Int = 0,
     val setDurationMs: Long = 0L,
-    /** The last set the camera saved, shown until the next one starts. */
+    /** The last set saved on its own, shown until the next one starts. */
     val lastSet: TrackedSet? = null,
     /** Why the camera stopped on its own. */
     val error: String? = null,
@@ -42,8 +44,8 @@ interface TrackingEffects {
 }
 
 /**
- * Runs the active workout: turns camera frames into saved sets, and starts and stops
- * the camera with the workout. Lives as long as the app process.
+ * Runs the active workout: turns camera frames, or motion from the pocket, into saved
+ * sets, and starts and stops tracking with the workout. Lives as long as the app process.
  *
  * Frames arrive on the camera thread, everything else on the main thread, so the
  * tracker is only touched under [lock]. Database writes run one at a time in order,
@@ -68,7 +70,7 @@ class WorkoutController(
     @Volatile
     private var settings = Settings()
     private var workoutId: Long? = null
-    private var tracker: ExerciseTracker? = null
+    private var tracker: SetTracker? = null
     private var lastPoseMs: Long? = null
     private var lastHoldCue = 0L
 
@@ -97,13 +99,14 @@ class WorkoutController(
             val id = workoutId ?: return
             if (tracker?.exercise == exercise) return
             flushSet(id)
-            tracker = ExerciseTracker(exercise)
+            tracker = newTracker(exercise, _live.value.inPocket)
             _live.update {
                 LiveState(
                     tracking = it.tracking,
                     exercise = exercise,
                     workoutStartedAtMs = it.workoutStartedAtMs,
                     personVisible = it.personVisible,
+                    inPocket = it.inPocket,
                 )
             }
             id
@@ -132,29 +135,66 @@ class WorkoutController(
         if (wasTracking) stopCamera()
     }
 
+    /**
+     * Switches between counting with the camera and with the motion sensors.
+     * Saves the set in progress first, since the other one can't pick it up.
+     */
+    fun setInPocket(inPocket: Boolean) {
+        synchronized(lock) {
+            val id = workoutId ?: return
+            val exercise = tracker?.exercise ?: return
+            if (_live.value.inPocket == inPocket) return
+            flushSet(id)
+            tracker = newTracker(exercise, inPocket)
+            _live.update {
+                LiveState(
+                    tracking = it.tracking,
+                    exercise = exercise,
+                    workoutStartedAtMs = it.workoutStartedAtMs,
+                    personVisible = inPocket,
+                    inPocket = inPocket,
+                    lastSet = it.lastSet,
+                )
+            }
+        }
+    }
+
     fun onFrame(pose: Pose?, nowMs: Long) {
         synchronized(lock) {
             val id = workoutId ?: return
-            val tracker = tracker ?: return
+            val tracker = tracker as? ExerciseTracker ?: return
             if (pose != null) lastPoseMs = nowMs
-            val wasInSet = _live.value.inSet
-            val state = tracker.update(pose, nowMs)
-            state.finishedSet?.let { save(id, it) }
-            if (state.repCounted && settings.repSound) effects?.beep()
-            if (state.inSet != wasInSet && settings.mediaControl) {
-                if (state.inSet) effects?.playMedia() else effects?.pauseMedia()
-            }
-            if (!state.inSet) lastHoldCue = 0L
-            if (state.inSet && tracker.exercise.isHold) cueHold(state.setDurationMs)
-            _live.update {
-                it.copy(
-                    personVisible = lastPoseMs.let { it != null && nowMs - it < PERSON_GONE_MS },
-                    inSet = state.inSet,
-                    reps = state.reps,
-                    setDurationMs = state.setDurationMs,
-                    lastSet = state.finishedSet ?: it.lastSet.takeUnless { state.inSet },
-                )
-            }
+            val visible = lastPoseMs.let { it != null && nowMs - it < PERSON_GONE_MS }
+            apply(id, tracker, tracker.update(pose, nowMs), visible)
+        }
+    }
+
+    fun onMotion(motion: Motion, nowMs: Long) {
+        synchronized(lock) {
+            val id = workoutId ?: return
+            val tracker = tracker as? PocketTracker ?: return
+            apply(id, tracker, tracker.update(motion, nowMs), visible = true)
+        }
+    }
+
+    /** Must hold [lock]. */
+    private fun apply(id: Long, tracker: SetTracker, state: TrackerState, visible: Boolean) {
+        val wasInSet = _live.value.inSet
+        state.finishedSet?.let { save(id, it) }
+        if (state.repCounted && settings.repSound) effects?.beep()
+        if (state.inSet != wasInSet && settings.mediaControl) {
+            if (state.inSet) effects?.playMedia() else effects?.pauseMedia()
+        }
+        if (!state.inSet) lastHoldCue = 0L
+        if (state.inSet && tracker.exercise.isHold) cueHold(state.setDurationMs)
+        _live.update {
+            it.copy(
+                personVisible = visible,
+                inSet = state.inSet,
+                reps = state.reps,
+                setDurationMs = state.setDurationMs,
+                lastSet = state.finishedSet ?: it.lastSet.takeUnless { state.inSet },
+            )
         }
     }
 
@@ -162,12 +202,15 @@ class WorkoutController(
         synchronized(lock) {
             if (workoutId == id && tracker != null) return
             workoutId = id
-            tracker = ExerciseTracker(exercise)
+            tracker = newTracker(exercise, inPocket = false)
             lastPoseMs = null
             _live.value = LiveState(tracking = true, exercise = exercise, workoutStartedAtMs = startedAtMs)
         }
         startCamera()
     }
+
+    private fun newTracker(exercise: Exercise, inPocket: Boolean): SetTracker =
+        if (inPocket) PocketTracker(exercise) else ExerciseTracker(exercise)
 
     private fun cueHold(durationMs: Long) {
         val seconds = durationMs / 1000

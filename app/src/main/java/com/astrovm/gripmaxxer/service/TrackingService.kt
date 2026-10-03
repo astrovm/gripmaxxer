@@ -9,6 +9,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.os.PowerManager
+import android.os.SystemClock
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
@@ -26,10 +32,12 @@ import com.astrovm.gripmaxxer.feedback.Cues
 import com.astrovm.gripmaxxer.feedback.FloatingTimer
 import com.astrovm.gripmaxxer.media.MediaRemote
 import com.astrovm.gripmaxxer.tracking.LiveState
+import com.astrovm.gripmaxxer.tracking.Motion
 import com.astrovm.gripmaxxer.tracking.TrackingEffects
 import com.astrovm.gripmaxxer.ui.formatDuration
 import com.astrovm.gripmaxxer.ui.formatResult
 import com.astrovm.gripmaxxer.ui.theme.accentColor
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -41,10 +49,16 @@ import kotlinx.coroutines.launch
  * Keeps the front camera running while a workout is open, even with the app in the
  * background, so you can watch a video while you hang. The counting itself happens in
  * [com.astrovm.gripmaxxer.tracking.WorkoutController].
+ *
+ * When the proximity sensor stays covered, the phone is in a pocket: the camera goes off
+ * and the motion sensors count instead, until it comes back out.
  */
 class TrackingService : LifecycleService() {
 
     private var camera: PoseCamera? = null
+    private lateinit var sensors: SensorManager
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var pocketJob: Job? = null
     private var cues: Cues? = null
     private lateinit var timer: FloatingTimer
     private var lastNotice: String? = null
@@ -75,8 +89,14 @@ class TrackingService : LifecycleService() {
             override fun pauseMedia() = media.pause()
         }
 
-        camera = PoseCamera(this, wantsImage = { app.previewVisible.value }, onFrame = ::onCameraFrame).also {
-            it.start(this) { app.controller.stopTracking(getString(R.string.error_camera_unavailable)) }
+        sensors = getSystemService(SensorManager::class.java)
+        sensors.getDefaultSensor(Sensor.TYPE_PROXIMITY)?.let {
+            sensors.registerListener(proximityListener, it, SensorManager.SENSOR_DELAY_NORMAL)
+        }
+        lifecycleScope.launch {
+            app.controller.live.map { it.inPocket }.distinctUntilChanged().collect { inPocket ->
+                if (inPocket) usePocket() else useCamera()
+            }
         }
 
         val inBackground = ProcessLifecycleOwner.get().lifecycle.currentStateFlow
@@ -113,6 +133,11 @@ class TrackingService : LifecycleService() {
     override fun onDestroy() {
         val app = container
         camera?.stop()
+        if (::sensors.isInitialized) {
+            sensors.unregisterListener(proximityListener)
+            sensors.unregisterListener(motionListener)
+        }
+        releaseWakeLock()
         if (::timer.isInitialized) timer.hide()
         cues?.release()
         app.controller.effects = null
@@ -121,6 +146,61 @@ class TrackingService : LifecycleService() {
         app.controller.stopTracking()
         super.onDestroy()
     }
+
+    private fun useCamera() {
+        sensors.unregisterListener(motionListener)
+        releaseWakeLock()
+        val app = container
+        if (camera != null || !app.controller.live.value.tracking) return
+        camera = PoseCamera(this, wantsImage = { app.previewVisible.value }, onFrame = ::onCameraFrame).also {
+            it.start(this) { app.controller.stopTracking(getString(R.string.error_camera_unavailable)) }
+        }
+    }
+
+    private fun usePocket() {
+        camera?.stop()
+        camera = null
+        container.preview.value = null
+        sensors.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let {
+            sensors.registerListener(motionListener, it, SensorManager.SENSOR_DELAY_GAME)
+        }
+        // The accelerometer stops reporting once the phone sleeps with the screen off.
+        wakeLock = getSystemService(PowerManager::class.java)
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "gripmaxxer:pocket")
+            .apply { acquire(MAX_POCKET_MS) }
+    }
+
+    private fun releaseWakeLock() {
+        wakeLock?.takeIf { it.isHeld }?.release()
+        wakeLock = null
+    }
+
+    private val proximityListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent) {
+            val covered = event.values[0] < event.sensor.maximumRange
+            // A hand passing over the sensor isn't a pocket.
+            pocketJob?.cancel()
+            pocketJob = lifecycleScope.launch {
+                delay(if (covered) POCKET_IN_MS else POCKET_OUT_MS)
+                container.controller.setInPocket(covered)
+            }
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) = Unit
+    }
+
+    private val motionListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent) {
+            // Sensor time runs on the boot clock. Line it up with the wall clock sets are saved in.
+            val ageMs = (SystemClock.elapsedRealtimeNanos() - event.timestamp) / 1_000_000
+            val (x, y, z) = event.values
+            onMotion(Motion(x, y, z), System.currentTimeMillis() - ageMs)
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) = Unit
+    }
+
+    internal fun onMotion(motion: Motion, timestampMs: Long) = container.controller.onMotion(motion, timestampMs)
 
     internal fun onCameraFrame(frame: CameraFrame) {
         val app = container
@@ -205,6 +285,10 @@ class TrackingService : LifecycleService() {
         private const val OLD_CHANNEL_ID = "tracking"
         private const val NOTIFICATION_ID = 1
         private const val ACTION_FINISH = "com.astrovm.gripmaxxer.FINISH"
+        private const val POCKET_IN_MS = 1_500L
+        private const val POCKET_OUT_MS = 500L
+        /** A safety net in case the wake lock is somehow never let go. */
+        private const val MAX_POCKET_MS = 4 * 60 * 60 * 1000L
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, Intent(context, TrackingService::class.java))

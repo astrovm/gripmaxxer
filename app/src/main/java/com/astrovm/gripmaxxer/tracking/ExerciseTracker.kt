@@ -1,6 +1,6 @@
 package com.astrovm.gripmaxxer.tracking
 
-/** A set the camera saw from start to finish. */
+/** A set the tracker saw from start to finish. */
 data class TrackedSet(
     val exercise: Exercise,
     val reps: Int,
@@ -20,13 +20,30 @@ data class TrackerState(
     val finishedSet: TrackedSet? = null,
 )
 
+/** Turns a stream of readings into sets for one exercise. */
+sealed interface SetTracker {
+    val exercise: Exercise
+
+    /** Ends the set in progress, if any. Call when switching exercise or stopping. */
+    fun finish(nowMs: Long): TrackedSet?
+}
+
+/** The set from [startMs] to [endMs], or null if it was too short to keep. */
+internal fun completedSet(exercise: Exercise, reps: Int, startMs: Long, endMs: Long, nowMs: Long, minReps: Int = 1): TrackedSet? {
+    val duration = (endMs - startMs).coerceAtLeast(0L)
+    val counts = if (exercise.isHold) duration >= MIN_HOLD_MS else reps >= minReps
+    return if (counts) TrackedSet(exercise, reps, duration, nowMs) else null
+}
+
+private const val MIN_HOLD_MS = 2_000L
+
 /**
  * Turns camera frames into sets for one exercise.
  *
  * Bar exercises: a set is one hang, from grabbing the bar to letting go.
  * Floor exercises: a set starts with the first rep and ends after a few seconds of rest.
  */
-class ExerciseTracker(val exercise: Exercise) {
+class ExerciseTracker(override val exercise: Exercise) : SetTracker {
 
     private val bar = if (exercise.onBar) BarDetector() else null
     private val reader = PositionReader.forExercise(exercise)
@@ -40,8 +57,7 @@ class ExerciseTracker(val exercise: Exercise) {
         return if (bar != null) updateOnBar(bar, pose, nowMs) else updateOnFloor(pose, nowMs)
     }
 
-    /** Ends the set in progress, if any. Call when switching exercise or stopping. */
-    fun finish(nowMs: Long): TrackedSet? {
+    override fun finish(nowMs: Long): TrackedSet? {
         val start = setStartMs ?: return null
         val end = if (bar != null) bar.lastGripAtMs else lastMoveMs
         return closeSet(start, end.coerceAtMost(nowMs), nowMs)
@@ -86,15 +102,12 @@ class ExerciseTracker(val exercise: Exercise) {
         val reps = counter.reps
         setStartMs = null
         counter = newCounter()
-        val duration = (endMs - startMs).coerceAtLeast(0L)
-        val counts = if (exercise.isHold) duration >= MIN_HOLD_MS else reps > 0
-        return if (counts) TrackedSet(exercise, reps, duration, nowMs) else null
+        return completedSet(exercise, reps, startMs, endMs, nowMs)
     }
 
     private fun newCounter() = RepCounter(countAtPeak = exercise.onBar)
 
     private companion object {
-        const val MIN_HOLD_MS = 2_000L
         const val FLOOR_REST_MS = 5_000L
         const val FLOOR_LOST_MS = 3_000L
     }

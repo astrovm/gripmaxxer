@@ -35,6 +35,7 @@ import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.PersonOff
+import androidx.compose.material.icons.outlined.Sensors
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.Button
@@ -422,6 +423,14 @@ private fun LivePanel(
                 ) {
                     ErrorLine(live.error)
                     OutlinedButton(onClick = onRetry) { Text("Try again") }
+                }
+
+                live.inPocket -> Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(Icons.Outlined.Sensors, contentDescription = null, tint = colors.onSurfaceVariant)
+                    Text("Counting from your pocket", color = colors.onSurfaceVariant)
                 }
 
                 frame?.image != null -> CameraPreview(
