@@ -107,7 +107,8 @@ class TrackingServiceTest {
     /** The floating timer's label and value, like "Rest" and "0:03". */
     private fun timerText(): List<String>? {
         val box = windows.views.singleOrNull() as LinearLayout? ?: return null
-        return (0 until box.childCount).map { (box.getChildAt(it) as TextView).text.toString() }
+        val face = box.getChildAt(0) as LinearLayout
+        return (0 until face.childCount).map { (face.getChildAt(it) as TextView).text.toString() }
     }
 
     @Test
@@ -188,6 +189,52 @@ class TrackingServiceTest {
         runBlocking { app.container.settings.setOverlay(false) }
         settle { windows.views.isEmpty() }
         service.destroy()
+    }
+
+    @Test
+    fun floatingTimerActions(): Unit = runBlocking {
+        shadowOf(app).grantPermissions(Manifest.permission.CAMERA)
+        ShadowSettings.setCanDrawOverlays(true)
+        app.container.settings.setOverlay(true)
+        startWorkout(Exercise.SQUAT)
+        val service = service()
+        settle { windows.views.isNotEmpty() }
+        fun tapAction(description: String) {
+            val box = windows.views.single() as LinearLayout
+            box.getChildAt(0).let { face ->
+                val now = android.os.SystemClock.uptimeMillis()
+                listOf(android.view.MotionEvent.ACTION_DOWN, android.view.MotionEvent.ACTION_UP).forEach { action ->
+                    android.view.MotionEvent.obtain(now, now, action, 10f, 10f, 0).also {
+                        face.dispatchTouchEvent(it)
+                        it.recycle()
+                    }
+                }
+            }
+            val actions = box.getChildAt(1) as LinearLayout
+            (0 until actions.childCount).map { actions.getChildAt(it) }.single { it.contentDescription == description }.performClick()
+        }
+
+        tapAction("Open Gripmaxxer")
+        assertEquals(
+            com.astrovm.gripmaxxer.MainActivity::class.java.name,
+            shadowOf(app).nextStartedActivity.component!!.className,
+        )
+
+        // Hidden for the rest of the workout.
+        tapAction("Hide")
+        assertTrue(windows.views.isEmpty())
+        waitMs(2_000)
+        assertTrue(windows.views.isEmpty())
+
+        val id = app.container.workouts.active.first()!!.id
+        app.container.workouts.addSet(id, Exercise.SQUAT, 5, 0)
+        service.destroy()
+        startWorkout(Exercise.SQUAT)
+        val again = service()
+        settle { windows.views.isNotEmpty() }
+        tapAction("Finish workout")
+        settle { runBlocking { app.container.workouts.active.first() } == null }
+        again.destroy()
     }
 
     @Test
@@ -326,6 +373,14 @@ class TrackingServiceTest {
         app.container.controller.setInPocket(false)
         idle()
         service.destroy()
+    }
+
+    @Test
+    fun opensFromTheBackgroundWithTheRightPermission() {
+        assertEquals(android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS, TrackingService.backgroundStartMode(36))
+        @Suppress("DEPRECATION")
+        assertEquals(android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED, TrackingService.backgroundStartMode(34))
+        assertNull(TrackingService.backgroundStartMode(33))
     }
 
     @Test

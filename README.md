@@ -11,7 +11,7 @@ Hang from a bar and it times the hang. Do pull-ups and it counts them. Every set
 - Also counts with the phone in your front pocket, using the motion sensors.
 - Mixes exercises in one workout. Switch any time from the live screen.
 - Plays your music or video while you're in a set and pauses it when you stop.
-- Shows a floating timer over other apps, so you can watch something while you hang.
+- Shows a floating timer over other apps, so you can watch something while you hang. Tap it to open the app, finish the workout or hide it. Drag it to either side.
 - Times your rest between sets.
 - Keeps the workout clock and a **Finish** button in the notification.
 - Beeps on each rep and reads hold times out loud every 10 seconds.
