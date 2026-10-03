@@ -3,7 +3,9 @@ package com.astrovm.gripmaxxer.ui
 import android.provider.Settings
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -149,7 +151,10 @@ class HistoryProfileUiTest : UiTestBase() {
         compose.onNodeWithContentDescription("White").assertIsSelected()
         compose.onNodeWithContentDescription("Green").tap()
         waitUntil { runBlocking { container.settings.settings.first().accent } == Accent.GREEN }
-        compose.onNodeWithContentDescription("Green").assertIsSelected()
+        // The saved setting reaches the screen a moment later.
+        waitUntil {
+            compose.onAllNodes(hasContentDescription("Green") and isSelected()).fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     @Test
