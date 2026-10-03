@@ -67,6 +67,19 @@ class ExerciseTrackerTest {
     }
 
     @Test
+    fun gettingDownAfterPullUpsIsNotARep() {
+        val tracker = ExerciseTracker(Exercise.PULL_UP)
+        tracker.feed(Poses.deadHang, 1000)
+        repeat(3) { tracker.pullUp() }
+        // Let go: hands come down past the face with bent elbows, then off the bar.
+        tracker.feed(Poses.lettingGo, 500)
+        tracker.feed(Poses.standing, 1000)
+
+        assertEquals(3, repEvents)
+        assertEquals(3, finished.single().reps)
+    }
+
+    @Test
     fun hangWithoutPullUpsIsNotARepSet() {
         val tracker = ExerciseTracker(Exercise.CHIN_UP)
         tracker.feed(Poses.deadHang, 5000)

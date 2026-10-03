@@ -46,6 +46,18 @@ object Poses {
         LEFT_KNEE to (210 to 400), RIGHT_KNEE to (270 to 400),
     )
 
+    /**
+     * Getting down from the bar: hands dropping past the face, elbows bent.
+     * Looks like the top of a pull-up, but the hands have left the bar.
+     */
+    val lettingGo = pose(
+        NOSE to (240 to 280),
+        LEFT_SHOULDER to (200 to 300), RIGHT_SHOULDER to (280 to 300),
+        LEFT_ELBOW to (150 to 295), RIGHT_ELBOW to (330 to 295),
+        LEFT_WRIST to (190 to 270), RIGHT_WRIST to (290 to 270),
+        LEFT_HIP to (210 to 420), RIGHT_HIP to (270 to 420),
+    )
+
     /** Halfway up: elbows at about 120 degrees. */
     val pullUpMiddle = pose(
         NOSE to (240 to 200),
