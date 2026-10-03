@@ -1,0 +1,190 @@
+package com.astrovm.gripmaxxer.tracking
+
+import com.astrovm.gripmaxxer.data.Settings
+import com.astrovm.gripmaxxer.data.SettingsRepository
+import com.astrovm.gripmaxxer.data.WorkoutRepository
+import com.astrovm.gripmaxxer.feedback.Cues
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.completeWith
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+
+/** What the live workout screen and the floating timer show. */
+data class LiveState(
+    /** The camera is on and counting. */
+    val tracking: Boolean = false,
+    val exercise: Exercise? = null,
+    /** A person is in frame. */
+    val personVisible: Boolean = false,
+    val inSet: Boolean = false,
+    val reps: Int = 0,
+    val setDurationMs: Long = 0L,
+    /** The last set the camera saved, shown until the next one starts. */
+    val lastSet: TrackedSet? = null,
+    /** Why the camera stopped on its own. */
+    val error: String? = null,
+)
+
+/** Things that need Android. The tracking service plugs in the real ones. */
+interface TrackingEffects {
+    fun beep()
+    fun say(text: String)
+    fun playMedia()
+    fun pauseMedia()
+}
+
+/**
+ * Runs the active workout: turns camera frames into saved sets, and starts and stops
+ * the camera with the workout. Lives as long as the app process.
+ *
+ * Frames arrive on the camera thread, everything else on the main thread, so the
+ * tracker is only touched under [lock]. Database writes run one at a time in order,
+ * so a set is always saved before the workout it belongs to is finished.
+ */
+class WorkoutController(
+    private val workouts: WorkoutRepository,
+    private val settingsRepository: SettingsRepository,
+    scope: CoroutineScope,
+    private val startCamera: () -> Unit,
+    private val stopCamera: () -> Unit,
+) {
+    private val lock = Any()
+    private val writes = Channel<suspend () -> Unit>(Channel.UNLIMITED)
+    private val _live = MutableStateFlow(LiveState())
+    val live: StateFlow<LiveState> = _live.asStateFlow()
+
+    /** Null until the tracking service is running. */
+    @Volatile
+    var effects: TrackingEffects? = null
+
+    @Volatile
+    private var settings = Settings()
+    private var workoutId: Long? = null
+    private var tracker: ExerciseTracker? = null
+    private var lastPoseMs: Long? = null
+    private var lastHoldCue = 0L
+
+    init {
+        // A failed write must not stop the ones queued behind it.
+        scope.launch { for (write in writes) runCatching { write() } }
+        scope.launch { settingsRepository.settings.collect { settings = it } }
+    }
+
+    /** Starts a new workout, or picks the running one back up. */
+    suspend fun start(exercise: Exercise) {
+        settingsRepository.setLastExercise(exercise)
+        val id = workouts.start(exercise)
+        val current = workouts.active.first()
+        track(id, current?.exercise ?: exercise)
+    }
+
+    /** Turns the camera back on for a workout that's still open, e.g. after the app was closed. */
+    suspend fun resume() {
+        val active = workouts.active.first() ?: return
+        track(active.id, active.exercise)
+    }
+
+    suspend fun switchExercise(exercise: Exercise) {
+        val id = synchronized(lock) {
+            val id = workoutId ?: return
+            if (tracker?.exercise == exercise) return
+            flushSet(id)
+            tracker = ExerciseTracker(exercise)
+            _live.update { LiveState(tracking = it.tracking, exercise = exercise, personVisible = it.personVisible) }
+            id
+        }
+        settingsRepository.setLastExercise(exercise)
+        write { workouts.switchExercise(id, exercise) }
+    }
+
+    /** Saves the set in progress and closes the workout. Returns false if it had no sets and was dropped. */
+    suspend fun finish(): Boolean {
+        val id = synchronized(lock) { workoutId } ?: workouts.active.first()?.id ?: return false
+        stopTracking()
+        return write { workouts.finish(id) }
+    }
+
+    /** Saves the set in progress and turns the camera off. The workout stays open. */
+    fun stopTracking(error: String? = null) {
+        val wasTracking = synchronized(lock) {
+            val id = workoutId ?: return@synchronized false
+            flushSet(id)
+            workoutId = null
+            tracker = null
+            _live.value = LiveState(error = error)
+            true
+        }
+        if (wasTracking) stopCamera()
+    }
+
+    fun onFrame(pose: Pose?, nowMs: Long) {
+        synchronized(lock) {
+            val id = workoutId ?: return
+            val tracker = tracker ?: return
+            if (pose != null) lastPoseMs = nowMs
+            val wasInSet = _live.value.inSet
+            val state = tracker.update(pose, nowMs)
+            state.finishedSet?.let { save(id, it) }
+            if (state.repCounted && settings.repSound) effects?.beep()
+            if (state.inSet != wasInSet && settings.mediaControl) {
+                if (state.inSet) effects?.playMedia() else effects?.pauseMedia()
+            }
+            if (!state.inSet) lastHoldCue = 0L
+            if (state.inSet && tracker.exercise.isHold) cueHold(state.setDurationMs)
+            _live.update {
+                it.copy(
+                    personVisible = lastPoseMs.let { it != null && nowMs - it < PERSON_GONE_MS },
+                    inSet = state.inSet,
+                    reps = state.reps,
+                    setDurationMs = state.setDurationMs,
+                    lastSet = state.finishedSet ?: it.lastSet.takeUnless { state.inSet },
+                )
+            }
+        }
+    }
+
+    private fun track(id: Long, exercise: Exercise) {
+        synchronized(lock) {
+            if (workoutId == id && tracker != null) return
+            workoutId = id
+            tracker = ExerciseTracker(exercise)
+            lastPoseMs = null
+            _live.value = LiveState(tracking = true, exercise = exercise)
+        }
+        startCamera()
+    }
+
+    private fun cueHold(durationMs: Long) {
+        val seconds = durationMs / 1000
+        val mark = seconds / Cues.HOLD_CUE_EVERY_S * Cues.HOLD_CUE_EVERY_S
+        if (mark <= lastHoldCue) return
+        lastHoldCue = mark
+        if (settings.voiceCues) effects?.say(Cues.holdText(mark))
+    }
+
+    /** Must hold [lock]. */
+    private fun flushSet(id: Long) {
+        tracker?.finish(System.currentTimeMillis())?.let { save(id, it) }
+        if (_live.value.inSet && settings.mediaControl) effects?.pauseMedia()
+    }
+
+    private fun save(id: Long, set: TrackedSet) {
+        writes.trySend { workouts.addTrackedSet(id, set) }
+    }
+
+    private suspend fun <T> write(block: suspend () -> T): T {
+        val result = CompletableDeferred<T>()
+        writes.send { result.completeWith(runCatching { block() }) }
+        return result.await()
+    }
+
+    private companion object {
+        const val PERSON_GONE_MS = 1_000L
+    }
+}

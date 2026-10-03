@@ -1,450 +1,126 @@
 package com.astrovm.gripmaxxer.ui
 
-import android.app.Application
-import android.content.Context
-import android.content.pm.PackageManager
-import androidx.core.content.ContextCompat
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.astrovm.gripmaxxer.datastore.AppSettings
-import com.astrovm.gripmaxxer.datastore.ColorPalette
-import com.astrovm.gripmaxxer.datastore.GripmaxxerDatabase
-import com.astrovm.gripmaxxer.datastore.SettingsRepository
-import com.astrovm.gripmaxxer.media.MediaControlManager
-import com.astrovm.gripmaxxer.overlay.OverlayTimerManager
-import com.astrovm.gripmaxxer.reps.ExerciseMode
-import com.astrovm.gripmaxxer.service.AutoSetEvent
-import com.astrovm.gripmaxxer.service.AutoSetEventStore
-import com.astrovm.gripmaxxer.service.DebugPreviewFrame
-import com.astrovm.gripmaxxer.service.DebugPreviewStore
-import com.astrovm.gripmaxxer.service.HangCamService
-import com.astrovm.gripmaxxer.service.MonitoringSnapshot
-import com.astrovm.gripmaxxer.service.MonitoringStateStore
-import com.astrovm.gripmaxxer.workout.ActiveWorkoutState
-import com.astrovm.gripmaxxer.workout.CalendarDaySummary
-import com.astrovm.gripmaxxer.workout.CompletedWorkoutDetail
-import com.astrovm.gripmaxxer.workout.ExerciseProfileStats
-import com.astrovm.gripmaxxer.workout.RoomWorkoutRepository
-import com.astrovm.gripmaxxer.workout.WorkoutFeedItem
-import com.astrovm.gripmaxxer.workout.WorkoutSetState
+import com.astrovm.gripmaxxer.AppContainer
+import com.astrovm.gripmaxxer.data.Accent
+import com.astrovm.gripmaxxer.data.ExerciseStats
+import com.astrovm.gripmaxxer.data.Settings
+import com.astrovm.gripmaxxer.data.Workout
+import com.astrovm.gripmaxxer.tracking.Exercise
+import com.astrovm.gripmaxxer.tracking.LiveState
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.util.Locale
 
-enum class RootTab {
-    LOG,
-    WORKOUT,
-    PROFILE,
+enum class Tab { WORKOUT, HISTORY, PROFILE }
+
+/** Which special-access permissions the app has. Refreshed whenever the app comes back. */
+data class Access(
+    val camera: Boolean = false,
+    val notifications: Boolean = false,
+    val overlay: Boolean = false,
+)
+
+/** Database state is still loading. */
+sealed interface Loadable<out T> {
+    data object Loading : Loadable<Nothing>
+    data class Ready<T>(val value: T) : Loadable<T>
 }
 
-data class PermissionSnapshot(
-    val cameraGranted: Boolean = false,
-    val notificationAccessEnabled: Boolean = false,
-    val overlayPermissionGranted: Boolean = false,
-)
+@OptIn(ExperimentalCoroutinesApi::class)
+class MainViewModel(private val app: AppContainer, private val readAccess: () -> Access) : ViewModel() {
 
-data class LiveSetUiState(
-    val active: Boolean = false,
-    val reps: Int = 0,
-    val durationMs: Long = 0L,
-)
+    private val _tab = MutableStateFlow(Tab.WORKOUT)
+    val tab: StateFlow<Tab> = _tab.asStateFlow()
 
-data class SessionEditorUiState(
-    val sets: List<WorkoutSetState> = emptyList(),
-)
+    private val _openWorkoutId = MutableStateFlow<Long?>(null)
+    val openWorkoutId: StateFlow<Long?> = _openWorkoutId.asStateFlow()
 
-data class WorkoutSessionUiState(
-    val workoutId: Long,
-    val mode: ExerciseMode,
-    val elapsedMs: Long,
-    val paused: Boolean,
-    val completedSetCount: Int,
-    val liveSet: LiveSetUiState,
-    val editor: SessionEditorUiState,
-)
+    private val _access = MutableStateFlow(readAccess())
+    val access: StateFlow<Access> = _access.asStateFlow()
 
-data class MainUiState(
-    val selectedTab: RootTab = RootTab.WORKOUT,
-    val settings: AppSettings = AppSettings(),
-    val permissions: PermissionSnapshot = PermissionSnapshot(),
-    val monitoring: MonitoringSnapshot = MonitoringSnapshot(),
-    val completedWorkouts: List<WorkoutFeedItem> = emptyList(),
-    val calendarDays: List<CalendarDaySummary> = emptyList(),
-    val profileStats: List<ExerciseProfileStats> = emptyList(),
-    val selectedWorkoutDetail: CompletedWorkoutDetail? = null,
-    val workoutSession: WorkoutSessionUiState? = null,
-    val showCameraPreview: Boolean = true,
-    val cameraPreviewFrame: DebugPreviewFrame? = null,
-    val workoutMessage: String? = null,
-)
+    val settings: StateFlow<Settings?> = app.settings.settings.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-class MainViewModel(application: Application) : AndroidViewModel(application) {
+    val activeWorkout: StateFlow<Loadable<Workout?>> = app.workouts.active
+        .map { Loadable.Ready(it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, Loadable.Loading)
 
-    private val appContext = application.applicationContext
-    private val settingsRepository = SettingsRepository(appContext)
-    private val database = GripmaxxerDatabase.getInstance(appContext)
-    private val workoutRepository = RoomWorkoutRepository(database)
+    val history: StateFlow<Loadable<List<Workout>>> = app.workouts.history
+        .map { Loadable.Ready(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Loadable.Loading)
 
-    private val permissionsState = MutableStateFlow(readPermissions())
-    private val selectedTabState = MutableStateFlow(RootTab.WORKOUT)
-    private val showCameraPreviewState = MutableStateFlow(true)
-    private val selectedWorkoutDetailState = MutableStateFlow<CompletedWorkoutDetail?>(null)
-    private val workoutMessageState = MutableStateFlow<String?>(null)
-    private val nowMsState = MutableStateFlow(System.currentTimeMillis())
+    val stats: StateFlow<List<ExerciseStats>> =
+        app.workouts.stats.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    private val settingsState = settingsRepository.settingsFlow.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = AppSettings(),
-    )
+    val openWorkout: StateFlow<Workout?> = _openWorkoutId
+        .flatMapLatest { id -> if (id == null) flowOf(null) else app.workouts.workout(id) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    private val completedWorkoutsState = workoutRepository.completedWorkoutFeedFlow.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = emptyList(),
-    )
-
-    private val calendarDaysState = workoutRepository.calendarSummaryFlow.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = emptyList(),
-    )
-
-    private val profileStatsState = workoutRepository.profileStatsFlow.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = emptyList(),
-    )
-
-    private val activeWorkoutState = workoutRepository.activeWorkoutFlow.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = null,
-    )
-
-    init {
-        DebugPreviewStore.enabled.value = true
-
-        viewModelScope.launch {
-            settingsRepository.purgeLegacyExerciseData()
-            workoutRepository.purgeLegacyWorkouts()
+    /** Wall clock that ticks every second while someone is watching it. */
+    val clock: StateFlow<Long> = flow {
+        while (true) {
+            emit(System.currentTimeMillis())
+            delay(1_000)
         }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), System.currentTimeMillis())
 
-        viewModelScope.launch {
-            AutoSetEventStore.events.collect { event ->
-                handleAutoSetEvent(event)
-            }
-        }
+    val live: StateFlow<LiveState> = app.controller.live
+    val preview = app.preview
 
-        viewModelScope.launch {
-            while (true) {
-                nowMsState.value = System.currentTimeMillis()
-                delay(1000L)
-            }
-        }
+    fun selectTab(tab: Tab) {
+        _tab.value = tab
     }
 
-    val uiState: StateFlow<MainUiState> = combine(
-        selectedTabState,
-        settingsState,
-        permissionsState,
-        MonitoringStateStore.snapshot,
-        completedWorkoutsState,
-        calendarDaysState,
-        profileStatsState,
-        selectedWorkoutDetailState,
-        activeWorkoutState,
-        showCameraPreviewState,
-        workoutMessageState,
-        nowMsState,
-        DebugPreviewStore.frame,
-    ) { values ->
-        val selectedTab = values[0] as RootTab
-        val settings = values[1] as AppSettings
-        val permissions = values[2] as PermissionSnapshot
-        val monitoring = values[3] as MonitoringSnapshot
-        val completedWorkouts = values[4] as List<WorkoutFeedItem>
-        val calendarDays = values[5] as List<CalendarDaySummary>
-        val profileStats = values[6] as List<ExerciseProfileStats>
-        val selectedWorkoutDetail = values[7] as CompletedWorkoutDetail?
-        val activeWorkout = values[8] as ActiveWorkoutState?
-        val showCameraPreview = values[9] as Boolean
-        val workoutMessage = values[10] as String?
-        val nowMs = values[11] as Long
-        val debugFrame = values[12] as DebugPreviewFrame?
-
-        MainUiState(
-            selectedTab = selectedTab,
-            settings = settings,
-            permissions = permissions,
-            monitoring = monitoring,
-            completedWorkouts = completedWorkouts,
-            calendarDays = calendarDays,
-            profileStats = profileStats,
-            selectedWorkoutDetail = selectedWorkoutDetail,
-            workoutSession = activeWorkout?.toWorkoutSessionUiState(monitoring = monitoring, nowMs = nowMs),
-            showCameraPreview = showCameraPreview,
-            cameraPreviewFrame = if (showCameraPreview) debugFrame else null,
-            workoutMessage = workoutMessage,
-        )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = MainUiState(),
-    )
-
-    fun selectTab(tab: RootTab) {
-        selectedTabState.value = tab
+    fun openWorkout(id: Long?) {
+        _openWorkoutId.value = id
     }
 
-    fun refreshPermissionState() {
-        permissionsState.value = readPermissions()
+    fun refreshAccess() {
+        _access.value = readAccess()
     }
 
-    fun setShowCameraPreview(enabled: Boolean) {
-        showCameraPreviewState.value = enabled
-        DebugPreviewStore.enabled.value = enabled
-        if (!enabled) {
-            DebugPreviewStore.clear()
-        }
+    fun setPreviewVisible(visible: Boolean) {
+        app.previewVisible.value = visible
+        if (!visible) app.preview.value = null
     }
 
-    fun setOverlayEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setOverlayEnabled(enabled)
-        }
+    fun startWorkout(exercise: Exercise) = launch { app.controller.start(exercise) }
+
+    fun resumeTracking() = launch { app.controller.resume() }
+
+    fun switchExercise(exercise: Exercise) = launch { app.controller.switchExercise(exercise) }
+
+    fun finishWorkout() = launch { app.controller.finish() }
+
+    fun addSet(workoutId: Long, exercise: Exercise, reps: Int, durationMs: Long) =
+        launch { app.workouts.addSet(workoutId, exercise, reps, durationMs) }
+
+    fun updateSet(setId: Long, reps: Int, durationMs: Long) = launch { app.workouts.updateSet(setId, reps, durationMs) }
+
+    fun deleteSet(setId: Long) = launch { app.workouts.deleteSet(setId) }
+
+    fun deleteWorkout(id: Long) = launch {
+        _openWorkoutId.value = null
+        app.workouts.delete(id)
     }
 
-    fun setMediaControlEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setMediaControlEnabled(enabled)
-        }
+    fun setMediaControl(on: Boolean) = launch { app.settings.setMediaControl(on) }
+    fun setOverlay(on: Boolean) = launch { app.settings.setOverlay(on) }
+    fun setRepSound(on: Boolean) = launch { app.settings.setRepSound(on) }
+    fun setVoiceCues(on: Boolean) = launch { app.settings.setVoiceCues(on) }
+    fun setAccent(accent: Accent) = launch { app.settings.setAccent(accent) }
+
+    private fun launch(block: suspend () -> Unit) {
+        viewModelScope.launch { block() }
     }
-
-    fun setRepSoundEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setRepSoundEnabled(enabled)
-        }
-    }
-
-    fun setVoiceCueEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setVoiceCueEnabled(enabled)
-        }
-    }
-
-    fun setColorPalette(palette: ColorPalette) {
-        viewModelScope.launch {
-            settingsRepository.setColorPalette(palette)
-        }
-    }
-
-    fun setSelectedExerciseMode(mode: ExerciseMode) {
-        viewModelScope.launch {
-            settingsRepository.setSelectedExerciseMode(mode)
-        }
-    }
-
-    fun startWorkout(mode: ExerciseMode = settingsState.value.selectedExerciseMode) {
-        viewModelScope.launch {
-            val existing = activeWorkoutState.value
-            if (existing != null) {
-                selectedTabState.value = RootTab.WORKOUT
-                clearWorkoutMessageLater("Workout already running")
-                return@launch
-            }
-            settingsRepository.setSelectedExerciseMode(mode)
-            workoutRepository.startWorkout(mode)
-            startMonitoringWithMode(mode)
-            selectedTabState.value = RootTab.WORKOUT
-            clearWorkoutMessageLater("Started ${mode.label}")
-        }
-    }
-
-    fun pauseWorkout() {
-        viewModelScope.launch {
-            val active = activeWorkoutState.value ?: return@launch
-            if (workoutRepository.pauseWorkout(active.id)) {
-                stopMonitoring()
-                clearWorkoutMessageLater("Workout paused")
-            }
-        }
-    }
-
-    fun resumeWorkout() {
-        viewModelScope.launch {
-            val active = activeWorkoutState.value ?: return@launch
-            if (workoutRepository.resumeWorkout(active.id)) {
-                startMonitoringWithMode(active.mode)
-                clearWorkoutMessageLater("Workout resumed")
-            }
-        }
-    }
-
-    fun endWorkout() {
-        viewModelScope.launch {
-            val active = activeWorkoutState.value ?: return@launch
-            if (workoutRepository.endWorkout(active.id)) {
-                stopMonitoring()
-                clearWorkoutMessageLater("Workout ended")
-            }
-        }
-    }
-
-    fun editActiveSet(setId: Long, reps: Int, durationMs: Long) {
-        viewModelScope.launch {
-            workoutRepository.editSet(setId = setId, reps = reps, durationMs = durationMs)
-        }
-    }
-
-    fun deleteActiveSet(setId: Long) {
-        viewModelScope.launch {
-            workoutRepository.deleteSet(setId)
-        }
-    }
-
-    fun openWorkoutDetail(workoutId: Long) {
-        viewModelScope.launch {
-            selectedWorkoutDetailState.value = workoutRepository.getCompletedWorkoutDetail(workoutId)
-        }
-    }
-
-    fun closeWorkoutDetail() {
-        selectedWorkoutDetailState.value = null
-    }
-
-    fun editDetailSet(setId: Long, reps: Int, durationMs: Long) {
-        viewModelScope.launch {
-            val success = workoutRepository.editSet(setId, reps, durationMs)
-            if (success) {
-                refreshOpenDetail()
-            }
-        }
-    }
-
-    fun deleteDetailSet(setId: Long) {
-        viewModelScope.launch {
-            val success = workoutRepository.deleteSet(setId)
-            if (success) {
-                refreshOpenDetail()
-            }
-        }
-    }
-
-    fun deleteCompletedWorkout(workoutId: Long) {
-        viewModelScope.launch {
-            val success = workoutRepository.deleteWorkout(workoutId)
-            if (success) {
-                if (selectedWorkoutDetailState.value?.workoutId == workoutId) {
-                    selectedWorkoutDetailState.value = null
-                }
-                clearWorkoutMessageLater("Workout deleted")
-            }
-        }
-    }
-
-    fun clearWorkoutMessage() {
-        workoutMessageState.value = null
-    }
-
-    private suspend fun refreshOpenDetail() {
-        val workoutId = selectedWorkoutDetailState.value?.workoutId ?: return
-        selectedWorkoutDetailState.value = workoutRepository.getCompletedWorkoutDetail(workoutId)
-    }
-
-    private suspend fun handleAutoSetEvent(event: AutoSetEvent) {
-        val active = activeWorkoutState.value ?: return
-        if (active.paused) return
-        if (active.mode != event.mode) return
-
-        val set = workoutRepository.appendAutoSet(active.id, event)
-        if (set != null) {
-            val message = if (active.mode.isHangMode()) {
-                "Set ${set.setNumber}: ${formatDurationShort(set.durationMs)} hold"
-            } else {
-                "Set ${set.setNumber}: ${set.reps} reps"
-            }
-            clearWorkoutMessageLater(message)
-        }
-    }
-
-    private suspend fun startMonitoringWithMode(mode: ExerciseMode) {
-        settingsRepository.setSelectedExerciseMode(mode)
-        HangCamService.start(appContext)
-    }
-
-    private fun stopMonitoring() {
-        HangCamService.stop(appContext)
-    }
-
-    private fun clearWorkoutMessageLater(message: String) {
-        viewModelScope.launch {
-            workoutMessageState.value = message
-            delay(1800L)
-            if (workoutMessageState.value == message) {
-                workoutMessageState.value = null
-            }
-        }
-    }
-
-    private fun formatDurationShort(ms: Long): String {
-        val totalSeconds = (ms / 1000L).coerceAtLeast(0L)
-        val minutes = totalSeconds / 60L
-        val seconds = totalSeconds % 60L
-        return String.format(Locale.US, "%d:%02d", minutes, seconds)
-    }
-
-    private fun readPermissions(): PermissionSnapshot {
-        val cameraGranted = ContextCompat.checkSelfPermission(
-            appContext,
-            android.Manifest.permission.CAMERA,
-        ) == PackageManager.PERMISSION_GRANTED
-
-        return PermissionSnapshot(
-            cameraGranted = cameraGranted,
-            notificationAccessEnabled = MediaControlManager.isNotificationAccessEnabled(appContext),
-            overlayPermissionGranted = OverlayTimerManager.isOverlayPermissionGranted(appContext),
-        )
-    }
-}
-
-private fun ActiveWorkoutState.toWorkoutSessionUiState(
-    monitoring: MonitoringSnapshot,
-    nowMs: Long,
-): WorkoutSessionUiState {
-    val computedElapsed = if (paused) {
-        elapsedMs
-    } else {
-        elapsedMs + (nowMs - elapsedComputedAtMs).coerceAtLeast(0L)
-    }
-
-    val liveSet = if (!paused && monitoring.mode == mode) {
-        LiveSetUiState(
-            active = monitoring.hanging,
-            reps = monitoring.reps,
-            durationMs = monitoring.elapsedHangMs,
-        )
-    } else {
-        LiveSetUiState()
-    }
-
-    return WorkoutSessionUiState(
-        workoutId = id,
-        mode = mode,
-        elapsedMs = computedElapsed.coerceAtLeast(0L),
-        paused = paused,
-        completedSetCount = sets.size,
-        liveSet = liveSet,
-        editor = SessionEditorUiState(sets = sets),
-    )
-}
-
-private fun ExerciseMode.isHangMode(): Boolean {
-    return this == ExerciseMode.DEAD_HANG ||
-        this == ExerciseMode.ACTIVE_HANG
 }

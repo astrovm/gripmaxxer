@@ -4,15 +4,15 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <uses-feature
         android:name="android.hardware.camera.front"
-        android:required="false" />
+        android:required="true" />
 
     <application
+        android:name=".GripApp"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -20,16 +20,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Gripmaxxer">
 
-        <meta-data
-            android:name="com.astrovm.gripmaxxer.DEVELOPER_NAME"
-            android:value="@string/developer_name" />
-        <meta-data
-            android:name="com.astrovm.gripmaxxer.DEVELOPER_ID"
-            android:value="@string/developer_id" />
-
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -37,14 +31,12 @@
         </activity>
 
         <service
-            android:name=".service.HangCamService"
-            android:enabled="true"
+            android:name=".service.TrackingService"
             android:exported="false"
             android:foregroundServiceType="camera" />
 
         <service
             android:name=".media.HangNotificationListener"
-            android:enabled="true"
             android:exported="false"
             android:label="@string/notification_listener_label"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">

@@ -42,10 +42,11 @@ android {
         versionCode = commitCount
         versionName = derivedVersionName
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        vectorDrawables {
-            useSupportLibrary = true
+        // Phones are ARM. Skipping x86 drops about 40 MB of ML Kit native code.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
         }
+
     }
 
     buildTypes {
@@ -65,6 +66,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     testOptions {
@@ -80,13 +82,20 @@ android {
     }
 }
 
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 kover {
     reports {
         filters {
             excludes {
-                // Room generates these implementations; measure our entities,
-                // DAOs and repository code, not compiler-generated adapters.
-                classes("com.astrovm.gripmaxxer.datastore.WorkoutDao_Impl*", "com.astrovm.gripmaxxer.datastore.GripmaxxerDatabase_Impl*")
+                // Generated code: Room's DAO and database implementations, and BuildConfig.
+                classes(
+                    "com.astrovm.gripmaxxer.data.WorkoutDao_Impl*",
+                    "com.astrovm.gripmaxxer.data.GripDatabase_Impl*",
+                    "com.astrovm.gripmaxxer.BuildConfig",
+                )
             }
         }
         variant("debug") {
@@ -103,28 +112,24 @@ dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
     implementation(composeBom)
     testImplementation(composeBom)
-    androidTestImplementation(composeBom)
 
     implementation("androidx.core:core-ktx:1.19.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
     implementation("androidx.lifecycle:lifecycle-service:2.11.0")
+    implementation("androidx.lifecycle:lifecycle-process:2.11.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
     implementation("androidx.activity:activity-compose:1.13.0")
 
     implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("com.google.android.material:material:1.14.0")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
 
     implementation("androidx.datastore:datastore-preferences:1.2.1")
     implementation("androidx.room:room-runtime:2.8.5")
-    implementation("androidx.room:room-ktx:2.8.5")
     ksp("androidx.room:room-compiler:2.8.5")
 
     implementation("androidx.camera:camera-core:1.6.2")
@@ -132,18 +137,12 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.6.2")
 
     implementation("com.google.mlkit:pose-detection:18.0.0-beta5")
-    implementation("com.google.mlkit:pose-detection-accurate:18.0.0-beta5")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.17")
     testImplementation("androidx.test:core:1.7.0")
     testImplementation("androidx.compose.ui:ui-test-junit4")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation("io.mockk:mockk:1.14.11")
-    androidTestImplementation("androidx.test.ext:junit:1.3.0")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
-    debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
