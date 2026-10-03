@@ -35,21 +35,36 @@ class Smoother(private val weight: Float = 0.5f) {
     }
 }
 
-/** Pull-ups and chin-ups: straight arms at rest, chin over the hands at the peak. */
+/**
+ * Pull-ups and chin-ups: straight arms at rest, chin over the hands at the peak.
+ *
+ * Letting go looks a lot like the top of a pull-up: the hands come down past the face
+ * with the elbows bent. The difference is the bar doesn't move. So it remembers where
+ * the hands were while hanging, and only counts a peak with the hands still up there.
+ */
 class PullReader : PositionReader {
     private val elbow = Smoother()
     private val lift = Smoother()
+    private var barY: Float? = null
 
     override fun read(pose: Pose): Position? {
-        val nose = pose[Joint.NOSE]
         val wrist = pose.wrist
         val shoulder = pose.shoulder
-        // Hands dropping below the shoulders means letting go, not a rep.
+        // Hands below the shoulders: off the bar.
         if (wrist != null && shoulder != null && wrist.y > shoulder.y) {
             elbow.update(null)
             lift.update(null)
             return null
         }
+        return when (val position = position(pose, wrist, shoulder)) {
+            Position.REST -> position.also { barY = wrist?.y ?: barY }
+            Position.PEAK -> position.takeIf { handsOnBar(pose, wrist) }
+            null -> null
+        }
+    }
+
+    private fun position(pose: Pose, wrist: Point?, shoulder: Point?): Position? {
+        val nose = pose[Joint.NOSE]
         val headOverHands = nose != null && wrist != null && nose.y < wrist.y
         val angle = elbow.update(pose.elbowAngle)
         if (angle != null) {
@@ -72,6 +87,17 @@ class PullReader : PositionReader {
             handLift > 0.9f -> Position.REST
             else -> null
         }
+    }
+
+    private fun handsOnBar(pose: Pose, wrist: Point?): Boolean {
+        val bar = barY ?: return false
+        val scale = pose.bodyScale ?: return false
+        return wrist != null && wrist.y - bar < BAR_SLACK * scale
+    }
+
+    private companion object {
+        // How far below the bar the wrists can read and still be gripping it, in torso lengths.
+        const val BAR_SLACK = 0.3f
     }
 }
 

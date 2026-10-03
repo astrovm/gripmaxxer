@@ -42,35 +42,56 @@ class PositionReaderTest {
         assertEquals(4f, smoother.update(4f))
     }
 
+    /** Reads [pose] for half a second of frames, so smoothing catches up. Returns the last reading. */
+    private fun PullReader.settle(pose: Pose): Position? = (1..10).map { read(pose) }.last()
+
+    /** A reader that has already seen a hang, so it knows where the bar is. */
+    private fun hangingReader(pose: Pose = Poses.deadHang) = PullReader().also { assertEquals(REST, it.read(pose)) }
+
     @Test
     fun pullReadsElbows() {
-        assertEquals(REST, PullReader().read(Poses.deadHang))
-        assertEquals(PEAK, PullReader().read(Poses.pullUpTop))
-        assertNull(PullReader().read(Poses.pullUpMiddle))
+        assertEquals(PEAK, hangingReader().settle(Poses.pullUpTop))
+        assertNull(hangingReader().settle(Poses.pullUpMiddle))
     }
 
     @Test
     fun pullCountsChinOverHandsEvenWithStraightishArms() {
         val chinOver = Poses.pullUpMiddle.joints + (NOSE to Point(240f, 120f))
-        assertEquals(PEAK, PullReader().read(Pose(chinOver)))
+        assertEquals(PEAK, hangingReader().read(Pose(chinOver)))
+    }
+
+    @Test
+    fun peakNeedsAKnownBar() {
+        // Never seen hanging: no idea where the bar is, so no peak.
+        assertNull(PullReader().settle(Poses.pullUpTop))
+        // Can't size the body: can't tell if the hands are still on the bar.
+        val noScale = Poses.pullUpTop.without(LEFT_HIP, RIGHT_HIP, LEFT_SHOULDER)
+        assertNull(hangingReader().read(noScale))
     }
 
     @Test
     fun lettingGoIsNotARep() {
+        // Hands coming down past the face with bent elbows, still above the shoulders.
+        assertNull(hangingReader().settle(Poses.lettingGo))
         // Standing under the bar: head above the hands, but the hands are down.
-        assertNull(PullReader().read(Poses.standing))
+        assertNull(hangingReader().settle(Poses.standing))
+    }
+
+    @Test
+    fun lettingGoWithElbowsHiddenIsNotARep() {
+        val reader = hangingReader(Poses.deadHang.without(LEFT_ELBOW, RIGHT_ELBOW))
+        assertNull(reader.settle(Poses.lettingGo.without(LEFT_ELBOW, RIGHT_ELBOW)))
     }
 
     @Test
     fun pullFallsBackToHandHeightWithoutElbows() {
-        val reader = PullReader()
-        assertEquals(REST, reader.read(Poses.deadHang.without(LEFT_ELBOW, RIGHT_ELBOW)))
+        val noElbows = Poses.deadHang.without(LEFT_ELBOW, RIGHT_ELBOW)
         val top = Poses.pullUpTop.without(LEFT_ELBOW, RIGHT_ELBOW, NOSE)
-        assertEquals(PEAK, PullReader().read(top))
+        assertEquals(PEAK, hangingReader(noElbows).settle(top))
         val middle = Poses.pullUpMiddle.without(LEFT_ELBOW, RIGHT_ELBOW)
-        assertNull(PullReader().read(middle))
+        assertNull(hangingReader(noElbows).settle(middle))
         val chinOver = Poses.pullUpTop.without(LEFT_ELBOW, RIGHT_ELBOW)
-        assertEquals(PEAK, PullReader().read(chinOver))
+        assertEquals(PEAK, hangingReader(noElbows).read(chinOver))
     }
 
     @Test
