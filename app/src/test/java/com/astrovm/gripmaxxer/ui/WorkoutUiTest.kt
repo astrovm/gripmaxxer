@@ -4,7 +4,7 @@ import android.graphics.Bitmap
 import android.provider.Settings
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
@@ -67,7 +67,7 @@ class WorkoutUiTest : UiTestBase() {
         waitForText("Finish")
         assertEquals(Exercise.SQUAT, container.controller.live.value.exercise)
         assertTrue(container.previewVisible.value)
-        compose.onNodeWithText("Squat").assertIsSelected()
+        waitUntil { compose.onAllNodes(hasText("Squat") and isSelected()).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Step into frame").assertIsDisplayed()
         feed(Poses.standing, 100)
         waitForText("Start your first rep")
