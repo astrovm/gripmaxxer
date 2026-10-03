@@ -166,6 +166,15 @@ class WorkoutUiTest : UiTestBase() {
     }
 
     @Test
+    fun showsWhenCountingFromThePocket() {
+        startWorkout("Squat")
+        container.controller.setInPocket(true)
+        waitForText("Counting from your pocket")
+        container.controller.setInPocket(false)
+        waitForText("Starting camera")
+    }
+
+    @Test
     fun cameraErrorsCanBeRetried() {
         startWorkout("Dip")
         container.controller.stopTracking("Camera unavailable")

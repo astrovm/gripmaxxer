@@ -5,6 +5,9 @@ import android.app.Application
 import android.app.NotificationManager
 import android.content.Intent
 import android.graphics.Bitmap
+import android.hardware.Sensor
+import android.hardware.SensorManager
+import android.os.PowerManager
 import android.os.Looper
 import android.view.WindowManager
 import android.widget.LinearLayout
@@ -16,6 +19,8 @@ import com.astrovm.gripmaxxer.GripApp
 import com.astrovm.gripmaxxer.camera.CameraFrame
 import com.astrovm.gripmaxxer.container
 import com.astrovm.gripmaxxer.tracking.Exercise
+import com.astrovm.gripmaxxer.tracking.Motion
+import com.astrovm.gripmaxxer.tracking.PocketMoves
 import com.astrovm.gripmaxxer.tracking.Pose
 import com.astrovm.gripmaxxer.tracking.Poses
 import com.google.common.util.concurrent.Futures
@@ -44,6 +49,9 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.android.controller.ServiceController
 import org.robolectric.annotation.Config
 import org.robolectric.shadow.api.Shadow
+import org.robolectric.shadows.SensorEventBuilder
+import org.robolectric.shadows.ShadowPowerManager
+import org.robolectric.shadows.ShadowSensor
 import org.robolectric.shadows.ShadowSettings
 import org.robolectric.shadows.ShadowWindowManagerImpl
 
@@ -235,6 +243,88 @@ class TrackingServiceTest {
         val service = Robolectric.buildService(TrackingService::class.java, finish).create().startCommand(0, 1)
         Robolectric.buildService(TrackingService::class.java).startCommand(0, 2)
         settle { runBlocking { app.container.workouts.active.first() } == null }
+        service.destroy()
+    }
+
+    private val sensors = app.getSystemService(SensorManager::class.java)
+
+    private fun addSensor(type: Int): Sensor = ShadowSensor.newInstance(type).also {
+        Shadow.extract<ShadowSensor>(it).setMaximumRange(5f)
+        shadowOf(sensors).addSensor(it)
+    }
+
+    private fun cover(sensor: Sensor, distance: Float) {
+        shadowOf(sensors).sendSensorEventToListeners(
+            SensorEventBuilder.newBuilder().setSensor(sensor).setValues(floatArrayOf(distance)).build(),
+            sensor,
+        )
+    }
+
+    private fun waitMs(ms: Long) = shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(ms))
+
+    @Test
+    fun countsFromThePocketWhileTheProximitySensorIsCovered() {
+        shadowOf(app).grantPermissions(Manifest.permission.CAMERA)
+        val proximity = addSensor(Sensor.TYPE_PROXIMITY)
+        val accelerometer = addSensor(Sensor.TYPE_ACCELEROMETER)
+        startWorkout(Exercise.SQUAT)
+        val service = service()
+        val controller = app.container.controller
+
+        // A hand passing over the sensor doesn't count.
+        cover(proximity, 0f)
+        waitMs(500)
+        cover(proximity, 5f)
+        waitMs(2_000)
+        assertFalse(controller.live.value.inPocket)
+
+        cover(proximity, 0f)
+        waitMs(1_500)
+        assertTrue(controller.live.value.inPocket)
+        assertTrue(shadowOf(sensors).hasListener(shadowOf(sensors).listeners.last(), accelerometer))
+        assertTrue(ShadowPowerManager.getLatestWakeLock().isHeld)
+        assertNull(app.container.preview.value)
+        shadowOf(sensors).listeners.forEach { it.onAccuracyChanged(accelerometer, SensorManager.SENSOR_STATUS_ACCURACY_HIGH) }
+
+        shadowOf(sensors).sendSensorEventToListeners(
+            SensorEventBuilder.newBuilder().setSensor(accelerometer).setValues(floatArrayOf(0f, 9.8f, 0f)).build(),
+            accelerometer,
+        )
+        val moves = PocketMoves(System.currentTimeMillis()) { motion, ms -> service.get().onMotion(motion, ms) }
+        moves.still(2_000)
+        repeat(2) {
+            moves.lean(85f, 800)
+            moves.lean(5f, 800)
+        }
+        idle()
+        settle { notificationText() == "Squat: 2 reps" }
+
+        cover(proximity, 5f)
+        waitMs(500)
+        assertFalse(controller.live.value.inPocket)
+        assertFalse(ShadowPowerManager.getLatestWakeLock().isHeld)
+        // The camera takes over, and the set from the pocket is saved.
+        settle { notificationText() == "Squat: step into frame" }
+        settle { runBlocking { app.container.workouts.active.first() }!!.sets.singleOrNull()?.reps == 2 }
+
+        // Back in the pocket when the workout ends.
+        cover(proximity, 0f)
+        waitMs(1_500)
+        service.destroy()
+        assertFalse(ShadowPowerManager.getLatestWakeLock().isHeld)
+        assertFalse(shadowOf(sensors).listeners.isNotEmpty())
+    }
+
+    @Test
+    fun withoutMotionSensorsThePocketStaysQuiet() {
+        shadowOf(app).grantPermissions(Manifest.permission.CAMERA)
+        startWorkout(Exercise.DIP)
+        val service = service()
+        app.container.controller.setInPocket(true)
+        idle()
+        service.get().onMotion(Motion(0f, 9.8f, 0f), 0)
+        app.container.controller.setInPocket(false)
+        idle()
         service.destroy()
     }
 

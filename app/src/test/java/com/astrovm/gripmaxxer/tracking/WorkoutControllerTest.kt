@@ -183,6 +183,56 @@ class WorkoutControllerTest {
     }
 
     @Test
+    fun countsFromThePocket() = runBlocking {
+        controller.start(Exercise.PULL_UP)
+        controller.setInPocket(true)
+        controller.setInPocket(true)
+        val pocket = controller.live.value
+        assertTrue(pocket.inPocket)
+        assertTrue(pocket.personVisible)
+        assertEquals(Exercise.PULL_UP, pocket.exercise)
+        // The camera can't see from a pocket, so frames don't count.
+        feed(Poses.deadHang, 1000)
+        assertFalse(controller.live.value.inSet)
+
+        val moves = PocketMoves(now) { motion, ms -> controller.onMotion(motion, ms) }
+        moves.still(2_000)
+        repeat(2) { moves.pullUp() }
+        assertTrue(controller.live.value.inSet)
+        assertEquals(2, controller.live.value.reps)
+        assertEquals(listOf("beep", "play", "beep"), effects.log)
+        moves.drop()
+        assertEquals("pause", effects.log.last())
+        assertEquals(2, controller.live.value.lastSet!!.reps)
+
+        // Switching exercise stays in the pocket.
+        controller.switchExercise(Exercise.SQUAT)
+        assertTrue(controller.live.value.inPocket)
+        repeat(2) {
+            moves.lean(85f, 800)
+            moves.lean(5f, 800)
+        }
+        assertTrue(controller.live.value.inSet)
+
+        // Out of the pocket: the set in progress is saved and the camera counts again.
+        controller.setInPocket(false)
+        assertFalse(controller.live.value.inPocket)
+        assertFalse(controller.live.value.inSet)
+        moves.still(1_000)
+        assertFalse(controller.live.value.inSet)
+        assertTrue(controller.finish())
+        val sets = workouts.history.first().single().sets
+        assertEquals(listOf(Exercise.PULL_UP to 2, Exercise.SQUAT to 2), sets.map { it.exercise to it.reps })
+    }
+
+    @Test
+    fun pocketWithoutAWorkoutDoesNothing() {
+        controller.setInPocket(true)
+        controller.onMotion(Motion(0f, 9.8f, 0f), 0)
+        assertEquals(LiveState(), controller.live.value)
+    }
+
+    @Test
     fun switchingWithoutAWorkoutDoesNothing() = runBlocking {
         controller.switchExercise(Exercise.DIP)
         assertNull(controller.live.value.exercise)

@@ -8,6 +8,7 @@ Hang from a bar and it times the hang. Do pull-ups and it counts them. Every set
 
 - Tracks dead hangs, active hangs, pull-ups, chin-ups, hanging leg raises, push-ups, squats and dips.
 - Saves a set when you let go of the bar, or after a few seconds of rest on the floor.
+- Also counts with the phone in your front pocket, using the motion sensors.
 - Mixes exercises in one workout. Switch any time from the live screen.
 - Plays your music or video while you're in a set and pauses it when you stop.
 - Shows a floating timer over other apps, so you can watch something while you hang.
@@ -33,6 +34,15 @@ Version 0.2.1 switches to a permanent release signing key. If you installed 0.2.
 4. Tap **Finish**. The workout shows up in **History**.
 
 The camera keeps running with the app in the background, so you can open YouTube or anything else while you train.
+
+### In your pocket
+
+Put the phone in a front trouser pocket and it switches to the motion sensors on its own. Take it out and the camera takes over again.
+
+- Squats and leg raises count from how far your thigh leans.
+- Pull-ups, chin-ups, dips and push-ups count from how far you move up and down.
+- On the bar, jump up to it, or just start your first pull-up. Dropping off and landing ends the set.
+- Floor sets need at least 2 reps, so sitting down and getting up doesn't count as a squat.
 
 ## 🔐 Permissions
 
@@ -69,9 +79,9 @@ The **release** environment needs `RELEASE_KEYSTORE_BASE64`, `RELEASE_KEYSTORE_P
 
 ## 🧭 How the code is laid out
 
-- `tracking/`: plain Kotlin, no Android. Turns body poses into reps and sets. Start here to tune detection.
+- `tracking/`: plain Kotlin, no Android. Turns body poses, or pocket motion, into reps and sets. Start here to tune detection.
 - `camera/`: front camera and ML Kit pose detection.
-- `service/`: keeps the camera on while a workout is open.
+- `service/`: keeps the camera, or the motion sensors in a pocket, on while a workout is open.
 - `data/`: Room database for workouts and DataStore for settings.
 - `media/`, `feedback/`: media control, sounds, voice and the floating timer.
 - `ui/`: Compose screens.
