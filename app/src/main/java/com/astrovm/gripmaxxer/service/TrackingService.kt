@@ -1,6 +1,8 @@
 package com.astrovm.gripmaxxer.service
 
 import android.Manifest
+import android.annotation.SuppressLint
+import android.app.ActivityOptions
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -13,6 +15,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.Build
 import android.os.PowerManager
 import android.os.SystemClock
 import androidx.compose.ui.graphics.toArgb
@@ -61,6 +64,7 @@ class TrackingService : LifecycleService() {
     private var pocketJob: Job? = null
     private var cues: Cues? = null
     private lateinit var timer: FloatingTimer
+    private var timerHidden = false
     private var lastNotice: String? = null
 
     override fun onCreate() {
@@ -81,7 +85,13 @@ class TrackingService : LifecycleService() {
 
         val media = MediaRemote(this)
         val cues = Cues(this).also { cues = it }
-        timer = FloatingTimer(this)
+        timer = FloatingTimer(
+            this,
+            onOpen = ::openApp,
+            onFinish = { app.scope.launch { app.controller.finish() } },
+            // Hidden until this workout ends.
+            onHide = { timerHidden = true },
+        )
         app.controller.effects = object : TrackingEffects {
             override fun beep() = cues.beep()
             override fun say(text: String) = cues.say(text)
@@ -113,7 +123,7 @@ class TrackingService : LifecycleService() {
         val lastSetAt = app.workouts.active.map { it?.sets?.lastOrNull()?.completedAtMs }.distinctUntilChanged()
         lifecycleScope.launch {
             combine(app.controller.live, app.settings.settings, inBackground, clock, lastSetAt) { live, settings, background, now, restFrom ->
-                if (settings.overlay && background && live.tracking) timer.show() else timer.hide()
+                if (settings.overlay && background && live.tracking && !timerHidden) timer.show() else timer.hide()
                 val (label, value) = timerText(live, restFrom.takeUnless { live.inSet }?.let { now - it })
                 timer.update(label, value, accentColor(settings.accent).toArgb().takeIf { live.inSet })
                 updateNotification(live)
@@ -146,6 +156,26 @@ class TrackingService : LifecycleService() {
         app.controller.stopTracking()
         super.onDestroy()
     }
+
+    /**
+     * Brings the app back from a tap on the floating timer. Android only lets a background
+     * app bring its task forward through a pending intent that says so.
+     */
+    private fun openApp() {
+        val options = ActivityOptions.makeBasic()
+        backgroundStartMode(Build.VERSION.SDK_INT)?.let {
+            @SuppressLint("NewApi") // Only returned where it exists.
+            options.setPendingIntentBackgroundActivityStartMode(it)
+        }
+        runCatching { openIntent().send(this, 0, null, null, null, null, options.toBundle()) }
+    }
+
+    private fun openIntent(): PendingIntent = PendingIntent.getActivity(
+        this,
+        0,
+        Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+        PendingIntent.FLAG_IMMUTABLE,
+    )
 
     private fun useCamera() {
         sensors.unregisterListener(motionListener)
@@ -233,12 +263,7 @@ class TrackingService : LifecycleService() {
     }
 
     private fun notification(text: String, live: LiveState): Notification {
-        val open = PendingIntent.getActivity(
-            this,
-            0,
-            Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
-            PendingIntent.FLAG_IMMUTABLE,
-        )
+        val open = openIntent()
         val finish = PendingIntent.getService(
             this,
             1,
@@ -289,6 +314,14 @@ class TrackingService : LifecycleService() {
         private const val POCKET_OUT_MS = 500L
         /** A safety net in case the wake lock is somehow never let go. */
         private const val MAX_POCKET_MS = 4 * 60 * 60 * 1000L
+
+        /** How to ask Android to let the app come forward from the background, on [sdk]. */
+        @Suppress("DEPRECATION")
+        internal fun backgroundStartMode(sdk: Int): Int? = when {
+            sdk >= Build.VERSION_CODES.BAKLAVA -> ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+            sdk >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+            else -> null
+        }
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, Intent(context, TrackingService::class.java))
