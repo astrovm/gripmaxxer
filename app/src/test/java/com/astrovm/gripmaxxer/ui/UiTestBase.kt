@@ -52,7 +52,8 @@ abstract class UiTestBase {
 
     /** What the permission dialog answers. */
     protected var grantCamera = true
-    protected var permissionRequests = 0
+    /** Every permission the app asked for, in order. */
+    protected val permissionRequests = mutableListOf<String>()
 
     private val registryOwner = object : ActivityResultRegistryOwner {
         override val activityResultRegistry = object : ActivityResultRegistry() {
@@ -62,14 +63,17 @@ abstract class UiTestBase {
                 input: I,
                 options: ActivityOptionsCompat?,
             ) {
-                permissionRequests++
-                if (grantCamera) access = access.copy(camera = true)
-                val granted = (input as Array<*>).map { it == android.Manifest.permission.CAMERA && grantCamera }
+                val permission = input as String
+                permissionRequests += permission
+                // Notifications are always allowed. The camera depends on the test.
+                val granted = permission != android.Manifest.permission.CAMERA || grantCamera
+                if (granted) shadowOf(app).grantPermissions(permission)
+                if (permission == android.Manifest.permission.CAMERA && grantCamera) access = access.copy(camera = true)
                 val intent = Intent()
-                    .putExtra(ActivityResultContracts.RequestMultiplePermissions.EXTRA_PERMISSIONS, input.map { it as String }.toTypedArray())
+                    .putExtra(ActivityResultContracts.RequestMultiplePermissions.EXTRA_PERMISSIONS, arrayOf(permission))
                     .putExtra(
                         ActivityResultContracts.RequestMultiplePermissions.EXTRA_PERMISSION_GRANT_RESULTS,
-                        granted.map { if (it) 0 else -1 }.toIntArray(),
+                        intArrayOf(if (granted) 0 else -1),
                     )
                 dispatchResult(requestCode, android.app.Activity.RESULT_OK, intent)
             }

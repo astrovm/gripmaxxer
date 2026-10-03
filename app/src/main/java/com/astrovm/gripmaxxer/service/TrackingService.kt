@@ -28,10 +28,12 @@ import com.astrovm.gripmaxxer.media.MediaRemote
 import com.astrovm.gripmaxxer.tracking.LiveState
 import com.astrovm.gripmaxxer.tracking.TrackingEffects
 import com.astrovm.gripmaxxer.ui.formatDuration
-import com.astrovm.gripmaxxer.ui.formatReps
+import com.astrovm.gripmaxxer.ui.formatResult
 import com.astrovm.gripmaxxer.ui.theme.accentColor
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -53,7 +55,7 @@ class TrackingService : LifecycleService() {
         ServiceCompat.startForeground(
             this,
             NOTIFICATION_ID,
-            notification(getString(R.string.tracking_starting)),
+            notification(getString(R.string.tracking_starting), LiveState()),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA,
         )
         val app = container
@@ -80,16 +82,22 @@ class TrackingService : LifecycleService() {
         val inBackground = ProcessLifecycleOwner.get().lifecycle.currentStateFlow
             .map { !it.isAtLeast(Lifecycle.State.STARTED) }
             .distinctUntilChanged()
-        lifecycleScope.launch {
-            combine(app.controller.live, app.settings.settings, inBackground) { live, settings, background ->
-                Triple(live, settings, background)
-            }.collect { (live, settings, background) ->
-                if (settings.overlay && background && live.tracking) timer.show() else timer.hide()
-                if (timer.isShowing) {
-                    timer.update(liveValue(live), accentColor(settings.accent).toArgb().takeIf { live.inSet })
-                }
-                updateNotification(live)
+        // Ticks so the rest time on the floating timer keeps counting between frames.
+        val clock = flow {
+            while (true) {
+                emit(System.currentTimeMillis())
+                delay(1_000)
             }
+        }
+        // Rest counts from the latest set, typed in or counted, like on the live screen.
+        val lastSetAt = app.workouts.active.map { it?.sets?.lastOrNull()?.completedAtMs }.distinctUntilChanged()
+        lifecycleScope.launch {
+            combine(app.controller.live, app.settings.settings, inBackground, clock, lastSetAt) { live, settings, background, now, restFrom ->
+                if (settings.overlay && background && live.tracking) timer.show() else timer.hide()
+                val (label, value) = timerText(live, restFrom.takeUnless { live.inSet }?.let { now - it })
+                timer.update(label, value, accentColor(settings.accent).toArgb().takeIf { live.inSet })
+                updateNotification(live)
+            }.collect {}
         }
     }
 
@@ -125,21 +133,26 @@ class TrackingService : LifecycleService() {
         return if (exercise.isHold) formatDuration(live.setDurationMs) else live.reps.toString()
     }
 
+    /** Label and value for the floating timer: how long you've rested, or the set in progress. */
+    private fun timerText(live: LiveState, restMs: Long?): Pair<String, String> =
+        if (restMs != null) getString(R.string.rest) to formatDuration(restMs) else (live.exercise?.label ?: "") to liveValue(live)
+
     private fun updateNotification(live: LiveState) {
         val exercise = live.exercise ?: return
+        val lastSet = live.lastSet
         val status = when {
             !live.personVisible -> getString(R.string.status_step_in)
-            !live.inSet -> getString(R.string.status_ready)
-            exercise.isHold -> formatDuration(live.setDurationMs)
-            else -> formatReps(live.reps)
+            live.inSet -> formatResult(exercise, live.reps, live.setDurationMs)
+            lastSet != null -> getString(R.string.status_saved, formatResult(lastSet.exercise, lastSet.reps, lastSet.durationMs))
+            else -> getString(R.string.status_ready)
         }
         val text = "${exercise.label}: $status"
         if (text == lastNotice) return
         lastNotice = text
-        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(text))
+        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(text, live))
     }
 
-    private fun notification(text: String): Notification {
+    private fun notification(text: String, live: LiveState): Notification {
         val open = PendingIntent.getActivity(
             this,
             0,
@@ -152,29 +165,44 @@ class TrackingService : LifecycleService() {
             Intent(this, TrackingService::class.java).setAction(ACTION_FINISH),
             PendingIntent.FLAG_IMMUTABLE,
         )
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(getString(R.string.notification_title))
             .setContentText(text)
             .setContentIntent(open)
+            .setCategory(NotificationCompat.CATEGORY_WORKOUT)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setSilent(true)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            // A live update: pinned at the top, with a chip in the status bar on Android 16 and up.
+            .setRequestPromotedOngoing(true)
             .addAction(0, getString(R.string.finish_workout), finish)
-            .build()
+        // The workout clock ticks on its own, so the notification doesn't need an update every second.
+        live.workoutStartedAtMs?.let { builder.setWhen(it).setShowWhen(true).setUsesChronometer(true) }
+        if (live.inSet) builder.setShortCriticalText(liveValue(live))
+        return builder.build()
     }
 
     private fun createChannel() {
+        val manager = getSystemService(NotificationManager::class.java)
+        // Default importance keeps it out of the collapsed "Silent" section. It still makes no sound.
         val channel = NotificationChannel(
             CHANNEL_ID,
             getString(R.string.notification_channel),
-            NotificationManager.IMPORTANCE_LOW,
-        ).apply { setShowBadge(false) }
-        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+            NotificationManager.IMPORTANCE_DEFAULT,
+        ).apply {
+            setShowBadge(false)
+            setSound(null, null)
+            enableVibration(false)
+        }
+        manager.createNotificationChannel(channel)
+        manager.deleteNotificationChannel(OLD_CHANNEL_ID)
     }
 
     companion object {
-        private const val CHANNEL_ID = "tracking"
+        private const val CHANNEL_ID = "workout"
+        /** Was silent, so the notification got tucked away. */
+        private const val OLD_CHANNEL_ID = "tracking"
         private const val NOTIFICATION_ID = 1
         private const val ACTION_FINISH = "com.astrovm.gripmaxxer.FINISH"
 

@@ -1,5 +1,6 @@
 package com.astrovm.gripmaxxer.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -11,19 +12,30 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -113,63 +125,122 @@ private fun WorkoutCard(workout: Workout, onClick: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun WorkoutDetailScreen(viewModel: MainViewModel) {
     val workout by viewModel.openWorkout.collectAsStateWithLifecycle()
     var editing by rememberSaveable { mutableStateOf<Long?>(null) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    // Adding a set: first pick the exercise, then fill in the editor.
+    var picking by rememberSaveable { mutableStateOf(false) }
+    var adding by rememberSaveable { mutableStateOf<Exercise?>(null) }
+    var addCount by rememberSaveable { mutableIntStateOf(0) }
+    val snackbar = remember { SnackbarHostState() }
+    val deleteSet = rememberDeleteWithUndo(viewModel, snackbar)
     val current = workout ?: return
 
-    LazyColumn(
-        modifier = Modifier
+    // Back closes the picker or the editor before it leaves the workout.
+    BackHandler(enabled = picking || adding != null) {
+        picking = false
+        adding = null
+    }
+
+    fun startAdding(exercise: Exercise) {
+        picking = false
+        addCount++
+        adding = exercise
+    }
+
+    Box(
+        Modifier
             .fillMaxSize()
             .safeDrawingPadding(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { viewModel.openWorkout(null) }) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { viewModel.openWorkout(null) }) {
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                    }
+                    Text(
+                        formatDateTime(current.startedAtMs),
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                    IconButton(onClick = { confirmDelete = true }) {
+                        Icon(Icons.Outlined.DeleteOutline, contentDescription = "Delete workout")
+                    }
                 }
+            }
+            item {
                 Text(
-                    formatDateTime(current.startedAtMs),
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.weight(1f),
+                    "Took ${formatDuration(current.durationMs ?: 0L)}",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 12.dp, bottom = 8.dp),
                 )
-                IconButton(onClick = { confirmDelete = true }) {
-                    Icon(Icons.Outlined.DeleteOutline, contentDescription = "Delete workout")
+            }
+            for (exercise in current.exercises) {
+                item(key = exercise.name) {
+                    Row(Modifier.padding(start = 12.dp, top = 12.dp)) {
+                        Text(exercise.label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                        Text(summary(exercise, current), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                val sets = current.sets.filter { it.exercise == exercise }
+                items(sets.size, key = { sets[it].id }) { index ->
+                    val set = sets[index]
+                    EditableSet(
+                        number = index + 1,
+                        set = set,
+                        showExercise = false,
+                        isEditing = editing == set.id,
+                        onEditingChange = { editing = if (it) set.id else null },
+                        onUpdate = { reps, ms -> viewModel.updateSet(set.id, reps, ms) },
+                        onDelete = { deleteSet(current.id, set) },
+                    )
+                }
+            }
+            val newExercise = adding
+            when {
+                newExercise != null -> item(key = "new-$addCount") {
+                    SetEditor(
+                        exercise = newExercise,
+                        existing = null,
+                        onSave = { reps, ms ->
+                            // Placed at the end of the workout, so it sorts after the sets already there.
+                            viewModel.addSet(current.id, newExercise, reps, ms, current.endedAtMs)
+                            adding = null
+                        },
+                        onDelete = null,
+                        onCancel = { adding = null },
+                    )
+                }
+
+                picking -> item(key = "pick") {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(top = 12.dp),
+                    ) {
+                        for (exercise in Exercise.entries) {
+                            FilterChip(selected = false, onClick = { startAdding(exercise) }, label = { Text(exercise.label) })
+                        }
+                    }
+                }
+
+                else -> item(key = "add") {
+                    TextButton(onClick = { picking = true }, modifier = Modifier.padding(top = 12.dp)) {
+                        Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(4.dp))
+                        Text("Add set")
+                    }
                 }
             }
         }
-        item {
-            Text(
-                "Took ${formatDuration(current.durationMs ?: 0L)}",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 12.dp, bottom = 8.dp),
-            )
-        }
-        for (exercise in current.exercises) {
-            item(key = exercise.name) {
-                Row(Modifier.padding(start = 12.dp, top = 12.dp)) {
-                    Text(exercise.label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                    Text(summary(exercise, current), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            val sets = current.sets.filter { it.exercise == exercise }
-            items(sets.size, key = { sets[it].id }) { index ->
-                val set = sets[index]
-                EditableSet(
-                    number = index + 1,
-                    set = set,
-                    showExercise = false,
-                    isEditing = editing == set.id,
-                    onEditingChange = { editing = if (it) set.id else null },
-                    onUpdate = { reps, ms -> viewModel.updateSet(set.id, reps, ms) },
-                    onDelete = { viewModel.deleteSet(set.id) },
-                )
-            }
-        }
+        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
     }
 
     if (confirmDelete) {

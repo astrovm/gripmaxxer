@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Videocam
@@ -22,17 +29,23 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -40,12 +53,14 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.astrovm.gripmaxxer.camera.CameraFrame
 import com.astrovm.gripmaxxer.data.WorkoutSet
 import com.astrovm.gripmaxxer.tracking.Exercise
 import com.astrovm.gripmaxxer.tracking.Joint
+import kotlinx.coroutines.launch
 
 @Composable
 fun SectionTitle(text: String, modifier: Modifier = Modifier) {
@@ -57,8 +72,7 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier) {
     )
 }
 
-/** "8 reps" for rep exercises, "0:42" for holds. */
-fun WorkoutSet.headline(): String = if (exercise.isHold) formatDuration(durationMs) else formatReps(reps)
+fun WorkoutSet.headline(): String = formatResult(exercise, reps, durationMs)
 
 @Composable
 fun SetRow(number: Int, set: WorkoutSet, showExercise: Boolean, onClick: () -> Unit) {
@@ -140,7 +154,9 @@ fun EditableSet(
 /**
  * Edits a set in place, or adds one when [existing] is null.
  * Holds only ask for time. Rep exercises ask for reps, time is optional.
+ * The keyboard's done key saves, and the whole editor stays above the keyboard.
  */
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun SetEditor(
     exercise: Exercise,
@@ -158,8 +174,18 @@ fun SetEditor(
     } else {
         repsValue != null && repsValue > 0
     }
+    val save = { if (valid) onSave(repsValue ?: 0, (secondsValue ?: 0L) * 1000) }
+
+    // The list only scrolls the focused field into view, which leaves Save under the keyboard.
+    val requester = remember { BringIntoViewRequester() }
+    var focused by remember { mutableStateOf(false) }
+    val keyboardUp = WindowInsets.isImeVisible
+    LaunchedEffect(focused, keyboardUp) { if (focused && keyboardUp) requester.bringIntoView() }
+
     Column(
         Modifier
+            .bringIntoViewRequester(requester)
+            .onFocusChanged { focused = it.hasFocus }
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
@@ -172,9 +198,9 @@ fun SetEditor(
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (!exercise.isHold) {
-                NumberField("Reps", reps, Modifier.weight(1f)) { reps = it }
+                NumberField("Reps", reps, ImeAction.Next, save, Modifier.weight(1f)) { reps = it }
             }
-            NumberField("Seconds", seconds, Modifier.weight(1f)) { seconds = it }
+            NumberField("Seconds", seconds, ImeAction.Done, save, Modifier.weight(1f)) { seconds = it }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (onDelete != null) {
@@ -182,24 +208,43 @@ fun SetEditor(
             }
             Spacer(Modifier.weight(1f))
             TextButton(onClick = onCancel) { Text("Cancel") }
-            TextButton(
-                enabled = valid,
-                onClick = { onSave(repsValue ?: 0, (secondsValue ?: 0L) * 1000) },
-            ) { Text("Save") }
+            TextButton(enabled = valid, onClick = save) { Text("Save") }
         }
     }
 }
 
 @Composable
-private fun NumberField(label: String, value: String, modifier: Modifier, onChange: (String) -> Unit) {
+private fun NumberField(
+    label: String,
+    value: String,
+    imeAction: ImeAction,
+    onDone: () -> Unit,
+    modifier: Modifier,
+    onChange: (String) -> Unit,
+) {
     OutlinedTextField(
         value = value,
         onValueChange = { text -> onChange(text.filter(Char::isDigit).take(5)) },
         label = { Text(label) },
         singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = imeAction),
+        keyboardActions = KeyboardActions(onDone = { onDone() }),
         modifier = modifier,
     )
+}
+
+/** Deletes a set right away and offers to bring it back for a few seconds. */
+@Composable
+fun rememberDeleteWithUndo(viewModel: MainViewModel, snackbar: SnackbarHostState): (Long, WorkoutSet) -> Unit {
+    val scope = rememberCoroutineScope()
+    return { workoutId, set ->
+        viewModel.deleteSet(set.id)
+        scope.launch {
+            snackbar.currentSnackbarData?.dismiss()
+            val result = snackbar.showSnackbar("Set deleted", actionLabel = "Undo", duration = SnackbarDuration.Long)
+            if (result == SnackbarResult.ActionPerformed) viewModel.restoreSet(workoutId, set)
+        }
+    }
 }
 
 /** A yes/no confirmation for things that can't be undone. */

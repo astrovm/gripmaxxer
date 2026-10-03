@@ -10,16 +10,35 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.WindowManager
+import android.widget.LinearLayout
 import android.widget.TextView
 
 /**
  * A small timer that floats over other apps, so you can see your set while watching
- * something. Drag it anywhere. Call everything on the main thread.
+ * something: a short label on top, the count or time below. Drag it anywhere.
+ * Call everything on the main thread.
  */
 class FloatingTimer(private val context: Context) {
 
     private val windowManager = context.getSystemService(WindowManager::class.java)
-    private var view: TextView? = null
+    private val label = TextView(context).apply {
+        setTextColor(0xB3FFFFFF.toInt())
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+        gravity = Gravity.CENTER
+        maxLines = 1
+    }
+    private val value = TextView(context).apply {
+        setTextColor(0xFFFFFFFF.toInt())
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 28f)
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        gravity = Gravity.CENTER
+    }
+    private val border = GradientDrawable().apply {
+        cornerRadius = dp(20).toFloat()
+        setColor(0xE6000000.toInt())
+        setStroke(dp(2), IDLE_STROKE)
+    }
+    private val view = createView()
     private val params = WindowManager.LayoutParams(
         WindowManager.LayoutParams.WRAP_CONTENT,
         WindowManager.LayoutParams.WRAP_CONTENT,
@@ -32,39 +51,36 @@ class FloatingTimer(private val context: Context) {
         y = 160
     }
 
-    val isShowing: Boolean get() = view != null
+    var isShowing: Boolean = false
+        private set
 
     fun show() {
-        if (view != null || !canShow(context)) return
-        val text = createView()
-        runCatching { windowManager.addView(text, params) }.onSuccess { view = text }
+        if (isShowing || !canShow(context)) return
+        isShowing = runCatching { windowManager.addView(view, params) }.isSuccess
     }
 
-    fun update(text: String, highlight: Int?) {
-        val current = view ?: return
-        current.text = text
-        (current.background as GradientDrawable).setStroke(dp(2), highlight ?: IDLE_STROKE)
+    fun update(label: String, value: String, highlight: Int?) {
+        if (!isShowing) return
+        this.label.text = label
+        this.value.text = value
+        border.setStroke(dp(2), highlight ?: IDLE_STROKE)
     }
 
     fun hide() {
-        val current = view ?: return
-        view = null
-        runCatching { windowManager.removeView(current) }
+        if (!isShowing) return
+        isShowing = false
+        runCatching { windowManager.removeView(view) }
     }
 
     @SuppressLint("ClickableViewAccessibility")
-    private fun createView() = TextView(context).apply {
-        setTextColor(0xFFFFFFFF.toInt())
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, 28f)
-        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    private fun createView() = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER
-        minWidth = dp(88)
-        setPadding(dp(16), dp(8), dp(16), dp(8))
-        background = GradientDrawable().apply {
-            cornerRadius = dp(20).toFloat()
-            setColor(0xE6000000.toInt())
-            setStroke(dp(2), IDLE_STROKE)
-        }
+        minimumWidth = dp(88)
+        setPadding(dp(16), dp(6), dp(16), dp(8))
+        background = border
+        addView(label)
+        addView(value)
         var startX = 0
         var startY = 0
         var touchX = 0f

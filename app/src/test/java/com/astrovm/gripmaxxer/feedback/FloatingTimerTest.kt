@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.WindowManager
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
@@ -22,14 +23,17 @@ class FloatingTimerTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val windows: ShadowWindowManagerImpl = Shadow.extract(context.getSystemService(WindowManager::class.java))
 
-    private fun shownView() = windows.views.single() as TextView
+    private fun shownView() = windows.views.single() as LinearLayout
+
+    /** The label and the value, like "Rest" and "1:12". */
+    private fun shownText() = (0 until shownView().childCount).map { (shownView().getChildAt(it) as TextView).text.toString() }
 
     @Test
     fun staysHiddenWithoutPermission() {
         ShadowSettings.setCanDrawOverlays(false)
         val timer = FloatingTimer(context)
         timer.show()
-        timer.update("0:10", null)
+        timer.update("Dead hang", "0:10", null)
         assertFalse(timer.isShowing)
         assertTrue(windows.views.isEmpty())
         timer.hide()
@@ -43,14 +47,20 @@ class FloatingTimerTest {
         timer.show()
         assertTrue(timer.isShowing)
 
-        timer.update("0:42", 0xFFFF6FAE.toInt())
-        assertEquals("0:42", shownView().text.toString())
-        timer.update("7", null)
-        assertEquals("7", shownView().text.toString())
+        timer.update("Dead hang", "0:42", 0xFFFF6FAE.toInt())
+        assertEquals(listOf("Dead hang", "0:42"), shownText())
+        timer.update("Rest", "0:07", null)
+        assertEquals(listOf("Rest", "0:07"), shownText())
 
+        timer.hide()
         timer.hide()
         assertFalse(timer.isShowing)
         assertTrue(windows.views.isEmpty())
+
+        // Comes back after being hidden.
+        timer.show()
+        assertTrue(timer.isShowing)
+        timer.hide()
     }
 
     @Test

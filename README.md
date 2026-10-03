@@ -11,9 +11,11 @@ Hang from a bar and it times the hang. Do pull-ups and it counts them. Every set
 - Mixes exercises in one workout. Switch any time from the live screen.
 - Plays your music or video while you're in a set and pauses it when you stop.
 - Shows a floating timer over other apps, so you can watch something while you hang.
+- Times your rest between sets.
+- Keeps the workout clock and a **Finish** button in the notification.
 - Beeps on each rep and reads hold times out loud every 10 seconds.
-- Lets you add, fix or delete sets by hand.
-- Keeps your history and personal bests.
+- Lets you add, fix or delete sets by hand, also in past workouts. Deleted a set by mistake? Tap **Undo**.
+- Keeps your history and personal bests, and shows your best and last time while you train.
 
 No account. Your workouts stay on the phone.
 

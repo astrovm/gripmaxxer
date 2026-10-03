@@ -20,6 +20,8 @@ data class LiveState(
     /** The camera is on and counting. */
     val tracking: Boolean = false,
     val exercise: Exercise? = null,
+    /** When the open workout started, for the notification clock. */
+    val workoutStartedAtMs: Long? = null,
     /** A person is in frame. */
     val personVisible: Boolean = false,
     val inSet: Boolean = false,
@@ -81,13 +83,13 @@ class WorkoutController(
         settingsRepository.setLastExercise(exercise)
         val id = workouts.start(exercise)
         val current = workouts.active.first()
-        track(id, current?.exercise ?: exercise)
+        track(id, current?.exercise ?: exercise, current?.startedAtMs)
     }
 
     /** Turns the camera back on for a workout that's still open, e.g. after the app was closed. */
     suspend fun resume() {
         val active = workouts.active.first() ?: return
-        track(active.id, active.exercise)
+        track(active.id, active.exercise, active.startedAtMs)
     }
 
     suspend fun switchExercise(exercise: Exercise) {
@@ -96,7 +98,14 @@ class WorkoutController(
             if (tracker?.exercise == exercise) return
             flushSet(id)
             tracker = ExerciseTracker(exercise)
-            _live.update { LiveState(tracking = it.tracking, exercise = exercise, personVisible = it.personVisible) }
+            _live.update {
+                LiveState(
+                    tracking = it.tracking,
+                    exercise = exercise,
+                    workoutStartedAtMs = it.workoutStartedAtMs,
+                    personVisible = it.personVisible,
+                )
+            }
             id
         }
         settingsRepository.setLastExercise(exercise)
@@ -149,13 +158,13 @@ class WorkoutController(
         }
     }
 
-    private fun track(id: Long, exercise: Exercise) {
+    private fun track(id: Long, exercise: Exercise, startedAtMs: Long?) {
         synchronized(lock) {
             if (workoutId == id && tracker != null) return
             workoutId = id
             tracker = ExerciseTracker(exercise)
             lastPoseMs = null
-            _live.value = LiveState(tracking = true, exercise = exercise)
+            _live.value = LiveState(tracking = true, exercise = exercise, workoutStartedAtMs = startedAtMs)
         }
         startCamera()
     }
