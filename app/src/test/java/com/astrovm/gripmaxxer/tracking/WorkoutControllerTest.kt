@@ -171,6 +171,8 @@ class WorkoutControllerTest {
         assertEquals("pause", effects.log.last())
         assertEquals(Exercise.PULL_UP, controller.live.value.exercise)
         assertFalse(controller.live.value.inSet)
+        // The notification clock keeps going across exercises.
+        assertEquals(workouts.active.first()!!.startedAtMs, controller.live.value.workoutStartedAtMs)
 
         controller.switchExercise(Exercise.PULL_UP)
         assertTrue(controller.finish())

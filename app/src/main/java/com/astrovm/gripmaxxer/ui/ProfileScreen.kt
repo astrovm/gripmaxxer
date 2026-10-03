@@ -8,6 +8,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Box
@@ -23,12 +25,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -66,30 +66,35 @@ fun ProfileScreen(viewModel: MainViewModel, settings: Settings) {
             items(stats, key = { it.exercise.name }) { StatsRow(it) }
         }
         item { SectionTitle("While you train", Modifier.padding(top = 8.dp)) }
+        // These only show as on once Android allows them. Turning one on asks for the access it needs.
         item {
             ToggleRow(
                 title = "Play and pause media",
                 detail = "Plays while you're in a set, pauses when you stop",
-                checked = settings.mediaControl,
-                onChange = viewModel::setMediaControl,
-                needsAccess = settings.mediaControl && !access.notifications,
-                onAllow = { context.startActivity(Intent(AndroidSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) },
+                checked = settings.mediaControl && access.notifications,
+                onChange = { on ->
+                    viewModel.setMediaControl(on)
+                    if (on && !access.notifications) {
+                        context.startActivity(Intent(AndroidSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                    }
+                },
             )
         }
         item {
             ToggleRow(
                 title = "Floating timer",
                 detail = "Shows over other apps",
-                checked = settings.overlay,
-                onChange = viewModel::setOverlay,
-                needsAccess = settings.overlay && !access.overlay,
-                onAllow = {
-                    context.startActivity(
-                        Intent(
-                            AndroidSettings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:${context.packageName}"),
-                        ),
-                    )
+                checked = settings.overlay && access.overlay,
+                onChange = { on ->
+                    viewModel.setOverlay(on)
+                    if (on && !access.overlay) {
+                        context.startActivity(
+                            Intent(
+                                AndroidSettings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:${context.packageName}"),
+                            ),
+                        )
+                    }
                 },
             )
         }
@@ -141,54 +146,28 @@ private fun StatsRow(stats: ExerciseStats) {
 }
 
 @Composable
-private fun ToggleRow(
-    title: String,
-    detail: String?,
-    checked: Boolean,
-    onChange: (Boolean) -> Unit,
-    needsAccess: Boolean = false,
-    onAllow: () -> Unit = {},
-) {
-    Column(
+private fun ToggleRow(title: String, detail: String?, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
         Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.surfaceContainer)
-            .clickable { onChange(!checked) }
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onChange)
             .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.bodyLarge)
-                if (detail != null) {
-                    Text(
-                        detail,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Switch(checked = checked, onCheckedChange = onChange)
-        }
-        if (needsAccess) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Outlined.ErrorOutline,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(18.dp),
-                )
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            if (detail != null) {
                 Text(
-                    "Needs permission",
-                    color = MaterialTheme.colorScheme.error,
+                    detail,
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier
-                        .padding(start = 6.dp)
-                        .weight(1f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                TextButton(onClick = onAllow) { Text("Allow") }
             }
         }
+        // The whole row toggles, so the switch itself only shows the state.
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 

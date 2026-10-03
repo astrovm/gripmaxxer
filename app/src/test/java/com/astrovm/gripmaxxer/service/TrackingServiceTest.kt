@@ -7,6 +7,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Looper
 import android.view.WindowManager
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.NotificationCompat
@@ -95,6 +96,12 @@ class TrackingServiceTest {
     private fun notificationText(): String? = notifications.allNotifications.lastOrNull()
         ?.extras?.getCharSequence(NotificationCompat.EXTRA_TEXT)?.toString()
 
+    /** The floating timer's label and value, like "Rest" and "0:03". */
+    private fun timerText(): List<String>? {
+        val box = windows.views.singleOrNull() as LinearLayout? ?: return null
+        return (0 until box.childCount).map { (box.getChildAt(it) as TextView).text.toString() }
+    }
+
     @Test
     fun withoutCameraPermissionItStopsAndSaysWhy() {
         startWorkout(Exercise.DEAD_HANG)
@@ -136,6 +143,25 @@ class TrackingServiceTest {
         val service = service()
         service.feed(Poses.deadHang, 3000)
         settle { notificationText() == "Dead hang: 0:02" }
+        val notification = notifications.allNotifications.last()
+        assertEquals(NotificationCompat.CATEGORY_WORKOUT, notification.category)
+        // The workout clock ticks in the notification on its own.
+        assertTrue(notification.extras.getBoolean(NotificationCompat.EXTRA_SHOW_CHRONOMETER))
+        assertEquals(runBlocking { app.container.workouts.active.first() }!!.startedAtMs, notification.`when`)
+
+        service.feed(Poses.standing, 1000)
+        settle { notificationText() == "Dead hang: saved 0:02" }
+        service.destroy()
+    }
+
+    @Test
+    fun notificationIsNotTuckedAwayAsSilent() {
+        shadowOf(app).grantPermissions(Manifest.permission.CAMERA)
+        startWorkout(Exercise.SQUAT)
+        val service = service()
+        val manager = app.getSystemService(NotificationManager::class.java)
+        assertEquals(NotificationManager.IMPORTANCE_DEFAULT, manager.getNotificationChannel("workout").importance)
+        assertNull(manager.getNotificationChannel("tracking"))
         service.destroy()
     }
 
@@ -149,7 +175,7 @@ class TrackingServiceTest {
         service.feed(Poses.armsStraight, 300)
         service.feed(Poses.armsBent, 400)
         service.feed(Poses.armsStraight, 400)
-        settle { (windows.views.single() as TextView).text.toString() == "1" }
+        settle { timerText() == listOf("Push-up", "1") }
 
         runBlocking { app.container.settings.setOverlay(false) }
         settle { windows.views.isEmpty() }
@@ -162,8 +188,14 @@ class TrackingServiceTest {
         ShadowSettings.setCanDrawOverlays(true)
         startWorkout(Exercise.ACTIVE_HANG)
         val service = service()
-        service.feed(Poses.deadHang, 1500)
-        settle { (windows.views.single() as TextView).text.toString() == "0:01" }
+        service.feed(Poses.deadHang, 2500)
+        settle { timerText() == listOf("Active hang", "0:02") }
+
+        // Off the bar: once the hang is saved, the timer counts the rest instead.
+        service.feed(Poses.standing, 1000)
+        settle { timerText()?.first() == "Rest" }
+        runBlocking { app.container.controller.switchExercise(Exercise.DEAD_HANG) }
+        settle { timerText()?.first() == "Rest" }
         service.destroy()
         assertTrue(windows.views.isEmpty())
     }

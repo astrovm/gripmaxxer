@@ -8,7 +8,9 @@ import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performSemanticsAction
@@ -87,7 +89,28 @@ class WorkoutUiTest : UiTestBase() {
         grantCamera = true
         compose.onNodeWithText("Start Dead hang").tap()
         waitForText("Finish")
-        assertEquals(2, permissionRequests)
+        // Notifications are only asked for once the camera is allowed.
+        val camera = android.Manifest.permission.CAMERA
+        assertEquals(listOf(camera, camera, android.Manifest.permission.POST_NOTIFICATIONS), permissionRequests)
+    }
+
+    @Test
+    fun startsWhenTheCameraIsAlreadyAllowed() {
+        launch()
+        waitForText("Start Dead hang")
+        compose.onNodeWithText("Start Dead hang").tap()
+        waitForText("Finish")
+        assertEquals(listOf(android.Manifest.permission.POST_NOTIFICATIONS), permissionRequests)
+    }
+
+    @Test
+    fun asksNothingWhenEverythingIsAllowed() {
+        org.robolectric.Shadows.shadowOf(app).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        launch()
+        waitForText("Start Dead hang")
+        compose.onNodeWithText("Start Dead hang").tap()
+        waitForText("Finish")
+        assertTrue(permissionRequests.isEmpty())
     }
 
     @Test
@@ -101,6 +124,13 @@ class WorkoutUiTest : UiTestBase() {
         scrollTo("Show a floating timer over other apps")
         compose.onAllNodesWithText("Allow")[1].tap()
         assertEquals(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, lastStartedIntent()!!.action)
+
+        // Not wanted: dismissing turns the setting off, so the hint goes away.
+        compose.onAllNodesWithContentDescription("Turn off")[1].tap()
+        compose.onAllNodesWithContentDescription("Turn off")[0].tap()
+        waitUntil { compose.onAllNodesWithText("Allow").fetchSemanticsNodes().isEmpty() }
+        val settings = runBlocking { container.settings.settings.first() }
+        assertTrue(!settings.mediaControl && !settings.overlay)
     }
 
     @Test
@@ -178,6 +208,51 @@ class WorkoutUiTest : UiTestBase() {
         compose.onNodeWithText("15 reps").tap()
         compose.onNodeWithText("Delete").tap()
         waitUntil { compose.onAllNodesWithText("15 reps").fetchSemanticsNodes().isEmpty() }
+
+        // Deleted by mistake: bring it back.
+        waitForText("Set deleted")
+        compose.onNodeWithText("Undo").tap()
+        waitForText("15 reps")
+    }
+
+    @Test
+    fun aNewSetStartsEmpty() {
+        startWorkout("Dead hang")
+        compose.onNodeWithText("Add set").tap()
+        field("Seconds").type("45")
+        compose.onNodeWithText("Save").tap()
+        waitForText("0:45")
+
+        compose.onNodeWithText("Pull-up").tap()
+        waitUntil { container.controller.live.value.exercise == Exercise.PULL_UP }
+        compose.onNodeWithText("Add set").tap()
+        waitForText("New Pull-up set")
+        assertTrue(compose.onAllNodes(hasSetTextAction() and hasText("45")).fetchSemanticsNodes().isEmpty())
+
+        // The keyboard's done key saves.
+        field("Reps").type("8")
+        field("Seconds").performImeAction()
+        waitForText("8 reps")
+        assertEquals(0L, runBlocking { container.workouts.active.first() }!!.sets.last().durationMs)
+    }
+
+    @Test
+    fun showsRestAndPastResults() {
+        runBlocking {
+            val workouts = container.workouts
+            val id = workouts.start(Exercise.PUSH_UP)
+            workouts.addSet(id, Exercise.PUSH_UP, reps = 12, durationMs = 0)
+            workouts.addSet(id, Exercise.PUSH_UP, reps = 9, durationMs = 0)
+            workouts.finish(id)
+        }
+        startWorkout("Push-up")
+        waitForText("Best 12 reps, last time 12 reps")
+        compose.onNodeWithText("Rest", substring = true).assertDoesNotExist()
+
+        compose.onNodeWithText("Add set").tap()
+        field("Reps").type("10")
+        compose.onNodeWithText("Save").tap()
+        waitForText("Rest 0:0", substring = true)
     }
 
     @Test

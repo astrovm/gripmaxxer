@@ -93,6 +93,16 @@ class WorkoutRepositoryTest {
         assertEquals(12, repo.active.first()!!.sets.single().reps)
         repo.deleteSet(set.id)
         assertTrue(repo.active.first()!!.sets.isEmpty())
+
+        repo.restoreSet(id, set)
+        assertEquals(set, repo.active.first()!!.sets.single())
+    }
+
+    @Test
+    fun setsAddedToAPastWorkoutKeepTheirTime() = runBlocking {
+        val id = repo.start(Exercise.DIP)
+        repo.addSet(id, Exercise.DIP, reps = 5, durationMs = 0, completedAtMs = 500)
+        assertEquals(500L, repo.active.first()!!.sets.single().completedAtMs)
     }
 
     @Test
@@ -120,15 +130,16 @@ class WorkoutRepositoryTest {
     }
 
     @Test
-    fun statsKeepBestsPerExercise() {
+    fun statsKeepBestsAndLastTimePerExercise() {
         fun set(exercise: Exercise, reps: Int, ms: Long) = WorkoutSet(0, exercise, reps, ms, 0, true)
         val workouts = listOf(
             Workout(1, 0, 1, Exercise.DIP, listOf(set(Exercise.DEAD_HANG, 0, 30_000), set(Exercise.DIP, 8, 20_000))),
             Workout(2, 0, 1, Exercise.DIP, listOf(set(Exercise.DIP, 12, 25_000), set(Exercise.DEAD_HANG, 0, 50_000))),
         )
+        // Newest first: workout 1 is the last time.
         val (hang, dip) = statsFor(workouts)
-        assertEquals(ExerciseStats(Exercise.DEAD_HANG, 2, 0, 0, 50_000, 80_000), hang)
-        assertEquals(ExerciseStats(Exercise.DIP, 2, 12, 20, 25_000, 45_000), dip)
+        assertEquals(ExerciseStats(Exercise.DEAD_HANG, 2, 0, 0, 50_000, 80_000, 0, 30_000), hang)
+        assertEquals(ExerciseStats(Exercise.DIP, 2, 12, 20, 25_000, 45_000, 8, 20_000), dip)
     }
 
     @Test

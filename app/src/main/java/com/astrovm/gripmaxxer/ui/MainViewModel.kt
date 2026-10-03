@@ -7,6 +7,7 @@ import com.astrovm.gripmaxxer.data.Accent
 import com.astrovm.gripmaxxer.data.ExerciseStats
 import com.astrovm.gripmaxxer.data.Settings
 import com.astrovm.gripmaxxer.data.Workout
+import com.astrovm.gripmaxxer.data.WorkoutSet
 import com.astrovm.gripmaxxer.tracking.Exercise
 import com.astrovm.gripmaxxer.tracking.LiveState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -102,12 +103,16 @@ class MainViewModel(private val app: AppContainer, private val readAccess: () ->
 
     fun finishWorkout() = launch { app.controller.finish() }
 
-    fun addSet(workoutId: Long, exercise: Exercise, reps: Int, durationMs: Long) =
-        launch { app.workouts.addSet(workoutId, exercise, reps, durationMs) }
+    /** [completedAtMs] places a set added to a past workout. Null means now. */
+    fun addSet(workoutId: Long, exercise: Exercise, reps: Int, durationMs: Long, completedAtMs: Long? = null) =
+        launch { app.workouts.addSet(workoutId, exercise, reps, durationMs, completedAtMs) }
 
     fun updateSet(setId: Long, reps: Int, durationMs: Long) = launch { app.workouts.updateSet(setId, reps, durationMs) }
 
     fun deleteSet(setId: Long) = launch { app.workouts.deleteSet(setId) }
+
+    /** Undoes [deleteSet]. Does nothing if the workout is gone too. */
+    fun restoreSet(workoutId: Long, set: WorkoutSet) = launch { runCatching { app.workouts.restoreSet(workoutId, set) } }
 
     fun deleteWorkout(id: Long) = launch {
         _openWorkoutId.value = null

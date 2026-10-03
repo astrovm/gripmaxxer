@@ -2,7 +2,9 @@ package com.astrovm.gripmaxxer.ui
 
 import android.provider.Settings
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.isSelected
@@ -76,8 +78,49 @@ class HistoryProfileUiTest : UiTestBase() {
         compose.onNodeWithText("Delete").tap()
         waitUntil { compose.onAllNodesWithText("Dead hang").fetchSemanticsNodes().isEmpty() }
 
+        // Deleted by mistake: bring it back.
+        compose.onNodeWithText("Undo").tap()
+        waitForText("1:01")
+
         compose.onNodeWithContentDescription("Back").tap()
         waitForText("History")
+    }
+
+    @Test
+    fun detailAddsSetsToAPastWorkout() {
+        val id = finishedWorkout()
+        openTab("History")
+        waitForText("2 sets, 14 reps")
+        compose.onNodeWithText("2 sets, 14 reps").tap()
+        waitForText("Took", substring = true)
+
+        scrollTo("Add set")
+        compose.onNodeWithText("Add set").tap()
+        scrollTo("Squat")
+        compose.onNodeWithText("Squat").tap()
+        waitForText("New Squat set")
+        compose.onNodeWithText("Cancel").tap()
+
+        // Back closes the picker, not the workout.
+        scrollTo("Add set")
+        compose.onNodeWithText("Add set").tap()
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        waitForText("Add set")
+        assertEquals(id, viewModel.openWorkoutId.value)
+
+        scrollTo("Add set")
+        compose.onNodeWithText("Add set").tap()
+        scrollTo("Squat")
+        compose.onNodeWithText("Squat").tap()
+        compose.onNode(hasSetTextAction() and hasText("Reps"))
+            .performSemanticsAction(SemanticsActions.SetText) { it(AnnotatedString("20")) }
+        advance()
+        compose.onNodeWithText("Save").tap()
+        waitForText("1 set, 20 reps")
+
+        // It lands at the end of the workout, not today.
+        val workout = runBlocking { container.workouts.workout(id).first() }!!
+        assertEquals(workout.endedAtMs, workout.sets.last().completedAtMs)
     }
 
     @Test
@@ -134,14 +177,24 @@ class HistoryProfileUiTest : UiTestBase() {
     }
 
     @Test
-    fun profileAsksForMissingAccess() {
+    fun profileAsksForMissingAccess(): Unit = runBlocking {
         access = Access(camera = true)
+        container.settings.setMediaControl(false)
+        container.settings.setOverlay(false)
         openTab("Profile")
-        waitForText("Needs permission")
-        compose.onAllNodesWithText("Allow")[0].tap()
+        waitForText("Play and pause media")
+        // Without access they show as off, even when the setting is on.
+        compose.onNode(hasText("Play and pause media") and isToggleable()).assertIsOff()
+
+        compose.onNodeWithText("Play and pause media").tap()
         assertEquals(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS, lastStartedIntent()!!.action)
-        compose.onAllNodesWithText("Allow")[1].tap()
+        compose.onNodeWithText("Floating timer").tap()
         assertEquals(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, lastStartedIntent()!!.action)
+        waitUntil {
+            val settings = runBlocking { container.settings.settings.first() }
+            settings.mediaControl && settings.overlay
+        }
+        compose.onNode(hasText("Floating timer") and isToggleable()).assertIsOff()
     }
 
     @Test

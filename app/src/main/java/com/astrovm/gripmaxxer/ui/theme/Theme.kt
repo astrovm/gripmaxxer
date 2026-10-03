@@ -44,6 +44,10 @@ fun GripTheme(accent: Accent, content: @Composable () -> Unit) {
         outline = Color(0xFF3A3A3A),
         outlineVariant = Color(0xFF2A2A2A),
         error = ErrorRed,
+        // Snackbars: a raised dark card with the accent on its action.
+        inverseSurface = Color(0xFF2E2E2E),
+        inverseOnSurface = Color.White,
+        inversePrimary = primary,
     )
     MaterialTheme(colorScheme = colors, content = content)
 }

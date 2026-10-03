@@ -36,6 +36,9 @@ data class ExerciseStats(
     val totalReps: Int,
     val bestHoldMs: Long,
     val totalHoldMs: Long,
+    /** Best set from the most recent workout with this exercise. */
+    val lastReps: Int,
+    val lastHoldMs: Long,
 )
 
 class WorkoutRepository(private val dao: WorkoutDao, private val clock: () -> Long = System::currentTimeMillis) {
@@ -81,15 +84,37 @@ class WorkoutRepository(private val dao: WorkoutDao, private val clock: () -> Lo
         )
     }
 
-    suspend fun addSet(workoutId: Long, exercise: Exercise, reps: Int, durationMs: Long) {
+    suspend fun addSet(
+        workoutId: Long,
+        exercise: Exercise,
+        reps: Int,
+        durationMs: Long,
+        /** Null means now. */
+        completedAtMs: Long? = null,
+    ) {
         dao.insert(
             SetEntity(
                 workoutId = workoutId,
                 exercise = exercise.name,
                 reps = reps,
                 durationMs = durationMs,
-                completedAtMs = clock(),
+                completedAtMs = completedAtMs ?: clock(),
                 tracked = false,
+            ),
+        )
+    }
+
+    /** Puts a deleted set back exactly as it was. */
+    suspend fun restoreSet(workoutId: Long, set: WorkoutSet) {
+        dao.insert(
+            SetEntity(
+                id = set.id,
+                workoutId = workoutId,
+                exercise = set.exercise.name,
+                reps = set.reps,
+                durationMs = set.durationMs,
+                completedAtMs = set.completedAtMs,
+                tracked = set.tracked,
             ),
         )
     }
@@ -115,10 +140,13 @@ private fun SetEntity.toSet(): WorkoutSet? {
     return WorkoutSet(id, exercise, reps, durationMs, completedAtMs, tracked)
 }
 
+/** [workouts] newest first, like [WorkoutRepository.history]. */
 internal fun statsFor(workouts: List<Workout>): List<ExerciseStats> =
     workouts.flatMap { it.sets }
         .groupBy { it.exercise }
         .map { (exercise, sets) ->
+            val last = workouts.first { workout -> workout.sets.any { it.exercise == exercise } }
+                .sets.filter { it.exercise == exercise }
             ExerciseStats(
                 exercise = exercise,
                 sets = sets.size,
@@ -126,6 +154,8 @@ internal fun statsFor(workouts: List<Workout>): List<ExerciseStats> =
                 totalReps = sets.sumOf { it.reps },
                 bestHoldMs = sets.maxOf { it.durationMs },
                 totalHoldMs = sets.sumOf { it.durationMs },
+                lastReps = last.maxOf { it.reps },
+                lastHoldMs = last.maxOf { it.durationMs },
             )
         }
         .sortedBy { it.exercise.ordinal }
