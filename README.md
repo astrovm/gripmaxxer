@@ -57,7 +57,3 @@ Checks CI runs on every pull request, 100% line coverage included:
 - `data/`: Room database for workouts and DataStore for settings.
 - `media/`, `feedback/`: media control, sounds, voice and the floating timer.
 - `ui/`: Compose screens.
-
-## License
-
-MIT
