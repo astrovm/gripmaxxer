@@ -19,6 +19,12 @@ Hang from a bar and it times the hang. Do pull-ups and it counts them. Every set
 
 No account. Your workouts stay on the phone.
 
+## 📦 Installing and updating
+
+Download the APK from [Releases](https://github.com/astrovm/gripmaxxer/releases), or add `https://github.com/astrovm/gripmaxxer` in Obtainium to get updates.
+
+Version 0.2.1 switches to a permanent release signing key. If you installed 0.2.0 or earlier, Android requires a one-time reinstall, which removes local workout history. Later releases update normally.
+
 ## 📱 Using it
 
 1. Prop the phone up so your whole body is in frame, hands included.
@@ -48,8 +54,18 @@ Needs JDK 21 and the Android SDK.
 Checks CI runs on every pull request, 100% line coverage included:
 
 ```sh
-./gradlew :app:testDebugUnitTest :app:koverVerifyDebug :app:assembleDebug
+./gradlew :app:ci
 ```
+
+## 🚀 Releasing
+
+After merging the changes, push a `vX.Y.Z` tag or run **Release** from **Actions** with a new tag on **main**.
+
+The [release workflow](.github/workflows/release.yml) tests, checks 100% line coverage, runs lint and builds the APK. Separate jobs sign it with the permanent key, verify it against a fresh build, and publish it to GitHub Releases. Obtainium picks up the attached APK.
+
+Versions come from Git: the tag sets the version name and the full commit count sets the version code. Every release must contain a new commit so Android sees a higher version code.
+
+The **release** environment needs `RELEASE_KEYSTORE_BASE64`, `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS` and `RELEASE_KEY_PASSWORD` secrets. The repository variable `RELEASE_CERT_SHA256` pins the signing certificate. Back up the keystore and its passwords outside GitHub and keep using the same key for every release.
 
 ## 🧭 How the code is laid out
 

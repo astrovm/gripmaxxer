@@ -157,3 +157,22 @@ tasks.withType<Test>().configureEach {
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
 }
+
+// Keep local validation, CI and release builds on the same checks.
+tasks.register("ci") {
+    group = "verification"
+    description = "Tests, 100% line coverage, lint, and debug and release APKs."
+    dependsOn(
+        "testDebugUnitTest",
+        "koverLogDebug",
+        "koverXmlReportDebug",
+        "koverVerifyDebug",
+        "lintDebug",
+        "assembleDebug",
+        "assembleRelease",
+    )
+}
+
+tasks.named("check") {
+    dependsOn("koverVerifyDebug")
+}

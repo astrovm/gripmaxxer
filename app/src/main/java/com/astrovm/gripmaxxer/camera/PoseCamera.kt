@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.util.Size
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.resolutionselector.ResolutionSelector
@@ -95,6 +96,7 @@ class PoseCamera(
         executor.shutdown()
     }
 
+    @androidx.annotation.OptIn(ExperimentalGetImage::class)
     internal fun analyze(proxy: ImageProxy) {
         val media = proxy.image
         if (media == null) {
