@@ -9,6 +9,7 @@
     <string name="status_saved">saved %1$s</string>
     <string name="rest">Rest</string>
     <string name="finish_workout">Finish</string>
+    <string name="show_timer">Show timer</string>
     <string name="error_camera_permission">Camera permission is off</string>
     <string name="error_camera_unavailable">Camera unavailable</string>
 </resources>

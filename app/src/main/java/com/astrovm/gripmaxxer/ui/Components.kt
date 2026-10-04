@@ -24,7 +24,7 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Videocam
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -112,8 +112,8 @@ fun SetRow(number: Int, set: WorkoutSet, showExercise: Boolean, onClick: () -> U
         }
         if (set.tracked) {
             Icon(
-                Icons.Outlined.Videocam,
-                contentDescription = "Counted by camera",
+                Icons.Outlined.AutoAwesome,
+                contentDescription = "Counted automatically",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
             )
