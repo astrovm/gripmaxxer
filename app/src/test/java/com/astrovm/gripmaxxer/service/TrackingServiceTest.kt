@@ -363,6 +363,83 @@ class TrackingServiceTest {
     }
 
     @Test
+    fun repeatedProximityReadingsDoNotPostponeTheModeSwitch() {
+        shadowOf(app).grantPermissions(Manifest.permission.CAMERA)
+        val proximity = addSensor(Sensor.TYPE_PROXIMITY)
+        addSensor(Sensor.TYPE_ACCELEROMETER)
+        startWorkout(Exercise.SQUAT)
+        val service = service()
+        val controller = app.container.controller
+
+        repeat(15) {
+            cover(proximity, 0f)
+            waitMs(100)
+        }
+        assertTrue(controller.live.value.inPocket)
+        repeat(5) {
+            cover(proximity, 5f)
+            waitMs(100)
+        }
+        assertFalse(controller.live.value.inPocket)
+        service.destroy()
+    }
+
+    @Test
+    fun screenOffCountsMotionEvenWhenProximityStaysFar() {
+        shadowOf(app).grantPermissions(Manifest.permission.CAMERA)
+        val proximity = addSensor(Sensor.TYPE_PROXIMITY)
+        val accelerometer = addSensor(Sensor.TYPE_ACCELEROMETER)
+        startWorkout(Exercise.SQUAT)
+        val service = service()
+        val controller = app.container.controller
+        cover(proximity, 5f)
+        app.sendBroadcast(Intent(Intent.ACTION_SCREEN_OFF))
+        idle()
+        assertTrue(controller.live.value.inPocket)
+        assertTrue(ShadowPowerManager.getLatestWakeLock().isHeld)
+        assertNull(app.container.preview.value)
+        assertTrue(shadowOf(sensors).hasListener(shadowOf(sensors).listeners.last(), accelerometer))
+
+        // A late proximity event must not turn the camera back on while locked.
+        cover(proximity, 0f)
+        cover(proximity, 5f)
+        waitMs(2_000)
+        assertTrue(controller.live.value.inPocket)
+        val moves = PocketMoves(System.currentTimeMillis()) { motion, ms -> service.get().onMotion(motion, ms) }
+        moves.still(2_000)
+        repeat(2) {
+            moves.lean(85f, 800)
+            moves.lean(5f, 800)
+        }
+        idle()
+        assertEquals(2, controller.live.value.reps)
+
+        app.sendBroadcast(Intent(Intent.ACTION_SCREEN_ON))
+        waitMs(500)
+        assertFalse(controller.live.value.inPocket)
+        assertFalse(ShadowPowerManager.getLatestWakeLock().isHeld)
+        service.destroy()
+    }
+
+    @Test
+    fun serviceStartingWithScreenOffUsesMotionAndUnlockKeepsCoveredPocket() {
+        shadowOf(app).grantPermissions(Manifest.permission.CAMERA)
+        shadowOf(app.getSystemService(PowerManager::class.java)).setIsInteractive(false)
+        val proximity = addSensor(Sensor.TYPE_PROXIMITY)
+        addSensor(Sensor.TYPE_ACCELEROMETER)
+        startWorkout(Exercise.SQUAT)
+        val service = service()
+        idle()
+        assertTrue(app.container.controller.live.value.inPocket)
+        cover(proximity, 0f)
+        app.sendBroadcast(Intent(Intent.ACTION_SCREEN_ON))
+        waitMs(1_500)
+        assertTrue(app.container.controller.live.value.inPocket)
+        service.destroy()
+        assertFalse(ShadowPowerManager.getLatestWakeLock().isHeld)
+    }
+
+    @Test
     fun withoutMotionSensorsThePocketStaysQuiet() {
         shadowOf(app).grantPermissions(Manifest.permission.CAMERA)
         startWorkout(Exercise.DIP)

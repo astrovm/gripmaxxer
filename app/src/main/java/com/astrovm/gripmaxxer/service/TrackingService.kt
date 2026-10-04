@@ -7,8 +7,10 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.hardware.Sensor
@@ -53,8 +55,9 @@ import kotlinx.coroutines.launch
  * background, so you can watch a video while you hang. The counting itself happens in
  * [com.astrovm.gripmaxxer.tracking.WorkoutController].
  *
- * When the proximity sensor stays covered, the phone is in a pocket: the camera goes off
- * and the motion sensors count instead, until it comes back out.
+ * When the proximity sensor stays covered, or the screen is off, the camera goes off
+ * and the motion sensors count instead. Turning the screen on outside a pocket restores
+ * the camera.
  */
 class TrackingService : LifecycleService() {
 
@@ -62,6 +65,9 @@ class TrackingService : LifecycleService() {
     private lateinit var sensors: SensorManager
     private var wakeLock: PowerManager.WakeLock? = null
     private var pocketJob: Job? = null
+    private var proximityCovered: Boolean? = null
+    private var screenOff = false
+    private var screenReceiverRegistered = false
     private var cues: Cues? = null
     private lateinit var timer: FloatingTimer
     private var timerHidden = false
@@ -103,6 +109,18 @@ class TrackingService : LifecycleService() {
         sensors.getDefaultSensor(Sensor.TYPE_PROXIMITY)?.let {
             sensors.registerListener(proximityListener, it, SensorManager.SENSOR_DELAY_NORMAL)
         }
+        ContextCompat.registerReceiver(
+            this,
+            screenReceiver,
+            IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_SCREEN_ON)
+            },
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        screenReceiverRegistered = true
+        screenOff = !getSystemService(PowerManager::class.java).isInteractive
+        if (screenOff) app.controller.setInPocket(true)
         lifecycleScope.launch {
             app.controller.live.map { it.inPocket }.distinctUntilChanged().collect { inPocket ->
                 if (inPocket) usePocket() else useCamera()
@@ -143,6 +161,7 @@ class TrackingService : LifecycleService() {
     override fun onDestroy() {
         val app = container
         camera?.stop()
+        if (screenReceiverRegistered) unregisterReceiver(screenReceiver)
         if (::sensors.isInitialized) {
             sensors.unregisterListener(proximityListener)
             sensors.unregisterListener(motionListener)
@@ -208,15 +227,36 @@ class TrackingService : LifecycleService() {
     private val proximityListener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
             val covered = event.values[0] < event.sensor.maximumRange
+            // Only a change in coverage starts the delay. Repeated readings must not
+            // keep postponing it while the phone stays covered (or uncovered).
+            if (proximityCovered == covered) return
+            proximityCovered = covered
+            updatePocketMode()
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) = Unit
+    }
+
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            screenOff = intent.action == Intent.ACTION_SCREEN_OFF
+            updatePocketMode()
+        }
+    }
+
+    private fun updatePocketMode() {
+        pocketJob?.cancel()
+        if (screenOff) {
+            // Screen-off workouts use motion even if proximity never reports "near".
+            container.controller.setInPocket(true)
+        } else {
+            val covered = proximityCovered == true
             // A hand passing over the sensor isn't a pocket.
-            pocketJob?.cancel()
             pocketJob = lifecycleScope.launch {
                 delay(if (covered) POCKET_IN_MS else POCKET_OUT_MS)
                 container.controller.setInPocket(covered)
             }
         }
-
-        override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) = Unit
     }
 
     private val motionListener = object : SensorEventListener {
