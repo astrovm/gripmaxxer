@@ -39,6 +39,8 @@ The camera keeps running with the app in the background, so you can open YouTube
 
 Put the phone in a front trouser pocket and it switches to the motion sensors on its own. Take it out and the camera takes over again.
 
+Locking the screen also switches to the motion sensors, so you can train with the phone locked even if its proximity sensor doesn't detect the pocket. Turn the screen on outside your pocket to return to the camera.
+
 - Squats and leg raises count from how far your thigh leans.
 - Pull-ups, chin-ups, dips and push-ups count from how far you move up and down.
 - On the bar, jump up to it, or just start your first pull-up. Dropping off and landing ends the set.
