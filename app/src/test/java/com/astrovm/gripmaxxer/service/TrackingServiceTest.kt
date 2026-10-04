@@ -220,11 +220,18 @@ class TrackingServiceTest {
             shadowOf(app).nextStartedActivity.component!!.className,
         )
 
-        // Hidden for the rest of the workout.
+        // Hidden until "Show timer" in the notification brings it back.
         tapAction("Hide")
         assertTrue(windows.views.isEmpty())
         waitMs(2_000)
         assertTrue(windows.views.isEmpty())
+        fun showTimer() = notifications.allNotifications.last().actions.orEmpty().singleOrNull { it.title == "Show timer" }
+        settle { showTimer() != null }
+        service.withIntent(shadowOf(showTimer()!!.actionIntent).savedIntent).startCommand(0, 2)
+        settle { windows.views.isNotEmpty() }
+        settle { showTimer() == null }
+        assertNull(showTimer())
+        tapAction("Hide")
 
         val id = app.container.workouts.active.first()!!.id
         app.container.workouts.addSet(id, Exercise.SQUAT, 5, 0)

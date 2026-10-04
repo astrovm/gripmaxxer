@@ -44,6 +44,7 @@ import com.astrovm.gripmaxxer.ui.formatResult
 import com.astrovm.gripmaxxer.ui.theme.accentColor
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
@@ -70,8 +71,8 @@ class TrackingService : LifecycleService() {
     private var screenReceiverRegistered = false
     private var cues: Cues? = null
     private lateinit var timer: FloatingTimer
-    private var timerHidden = false
-    private var lastNotice: String? = null
+    private val timerHidden = MutableStateFlow(false)
+    private var lastNotice: Pair<String, Boolean>? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -95,8 +96,8 @@ class TrackingService : LifecycleService() {
             this,
             onOpen = ::openApp,
             onFinish = { app.scope.launch { app.controller.finish() } },
-            // Hidden until this workout ends.
-            onHide = { timerHidden = true },
+            // Hidden until this workout ends, or until "Show timer" in the notification.
+            onHide = { timerHidden.value = true },
         )
         app.controller.effects = object : TrackingEffects {
             override fun beep() = cues.beep()
@@ -130,6 +131,7 @@ class TrackingService : LifecycleService() {
         val inBackground = ProcessLifecycleOwner.get().lifecycle.currentStateFlow
             .map { !it.isAtLeast(Lifecycle.State.STARTED) }
             .distinctUntilChanged()
+        val away = combine(inBackground, timerHidden) { background, hidden -> background to hidden }
         // Ticks so the rest time on the floating timer keeps counting between frames.
         val clock = flow {
             while (true) {
@@ -140,11 +142,11 @@ class TrackingService : LifecycleService() {
         // Rest counts from the latest set, typed in or counted, like on the live screen.
         val lastSetAt = app.workouts.active.map { it?.sets?.lastOrNull()?.completedAtMs }.distinctUntilChanged()
         lifecycleScope.launch {
-            combine(app.controller.live, app.settings.settings, inBackground, clock, lastSetAt) { live, settings, background, now, restFrom ->
-                if (settings.overlay && background && live.tracking && !timerHidden) timer.show() else timer.hide()
+            combine(app.controller.live, app.settings.settings, away, clock, lastSetAt) { live, settings, (background, hidden), now, restFrom ->
+                if (settings.overlay && background && live.tracking && !hidden) timer.show() else timer.hide()
                 val (label, value) = timerText(live, restFrom.takeUnless { live.inSet }?.let { now - it })
                 timer.update(label, value, accentColor(settings.accent).toArgb().takeIf { live.inSet })
-                updateNotification(live)
+                updateNotification(live, showTimerAction = settings.overlay && hidden)
             }.collect {}
         }
     }
@@ -155,6 +157,7 @@ class TrackingService : LifecycleService() {
             val app = container
             app.scope.launch { app.controller.finish() }
         }
+        if (intent?.action == ACTION_SHOW_TIMER) timerHidden.value = false
         return START_NOT_STICKY
     }
 
@@ -287,7 +290,7 @@ class TrackingService : LifecycleService() {
     private fun timerText(live: LiveState, restMs: Long?): Pair<String, String> =
         if (restMs != null) getString(R.string.rest) to formatDuration(restMs) else (live.exercise?.label ?: "") to liveValue(live)
 
-    private fun updateNotification(live: LiveState) {
+    private fun updateNotification(live: LiveState, showTimerAction: Boolean) {
         val exercise = live.exercise ?: return
         val lastSet = live.lastSet
         val status = when {
@@ -297,12 +300,12 @@ class TrackingService : LifecycleService() {
             else -> getString(R.string.status_ready)
         }
         val text = "${exercise.label}: $status"
-        if (text == lastNotice) return
-        lastNotice = text
-        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(text, live))
+        if (text to showTimerAction == lastNotice) return
+        lastNotice = text to showTimerAction
+        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(text, live, showTimerAction))
     }
 
-    private fun notification(text: String, live: LiveState): Notification {
+    private fun notification(text: String, live: LiveState, showTimerAction: Boolean = false): Notification {
         val open = openIntent()
         val finish = PendingIntent.getService(
             this,
@@ -322,6 +325,15 @@ class TrackingService : LifecycleService() {
             // A live update: pinned at the top, with a chip in the status bar on Android 16 and up.
             .setRequestPromotedOngoing(true)
             .addAction(0, getString(R.string.finish_workout), finish)
+        if (showTimerAction) {
+            val show = PendingIntent.getService(
+                this,
+                2,
+                Intent(this, TrackingService::class.java).setAction(ACTION_SHOW_TIMER),
+                PendingIntent.FLAG_IMMUTABLE,
+            )
+            builder.addAction(0, getString(R.string.show_timer), show)
+        }
         // The workout clock ticks on its own, so the notification doesn't need an update every second.
         live.workoutStartedAtMs?.let { builder.setWhen(it).setShowWhen(true).setUsesChronometer(true) }
         if (live.inSet) builder.setShortCriticalText(liveValue(live))
@@ -350,6 +362,7 @@ class TrackingService : LifecycleService() {
         private const val OLD_CHANNEL_ID = "tracking"
         private const val NOTIFICATION_ID = 1
         private const val ACTION_FINISH = "com.astrovm.gripmaxxer.FINISH"
+        private const val ACTION_SHOW_TIMER = "com.astrovm.gripmaxxer.SHOW_TIMER"
         private const val POCKET_IN_MS = 1_500L
         private const val POCKET_OUT_MS = 500L
         /** A safety net in case the wake lock is somehow never let go. */

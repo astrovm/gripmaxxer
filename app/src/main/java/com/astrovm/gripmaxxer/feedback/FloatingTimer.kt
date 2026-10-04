@@ -52,7 +52,7 @@ class FloatingTimer(
     }
     private val border = GradientDrawable().apply {
         cornerRadius = dp(20).toFloat()
-        setColor(0xE6000000.toInt())
+        setColor(0xFF000000.toInt())
         setStroke(dp(2), IDLE_STROKE)
     }
     private val actions: LinearLayout = LinearLayout(context).apply {

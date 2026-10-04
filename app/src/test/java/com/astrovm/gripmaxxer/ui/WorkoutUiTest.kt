@@ -272,7 +272,7 @@ class WorkoutUiTest : UiTestBase() {
         field("Seconds").type("45")
         compose.onNodeWithText("Save").tap()
         waitForText("0:45")
-        compose.onNodeWithContentDescription("Counted by camera").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Counted automatically").assertDoesNotExist()
         compose.onNodeWithText("Add set").tap()
         compose.onNodeWithText("Cancel").tap()
     }
@@ -297,7 +297,7 @@ class WorkoutUiTest : UiTestBase() {
         feed(Poses.armsStraight, 400)
         feed(null, 3_100)
         waitForText("1 rep")
-        compose.onNodeWithContentDescription("Counted by camera").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Counted automatically").assertIsDisplayed()
         compose.onNodeWithText("Finish").tap()
         waitForText("Start Dip")
         compose.onNodeWithText("History").tap()
