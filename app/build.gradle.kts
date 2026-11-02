@@ -146,6 +146,17 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
+// GHSA-xxph-c9ww-hj94: guava before 33.7.2 is vulnerable. The tools around the app still pull
+// older versions (Room's KSP processor 33.2.1, Android lint 33.4.0, Robolectric tests 33.6.0), so
+// raise it in every configuration. Drop this once those tools ship guava 33.7.2 or newer.
+configurations.matching { it.isCanBeResolved }.configureEach {
+    dependencyConstraints.add(
+        project.dependencies.constraints.create("com.google.guava:guava:33.7.2-jre") {
+            because("GHSA-xxph-c9ww-hj94 is fixed in 33.7.2")
+        },
+    )
+}
+
 tasks.withType<Test>().configureEach {
     // Robolectric's Android 16 runtime reaches into JDK internals.
     jvmArgs(
