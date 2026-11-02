@@ -5,6 +5,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
     id("org.jetbrains.kotlinx.kover")
+    id("pl.droidsonroids.pitest")
 }
 
 fun Project.gitOutput(vararg args: String): String? {
@@ -143,15 +144,18 @@ dependencies {
     testImplementation("androidx.test:core:1.7.0")
     testImplementation("androidx.compose.ui:ui-test-junit4")
     testImplementation("io.mockk:mockk:1.14.11")
+    pitest(project(":pitest-changed-lines"))
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
+// Robolectric's Android 16 runtime reaches into JDK internals.
+val robolectricJvmArgs = listOf(
+    "--add-opens=java.base/jdk.internal.access=ALL-UNNAMED",
+    "--add-opens=java.base/java.io=ALL-UNNAMED",
+)
+
 tasks.withType<Test>().configureEach {
-    // Robolectric's Android 16 runtime reaches into JDK internals.
-    jvmArgs(
-        "--add-opens=java.base/jdk.internal.access=ALL-UNNAMED",
-        "--add-opens=java.base/java.io=ALL-UNNAMED",
-    )
+    jvmArgs(robolectricJvmArgs)
     testLogging {
         events("failed")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
@@ -164,6 +168,7 @@ tasks.register("ci") {
     description = "Tests, 100% line coverage, lint, and debug and release APKs."
     dependsOn(
         "testDebugUnitTest",
+        ":pitest-changed-lines:test",
         "koverLogDebug",
         "koverXmlReportDebug",
         "koverVerifyDebug",
@@ -176,3 +181,40 @@ tasks.register("ci") {
 tasks.named("check") {
     dependsOn("koverVerifyDebug")
 }
+
+// Mutation testing: scripts/mutants.py runs it on the lines a branch changed, or on one part of all
+// of the app's code, through these properties. Only the unit tests, which run on Robolectric.
+pitest {
+    pitestVersion.set("1.30.1")
+    targetClasses.set(providers.gradleProperty("mutateClasses").map { it.split(",") }.orElse(listOf("com.astrovm.gripmaxxer.*")))
+    providers.gradleProperty("mutateTests").orNull?.let { targetTests.set(it.split(",")) }
+    providers.gradleProperty("mutateLines").orNull?.let { features.set(listOf("+CHANGED(file[$it])")) }
+    // Changed lines that give PIT nothing to change, like comments and imports, aren't a failure.
+    failWhenNoMutations.set(false)
+    threads.set(2)
+    // A fresh test process takes some seconds to start Robolectric, more than PIT allows a test by default.
+    timeoutConstInMillis.set(30_000)
+    outputFormats.set(listOf("XML", "HTML"))
+    timestampedReports.set(false)
+    verbose.set(providers.gradleProperty("mutateVerbose").map { it.toBoolean() }.orElse(false))
+    // Each mutant's classes are loaded again, and their adapters and stubs fill the JIT's small code
+    // heap for them long before the Java heap fills, which PIT reports as a MEMORY_ERROR. One code
+    // cache, unsplit, gives them the room.
+    jvmArgs.set(robolectricJvmArgs + listOf("-Xmx3g", "-XX:-SegmentedCodeCache", "-XX:ReservedCodeCacheSize=512m"))
+}
+
+// After the plugin's own setup, which gives the tests only what they compile against.
+afterEvaluate {
+    tasks.withType<pl.droidsonroids.gradle.pitest.PitestTask>().configureEach {
+        // What the unit tests run with, like the app's resources, which Robolectric reads. The app's own
+        // classes come from the folders PIT mutates, not the jar the tests get, or PIT finds nothing to mutate.
+        additionalClasspath.setFrom(
+            mutableCodePaths,
+            tasks.named<Test>("testDebugUnitTest").map { test -> test.classpath.filter { "runtime_app_classes_jar" !in it.path } },
+        )
+    }
+}
+
+// The plugin adds the old libraries Android once shipped, for tests run against android.jar. Ours run on
+// Robolectric with the classpath above, so they're never used, and they set off security alerts.
+configurations.matching { it.name == "pitestTestCompile" }.configureEach { withDependencies { clear() } }

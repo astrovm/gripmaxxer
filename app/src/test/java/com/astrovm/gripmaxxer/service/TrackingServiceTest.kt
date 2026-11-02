@@ -70,6 +70,9 @@ class TrackingServiceTest {
         every { PoseDetection.getClient(any<PoseDetectorOptionsBase>()) } returns mockk(relaxed = true)
         mockkObject(ProcessCameraProvider.Companion)
         every { ProcessCameraProvider.getInstance(any()) } returns Futures.immediateFuture(mockk(relaxed = true))
+        // The settings store lives as long as the test JVM, so a test that turns the timer off
+        // must not leak that into whichever test runs next.
+        runBlocking { app.container.settings.setOverlay(true) }
     }
 
     @After
