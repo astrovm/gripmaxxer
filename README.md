@@ -69,6 +69,15 @@ Checks CI runs on every pull request, 100% line coverage included:
 ./gradlew :app:ci
 ```
 
+Mutation testing checks that the tests notice when the code changes. [PIT](https://pitest.org) changes a line a little, one change at a time, and runs the unit tests that reach it:
+
+```sh
+python3 scripts/mutants.py diff origin/main   # the lines this branch changed
+python3 scripts/mutants.py part 3 64          # the 4th of 64 equal parts of all the app's lines
+```
+
+It is slow, so run it only when you want to. It never blocks a merge. On a pull request, the **Mutants** workflow comments the changes no test noticed. Every Saturday it runs a quarter of the 64 parts, and what lived goes in the open "Missed mutants" issue. Kotlin's own null checks and the code Compose adds to composables are left out by the PIT plugin in `tools/pitest-changed-lines/`. The full report goes to `app/build/reports/pitest/debug/`.
+
 ## 🚀 Releasing
 
 After merging the changes, push a `vX.Y.Z` tag or run **Release** from **Actions** with a new tag on **main**.
