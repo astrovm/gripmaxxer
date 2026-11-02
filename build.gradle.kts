@@ -8,6 +8,8 @@ buildscript {
             classpath("org.bitbucket.b_c:jose4j:0.9.7")
             classpath("org.jdom:jdom2:2.0.6.1")
             classpath("org.apache.commons:commons-lang3:3.21.0")
+            // GHSA-xxph-c9ww-hj94: AGP 9.5.0 still pulls guava 33.4.0.
+            classpath("com.google.guava:guava:33.7.2-jre")
         }
     }
 }
