@@ -19,3 +19,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Gripmaxxer"
 include(":app")
+include(":pitest-changed-lines")
+project(":pitest-changed-lines").projectDir = file("tools/pitest-changed-lines")
