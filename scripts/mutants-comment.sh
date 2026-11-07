@@ -8,6 +8,8 @@ results=${1:?Usage: scripts/mutants-comment.sh DIR}
 marker='<!-- mutants -->'
 lived=$(cat "$results/lived.txt" 2>/dev/null || true)
 tally=$(cat "$results/tally.txt" 2>/dev/null || echo "0 of 0")
+has_findings=false
+[[ -z $lived ]] || has_findings=true
 truncated=''
 if [ "$(printf '%s' "$lived" | wc -c)" -gt 58000 ]; then
   lived=$(printf '%s\n' "$lived" | LC_ALL=C awk '{ if (size + length($0) + 1 <= 58000 && !full) { print; size += length($0) + 1 } else full = 1 }')
@@ -22,11 +24,11 @@ $lived
 
 $truncated
 Each one is a change to the code no test noticed. Not a blocker: real gaps get their own PR. [Full report]($RUN)"
-[[ -z $lived ]] || printf '%s\n' "$body" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+[[ $has_findings != true ]] || printf '%s\n' "$body" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
 [[ ${FORK:-false} != true ]] || exit 0
 old=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
   --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | head -n 1)
-if [[ -z $lived ]]; then
+if [[ $has_findings != true ]]; then
   if [[ -n $old ]]; then gh api -X DELETE "repos/$GITHUB_REPOSITORY/issues/comments/$old"; fi
 elif [[ -n $old ]]; then
   gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$old" -f body="$body" >/dev/null

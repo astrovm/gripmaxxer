@@ -72,6 +72,12 @@ class Comment(unittest.TestCase):
         self.assertIn("[Full report](https://run)", self.body)
         self.assertNotIn("A.kt:1999", self.body)
 
+    def test_one_oversized_row_still_reports_truncation(self):
+        calls = self.comment('A.kt:1  survived: ' + 'x' * 70000 + '\n', True)
+        self.assertEqual(calls[1:], ['api -X PATCH repos/o/r/issues/comments/7'])
+        self.assertIn('Results truncated.', self.body)
+        self.assertEqual(self.body.count('```'), 2)
+
     def test_the_comment_goes_once_every_change_is_caught(self):
         self.assertEqual(self.comment("", True)[1:], ["api -X DELETE repos/o/r/issues/comments/7"])
         self.assertEqual(self.comment("", False)[1:], [])
