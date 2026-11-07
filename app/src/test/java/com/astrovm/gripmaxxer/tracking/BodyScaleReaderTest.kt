@@ -19,6 +19,14 @@ class BodyScaleReaderTest {
     }
 
     @Test
+    fun largestFiniteBodyScaleRemainsUsable() {
+        val pose = Poses.pose(
+            LEFT_SHOULDER to (0f to 0f), LEFT_HIP to (Float.MAX_VALUE to 0f),
+        )
+        assertEquals(Float.MAX_VALUE, requireNotNull(pose.bodyScale), 0f)
+    }
+
+    @Test
     fun nonFiniteBodyScaleIsNotUsed() {
         val invalid = Poses.deadHang.copy(joints = Poses.deadHang.joints + mapOf(
             LEFT_HIP to Point(Float.POSITIVE_INFINITY, 420f),
