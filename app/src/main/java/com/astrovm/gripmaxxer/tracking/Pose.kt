@@ -39,10 +39,14 @@ data class Pose(val joints: Map<Joint, Point>) {
         get() {
             val shoulder = shoulder
             val hip = hip
-            if (shoulder != null && hip != null) return shoulder.distanceTo(hip)
-            val left = joints[Joint.LEFT_SHOULDER] ?: return null
-            val right = joints[Joint.RIGHT_SHOULDER] ?: return null
-            return left.distanceTo(right) * SHOULDER_TO_TORSO
+            val scale = if (shoulder != null && hip != null) {
+                shoulder.distanceTo(hip)
+            } else {
+                val left = joints[Joint.LEFT_SHOULDER] ?: return null
+                val right = joints[Joint.RIGHT_SHOULDER] ?: return null
+                left.distanceTo(right) * SHOULDER_TO_TORSO
+            }
+            return scale.takeIf { it.isFinite() && it > 0f }
         }
 
     /** Average elbow bend in degrees. 180 is a straight arm. */
