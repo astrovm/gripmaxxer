@@ -63,6 +63,21 @@ class Comment(unittest.TestCase):
         self.assertIn("A.kt:3  survived: X", self.summary)
         self.assertEqual(self.comment("A.kt:3  survived: X\n", True)[1:], ["api -X PATCH repos/o/r/issues/comments/7"])
 
+    def test_long_results_are_truncated_at_lines_with_a_balanced_fence(self):
+        rows = "".join(f"A.kt:{i}  survived: {'x' * 80}\n" for i in range(2000))
+        self.comment(rows, False)
+        self.assertLessEqual(len(self.body.encode()), 60000)
+        self.assertEqual(self.body.count("```"), 2)
+        self.assertIn("Results truncated.", self.body)
+        self.assertIn("[Full report](https://run)", self.body)
+        self.assertNotIn("A.kt:1999", self.body)
+
+    def test_one_oversized_row_still_reports_truncation(self):
+        calls = self.comment('A.kt:1  survived: ' + 'x' * 70000 + '\n', True)
+        self.assertEqual(calls[1:], ['api -X PATCH repos/o/r/issues/comments/7'])
+        self.assertIn('Results truncated.', self.body)
+        self.assertEqual(self.body.count('```'), 2)
+
     def test_the_comment_goes_once_every_change_is_caught(self):
         self.assertEqual(self.comment("", True)[1:], ["api -X DELETE repos/o/r/issues/comments/7"])
         self.assertEqual(self.comment("", False)[1:], [])

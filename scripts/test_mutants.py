@@ -119,6 +119,13 @@ class Lived(unittest.TestCase):
         file.close()
         return Path(file.name)
 
+    def test_same_line_mutants_remain_distinct(self):
+        report = self.report("""<mutations>
+          <mutation status="SURVIVED"><sourceFile>A.kt</sourceFile><mutatedClass>pkg.A</mutatedClass><mutatedMethod>read</mutatedMethod><methodDescription>()V</methodDescription><lineNumber>10</lineNumber><indexes><index>2</index></indexes><blocks><block>0</block></blocks><description>changed boundary</description></mutation>
+          <mutation status="SURVIVED"><sourceFile>A.kt</sourceFile><mutatedClass>pkg.A</mutatedClass><mutatedMethod>read</mutatedMethod><methodDescription>()V</methodDescription><lineNumber>10</lineNumber><indexes><index>4</index></indexes><blocks><block>0</block></blocks><description>changed boundary</description></mutation>
+        </mutations>""")
+        self.assertEqual(len(set(mutants.lived(report)[0])), 2)
+
     def test_what_no_test_caught_is_listed_by_file_and_line(self):
         report = self.report(
             """<mutations>
@@ -134,9 +141,9 @@ class Lived(unittest.TestCase):
         self.assertEqual(
             rows,
             [
-                "A.kt:2  timed out: loop",
-                "A.kt:12  no coverage: removed call",
-                "B.kt:10  survived: negated conditional",
+                "A.kt:2  timed out: loop [class=None method=NoneNone mutator=None index= block=]",
+                "A.kt:12  no coverage: removed call [class=None method=NoneNone mutator=None index= block=]",
+                "B.kt:10  survived: negated conditional [class=None method=NoneNone mutator=None index= block=]",
             ],
         )
 
@@ -147,7 +154,7 @@ class Lived(unittest.TestCase):
           <mutation status='SURVIVED'><sourceFile>A.kt</sourceFile><lineNumber>9</lineNumber><description>a</description></mutation>
         </mutations>"""
         )
-        self.assertEqual(mutants.lived(report)[0], ["A.kt:9  survived: a", "A.kt:10  survived: b"])
+        self.assertEqual(mutants.lived(report)[0], ["A.kt:9  survived: a [class=None method=NoneNone mutator=None index= block=]", "A.kt:10  survived: b [class=None method=NoneNone mutator=None index= block=]"])
 
     def test_no_report_is_nothing_to_change(self):
         self.assertEqual(mutants.lived(Path("/nonexistent/mutations.xml")), ([], 0))
@@ -193,7 +200,7 @@ class Run(unittest.TestCase):
         self.assertEqual((root / "args").read_text().split()[:2], [":app:pitestDebug", f"-PmutateLines={root}/build/lines.txt"])
         self.assertIn("-PmutateVerbose=true", (root / "args").read_text())
         self.assertEqual((root / "lines-seen").read_text().splitlines(), mutants.part(mutants.all_lines(), 0, 64))
-        self.assertEqual((root / "out/lived.txt").read_text(), "A.kt:3  survived: d\n")
+        self.assertEqual((root / "out/lived.txt").read_text(), "A.kt:3  survived: d [class=None method=NoneNone mutator=None index= block=]\n")
         self.assertEqual((root / "out/tally.txt").read_text(), "1 of 2\n")
 
     def test_pit_finding_nothing_to_change_counts_as_all_caught(self):
