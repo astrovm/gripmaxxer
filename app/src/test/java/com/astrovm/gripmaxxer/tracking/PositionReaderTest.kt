@@ -174,6 +174,65 @@ class PositionReaderTest {
     }
 
     @Test
+    fun barSlackIsAThirdOfATorso() {
+        fun topAt(y: Float) = Poses.pullUpTop.copy(joints = Poses.pullUpTop.joints + mapOf(
+            LEFT_WRIST to Point(190f, y), RIGHT_WRIST to Point(290f, y),
+        ))
+        assertEquals(PEAK, hangingReader().settle(topAt(175f)))
+        assertNull(hangingReader().settle(topAt(176f)))
+    }
+
+    @Test
+    fun squatWithAnklesHiddenRecoversWhenTheyReturn() {
+        val reader = SquatReader()
+        val hidden = Poses.standing.without(Joint.LEFT_ANKLE, Joint.RIGHT_ANKLE)
+        assertNull(reader.read(hidden))
+        assertNull(reader.read(hidden))
+        assertEquals(REST, reader.read(Poses.standing))
+    }
+
+    @Test
+    fun handsAtShoulderHeightAreStillOnTheBar() {
+        val atShoulders = Poses.pullUpTop.copy(joints = Poses.pullUpTop.joints + mapOf(
+            LEFT_SHOULDER to Point(200f, 140f), RIGHT_SHOULDER to Point(280f, 140f),
+            LEFT_HIP to Point(210f, 260f), RIGHT_HIP to Point(270f, 260f),
+        ))
+        assertEquals(PEAK, hangingReader().settle(atShoulders))
+    }
+
+    @Test
+    fun chinAtHandHeightIsNotOverTheBar() {
+        val atHands = Poses.pullUpMiddle.copy(joints = Poses.pullUpMiddle.joints + (NOSE to Point(240f, 140f)))
+        assertNull(hangingReader().settle(atHands))
+    }
+
+    @Test
+    fun legRaiseThresholdsExcludeTheirExactBoundaries() {
+        fun kneesAt(y: Float) = Poses.deadHang.copy(joints = Poses.deadHang.joints + mapOf(
+            LEFT_KNEE to Point(210f, y), RIGHT_KNEE to Point(270f, y),
+        ))
+        fun anklesAt(y: Float): Pose {
+            val noKnees = Poses.deadHang.without(LEFT_KNEE, RIGHT_KNEE)
+            return noKnees.copy(joints = noKnees.joints + mapOf(
+                Joint.LEFT_ANKLE to Point(210f, y), Joint.RIGHT_ANKLE to Point(270f, y),
+            ))
+        }
+        assertNull(LegRaiseReader().read(kneesAt(438f)))
+        assertNull(LegRaiseReader().read(kneesAt(480f)))
+        assertNull(LegRaiseReader().read(anklesAt(462f)))
+        assertNull(LegRaiseReader().read(anklesAt(540f)))
+    }
+
+    @Test
+    fun dipAndPushUpUseDifferentPeakAngles() {
+        val pose = Poses.pose(
+            LEFT_SHOULDER to (200 to 300), LEFT_ELBOW to (200 to 380), LEFT_WRIST to (122 to 397),
+        )
+        assertNull(requireNotNull(PositionReader.forExercise(Exercise.PUSH_UP)).read(pose))
+        assertEquals(PEAK, requireNotNull(PositionReader.forExercise(Exercise.DIP)).read(pose))
+    }
+
+    @Test
     fun squatNeedsLegs() {
         assertNull(SquatReader().read(Poses.standing.without(LEFT_KNEE, RIGHT_KNEE)))
     }
