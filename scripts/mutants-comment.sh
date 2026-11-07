@@ -8,6 +8,11 @@ results=${1:?Usage: scripts/mutants-comment.sh DIR}
 marker='<!-- mutants -->'
 lived=$(cat "$results/lived.txt" 2>/dev/null || true)
 tally=$(cat "$results/tally.txt" 2>/dev/null || echo "0 of 0")
+truncated=''
+if [ "$(printf '%s' "$lived" | wc -c)" -gt 58000 ]; then
+  lived=$(printf '%s\n' "$lived" | LC_ALL=C awk '{ if (size + length($0) + 1 <= 58000 && !full) { print; size += length($0) + 1 } else full = 1 }')
+  truncated='Results truncated. See the run artifact for the full report.'
+fi
 body="$marker
 **Mutation testing:** $tally changes caught by a test.
 
@@ -15,6 +20,7 @@ body="$marker
 $lived
 \`\`\`
 
+$truncated
 Each one is a change to the code no test noticed. Not a blocker: real gaps get their own PR. [Full report]($RUN)"
 [[ -z $lived ]] || printf '%s\n' "$body" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
 [[ ${FORK:-false} != true ]] || exit 0

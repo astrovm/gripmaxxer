@@ -217,6 +217,9 @@ pitest {
 // After the plugin's own setup, which gives the tests only what they compile against.
 afterEvaluate {
     tasks.withType<pl.droidsonroids.gradle.pitest.PitestTask>().configureEach {
+        providers.gradleProperty("mutateLines").orNull?.let {
+            inputs.file(it).withPathSensitivity(PathSensitivity.NONE)
+        }
         // What the unit tests run with, like the app's resources, which Robolectric reads. The app's own
         // classes come from the folders PIT mutates, not the jar the tests get, or PIT finds nothing to mutate.
         additionalClasspath.setFrom(
