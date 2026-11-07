@@ -36,6 +36,13 @@ class BodyScaleReaderTest {
     }
 
     @Test
+    fun shoulderWidthEstimatesScaleWhenHipsAreHidden() {
+        val pose = Poses.deadHang.without(LEFT_HIP, RIGHT_HIP)
+        assertEquals(112f, requireNotNull(pose.bodyScale), 0f)
+        assertNull(pose.without(RIGHT_SHOULDER).bodyScale)
+    }
+
+    @Test
     fun coincidentShouldersCannotEstimateBodyScale() {
         val zero = Poses.deadHang.without(LEFT_HIP, RIGHT_HIP).copy(joints =
             Poses.deadHang.without(LEFT_HIP, RIGHT_HIP).joints + mapOf(
