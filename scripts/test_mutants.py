@@ -141,11 +141,23 @@ class Lived(unittest.TestCase):
         self.assertEqual(
             rows,
             [
+                "A.kt:1  memory error: oom [class=None method=NoneNone mutator=None index= block=]",
                 "A.kt:2  timed out: loop [class=None method=NoneNone mutator=None index= block=]",
                 "A.kt:12  no coverage: removed call [class=None method=NoneNone mutator=None index= block=]",
                 "B.kt:10  survived: negated conditional [class=None method=NoneNone mutator=None index= block=]",
             ],
         )
+
+    def test_every_change_that_was_not_killed_is_listed(self):
+        statuses = ["RUN_ERROR", "NON_VIABLE", "NOT_STARTED", "STARTED"]
+        report = self.report(
+            "<mutations><mutation status='KILLED'><sourceFile>A.kt</sourceFile><lineNumber>1</lineNumber><description>k</description></mutation>"
+            + "".join(f"<mutation status='{s}'><sourceFile>B.kt</sourceFile><lineNumber>{i + 1}</lineNumber><description>d</description></mutation>" for i, s in enumerate(statuses))
+            + "</mutations>"
+        )
+        rows, total = mutants.lived(report)
+        self.assertEqual(total, 5)
+        self.assertEqual([row.split(": ")[0] for row in rows], [f"B.kt:{i + 1}  {s.lower().replace('_', ' ')}" for i, s in enumerate(statuses)])
 
     def test_lines_are_sorted_as_numbers(self):
         report = self.report(

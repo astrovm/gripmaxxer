@@ -24,7 +24,6 @@ ROOT = Path(__file__).resolve().parent.parent
 SOURCES = "app/src/main/java/"
 LINES = ROOT / "app/build/mutants/lines.txt"
 REPORT = ROOT / "app/build/reports/pitest/debug/mutations.xml"
-LIVED = ("SURVIVED", "NO_COVERAGE", "TIMED_OUT")
 
 
 def changed_lines(base, root=ROOT):
@@ -64,12 +63,14 @@ def part(lines, k, n):
 
 
 def lived(report):
-    """What no test caught, "File.kt:12  survived: description", by file and line, and how many changes there were.
+    """What no test killed, "File.kt:12  survived: description", by file and line, and how many changes there were.
+    Anything but KILLED counts: a change that ran out of memory or broke the run was not caught either, and
+    must not vanish from the list while the job says success.
     No report at all means PIT found nothing to change, which is every change caught."""
     if not report.exists():
         return [], 0
     mutations = ET.parse(report).getroot()
-    left = [m for m in mutations if m.get("status") in LIVED]
+    left = [m for m in mutations if m.get("status") != "KILLED"]
     left.sort(key=lambda m: (m.findtext("sourceFile"), int(m.findtext("lineNumber"))))
     rows = [
         f"{m.findtext('sourceFile')}:{m.findtext('lineNumber')}  {m.get('status').lower().replace('_', ' ')}: {m.findtext('description')} [class={m.findtext('mutatedClass')} method={m.findtext('mutatedMethod')}{m.findtext('methodDescription')} mutator={m.findtext('mutator')} index={','.join(e.text for e in m.findall('indexes/index'))} block={','.join(e.text for e in m.findall('blocks/block'))}]"
