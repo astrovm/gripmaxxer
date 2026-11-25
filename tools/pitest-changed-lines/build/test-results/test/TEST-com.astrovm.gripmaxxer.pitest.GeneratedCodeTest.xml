@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.astrovm.gripmaxxer.pitest.GeneratedCodeTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-25T13:19:44.143Z" hostname="mr" time="0.028">
+  <properties/>
+  <testcase name="aMaskKeptInALocalOfItsOwnIsStillCompose" classname="com.astrovm.gripmaxxer.pitest.GeneratedCodeTest" time="0.014"/>
+  <testcase name="whetherACallSuspendedIsKotlins" classname="com.astrovm.gripmaxxer.pitest.GeneratedCodeTest" time="0.001"/>
+  <testcase name="askingTheComposerWhetherToSkipIsCompose" classname="com.astrovm.gripmaxxer.pitest.GeneratedCodeTest" time="0.0"/>
+  <testcase name="aMaskOfWhatChangedIsCompose" classname="com.astrovm.gripmaxxer.pitest.GeneratedCodeTest" time="0.002"/>
+  <testcase name="theAppsOwnNumberIsntCompose" classname="com.astrovm.gripmaxxer.pitest.GeneratedCodeTest" time="0.0"/>
+  <testcase name="whetherAClassIsStableIsCompose" classname="com.astrovm.gripmaxxer.pitest.GeneratedCodeTest" time="0.0"/>
+  <testcase name="whatALambdaGivesBackIsTheApps" classname="com.astrovm.gripmaxxer.pitest.GeneratedCodeTest" time="0.001"/>
+  <testcase name="whatsRememberedIsTheApps" classname="com.astrovm.gripmaxxer.pitest.GeneratedCodeTest" time="0.0"/>
+  <testcase name="anotherClassesInvokeIsntABridge" classname="com.astrovm.gripmaxxer.pitest.GeneratedCodeTest" time="0.0"/>
+  <testcase name="aSuspendLambdasInvokeIsOnlyABridge" classname="com.astrovm.gripmaxxer.pitest.GeneratedCodeTest" time="0.0"/>
+  <testcase name="askingTheAppIsntCompose" classname="com.astrovm.gripmaxxer.pitest.GeneratedCodeTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
